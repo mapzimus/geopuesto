@@ -1,0 +1,1929 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Geopuesto · Antipodal Observation System</title>
+<meta name="description" content="See what's on the exact opposite side of Earth from any location." />
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%230a1218'/%3E%3Ccircle cx='32' cy='50' r='18' fill='%23F26522'/%3E%3Ccircle cx='68' cy='50' r='18' fill='%2300BFA5'/%3E%3Cline x1='50' y1='10' x2='50' y2='90' stroke='url(%23g)' stroke-width='2'/%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23F26522'/%3E%3Cstop offset='1' stop-color='%2300BFA5'/%3E%3C/linearGradient%3E%3C/defs%3E%3C/svg%3E" />
+<meta property="og:title" content="Geopuesto · Antipodal Observation System" />
+<meta property="og:description" content="See what's on the exact opposite side of Earth from any location — with live weather, photos, Street View, satellites overhead, and more." />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="https://maxwellhowegis.com/geopuesto/" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="Geopuesto · Antipodal Observation System" />
+<meta name="twitter:description" content="See what's on the exact opposite side of Earth from any location." />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600;700&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --orange: #F26522;
+    --orange-soft: rgba(242,101,34,0.08);
+    --orange-dim: rgba(242,101,34,0.18);
+    --teal: #00BFA5;
+    --teal-soft: rgba(0,191,165,0.08);
+    --teal-dim: rgba(0,191,165,0.18);
+    --bg: #0a1218;
+    --bg-2: #0e1820;
+    --surface: #14222d;
+    --surface-2: #1a2c39;
+    --border: #1f3344;
+    --border-bright: #2c4459;
+    --text: #d8e0e8;
+    --text-bright: #f5f8fa;
+    --dim: #6c8294;
+    --green: #4ade80;
+    --amber: #fbbf24;
+    --red: #ef4444;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  body::before {
+    content: "";
+    position: fixed; inset: 0;
+    background: repeating-linear-gradient(0deg, transparent 0, transparent 2px, rgba(255,255,255,0.012) 2px, rgba(255,255,255,0.012) 3px);
+    pointer-events: none;
+    z-index: 9999;
+  }
+  .mono { font-family: 'IBM Plex Mono', 'SF Mono', Menlo, Consolas, monospace; }
+
+  /* ============ Console Header ============ */
+  .console-header {
+    position: sticky; top: 0; z-index: 1000;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    padding: 11px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .console-header .lhs { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+  .brand {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 1.15rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    color: var(--text-bright);
+  }
+  .brand .geo { color: var(--orange); }
+  .brand .puesto { color: var(--teal); }
+  .brand .pivot {
+    background: linear-gradient(90deg, var(--orange) 0%, var(--orange) 30%, var(--teal) 70%, var(--teal) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .system-id {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--dim);
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+  }
+  .system-id::before { content: "::"; color: var(--orange); margin-right: 8px; opacity: 0.7; }
+  .status-row {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+  }
+  .status-led { display: inline-flex; align-items: center; gap: 7px; color: var(--dim); }
+  .status-led .dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 8px var(--green);
+    animation: pulseLed 2s infinite;
+  }
+  @keyframes pulseLed { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+  .system-clock {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.78rem;
+    color: var(--text);
+    letter-spacing: 0.05em;
+  }
+
+  /* ============ Map Viewports ============ */
+  .viewport-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    height: 38vh;
+    min-height: 320px;
+    background: var(--bg-2);
+    position: relative;
+    border-bottom: 1px solid var(--border);
+  }
+  .viewport {
+    position: relative;
+    background: #0a1218;
+  }
+  .viewport-header {
+    position: absolute;
+    top: 10px; left: 10px;
+    z-index: 500;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    background: rgba(10,18,24,0.92);
+    padding: 5px 11px;
+    border: 1px solid;
+    border-radius: 1px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    backdrop-filter: blur(4px);
+  }
+  .viewport-header.origin { border-color: var(--orange); color: var(--orange); }
+  .viewport-header.target { border-color: var(--teal); color: var(--teal); }
+  .viewport-header::before { content: "▸"; font-size: 0.7rem; }
+  /* Corner brackets */
+  .viewport::before, .viewport::after {
+    content: "";
+    position: absolute;
+    width: 14px; height: 14px;
+    border-color: var(--border-bright);
+    border-style: solid;
+    z-index: 400;
+    pointer-events: none;
+  }
+  .viewport::before { top: 0; left: 0; border-width: 1px 0 0 1px; }
+  .viewport::after { bottom: 0; right: 0; border-width: 0 1px 1px 0; }
+  .viewport.target::before { top: 0; right: 0; left: auto; border-width: 1px 1px 0 0; }
+  .viewport.target::after { bottom: 0; left: 0; right: auto; border-width: 0 0 1px 1px; }
+  .map { width: 100%; height: 100%; }
+  .divider {
+    position: absolute;
+    top: 0; bottom: 0; left: 50%;
+    width: 1px;
+    background: linear-gradient(var(--orange), var(--teal));
+    z-index: 600;
+    pointer-events: none;
+    transform: translateX(-0.5px);
+  }
+  .divider::before, .divider::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    transform: translateX(-50%);
+  }
+  .divider::before { top: 12px; background: var(--orange); box-shadow: 0 0 8px var(--orange); }
+  .divider::after { bottom: 12px; background: var(--teal); box-shadow: 0 0 8px var(--teal); }
+
+  /* ============ Coordinate Readout (LCD) ============ */
+  .readout-strip {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 20px;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 18px;
+    align-items: center;
+  }
+  .readout-strip[data-empty="true"] { display: none; }
+  .readout { display: flex; flex-direction: column; gap: 3px; }
+  .readout .label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: var(--dim);
+  }
+  .readout.origin .label { color: var(--orange); }
+  .readout.target .label { color: var(--teal); }
+  .readout .value {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 1.05rem;
+    font-weight: 500;
+    color: var(--text-bright);
+    letter-spacing: 0.01em;
+  }
+  .readout.target { text-align: right; }
+  .readout-actions { display: flex; flex-direction: column; gap: 7px; align-items: center; }
+  .swap-btn {
+    background: var(--surface-2);
+    border: 1px solid var(--border-bright);
+    color: var(--text);
+    padding: 7px 16px;
+    border-radius: 1px;
+    cursor: pointer;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    transition: all 0.15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .swap-btn:hover {
+    border-color: var(--orange);
+    color: var(--orange);
+    background: var(--orange-soft);
+  }
+  .swap-btn .arrows { font-size: 0.95rem; opacity: 0.85; }
+  .distance {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.6rem;
+    color: var(--dim);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+
+  /* ============ Input Panel ============ */
+  .input-panel {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 20px 16px;
+  }
+  .tabs {
+    display: flex;
+    gap: 0;
+    margin-bottom: 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .tab {
+    padding: 9px 18px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--dim);
+    cursor: pointer;
+    transition: all 0.15s;
+    margin-bottom: -1px;
+  }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--orange); border-bottom-color: var(--orange); }
+  .tab.tab-action {
+    margin-left: auto;
+    border: 1px solid var(--orange);
+    background: var(--orange-soft);
+    color: var(--orange);
+    border-radius: 1px;
+    margin-bottom: 0;
+  }
+  .tab.tab-action:hover { background: var(--orange-dim); }
+  .tab.tab-action:disabled { opacity: 0.5; cursor: not-allowed; }
+  .panel { display: none; }
+  .panel.active { display: block; }
+  .presets-grid {
+    display: grid;
+    grid-template-rows: repeat(2, auto);
+    grid-auto-flow: column;
+    grid-auto-columns: 200px;
+    gap: 4px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 6px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-bright) var(--surface);
+  }
+  .presets-grid::-webkit-scrollbar { height: 6px; }
+  .presets-grid::-webkit-scrollbar-track { background: var(--surface); }
+  .presets-grid::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 1px; }
+  .presets-grid::-webkit-scrollbar-thumb:hover { background: var(--orange); }
+  .preset {
+    padding: 9px 12px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    cursor: pointer;
+    border-radius: 1px;
+    font-family: inherit;
+    text-align: left;
+    line-height: 1.3;
+    transition: all 0.12s;
+  }
+  .preset .city { font-weight: 500; font-size: 0.85rem; display: block; }
+  .preset .dest {
+    display: block;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.62rem;
+    color: var(--dim);
+    margin-top: 3px;
+    letter-spacing: 0.08em;
+  }
+  .preset .dest::before { content: "→ "; }
+  .preset:hover { background: var(--orange-soft); border-color: var(--orange); }
+  .preset:hover .dest { color: var(--orange); }
+  .preset.active {
+    background: var(--orange-soft);
+    border-color: var(--orange);
+    color: var(--orange);
+  }
+  .preset.active .dest { color: var(--orange); opacity: 0.9; }
+  input[type="text"], input[type="number"] {
+    width: 100%;
+    padding: 11px 14px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.85rem;
+    border-radius: 1px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  input:focus { border-color: var(--orange); }
+  input::placeholder { color: var(--dim); letter-spacing: 0.12em; text-transform: uppercase; font-size: 0.7rem; }
+  .search-wrap { position: relative; }
+  .suggestions {
+    position: absolute;
+    top: 100%; left: 0; right: 0;
+    background: var(--surface-2);
+    border: 1px solid var(--border-bright);
+    border-top: none;
+    z-index: 1000;
+    max-height: 240px;
+    overflow-y: auto;
+  }
+  .suggestion {
+    padding: 10px 14px;
+    font-size: 0.78rem;
+    cursor: pointer;
+    color: var(--dim);
+    border-bottom: 1px solid var(--border);
+  }
+  .suggestion:hover { background: var(--orange-soft); color: var(--text); }
+  .suggestion:last-child { border-bottom: none; }
+  .coord-inputs { display: flex; gap: 6px; }
+  .coord-inputs input { flex: 1; }
+  .btn-go {
+    padding: 11px 22px;
+    background: var(--orange);
+    border: none;
+    color: var(--bg);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    border-radius: 1px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .btn-go:hover { background: #ff7733; }
+
+  /* ============ Cluster (instrument grid) ============ */
+  .cluster {
+    padding: 22px 20px 60px;
+    max-width: 1320px;
+    margin: 0 auto;
+    display: grid;
+    gap: 14px;
+  }
+  .module {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 1px;
+    overflow: hidden;
+  }
+
+  /* Hero — top-of-page headline */
+  .hero-module {
+    border-color: var(--orange);
+    background: linear-gradient(180deg, rgba(242,101,34,0.04), var(--surface) 50%);
+  }
+  .hero-body {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 22px;
+    padding: 22px;
+  }
+  .hero-photo { position: relative; }
+  .hero-photo img {
+    width: 280px; height: 280px;
+    object-fit: cover;
+    border: 1px solid var(--border-bright);
+    display: block;
+  }
+  .hero-photo::before, .hero-photo::after {
+    content: "";
+    position: absolute;
+    width: 12px; height: 12px;
+    border-color: var(--orange);
+    border-style: solid;
+    pointer-events: none;
+  }
+  .hero-photo::before { top: -1px; left: -1px; border-width: 1px 0 0 1px; }
+  .hero-photo::after { bottom: -1px; right: -1px; border-width: 0 1px 1px 0; }
+  .hero-text { display: flex; flex-direction: column; }
+  .hero-title {
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 2.4rem;
+    font-weight: 500;
+    color: var(--text-bright);
+    margin: 0 0 6px;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+  }
+  .hero-subtitle {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.78rem;
+    color: var(--orange);
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    margin-bottom: 18px;
+  }
+  .hero-facts {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin-top: auto;
+  }
+  .hero-fact {
+    display: grid;
+    grid-template-columns: 140px 1fr;
+    gap: 12px;
+    align-items: baseline;
+    padding: 10px 0;
+    border-top: 1px solid var(--border);
+  }
+  .hero-fact:last-child { padding-bottom: 0; }
+  .hero-fact-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.62rem;
+    color: var(--dim);
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+  }
+  .hero-fact-value {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 1.1rem;
+    color: var(--text-bright);
+    font-weight: 500;
+  }
+  .hero-fact-value.huge { font-size: 1.6rem; color: var(--orange); }
+  @media (max-width: 640px) {
+    .hero-body { grid-template-columns: 1fr; }
+    .hero-photo img { width: 100%; height: 240px; }
+    .hero-title { font-size: 1.8rem; }
+    .hero-fact { grid-template-columns: 1fr; gap: 2px; }
+  }
+  .module.full { grid-column: 1 / -1; }
+  .module-header {
+    padding: 9px 16px;
+    background: var(--bg-2);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    letter-spacing: 0.22em;
+    color: var(--dim);
+  }
+  .module-header.orange { color: var(--orange); }
+  .module-header.teal { color: var(--teal); }
+  .module-header::before { content: "::"; opacity: 0.55; margin-right: 9px; }
+  .module-header .meta {
+    font-size: 0.58rem;
+    letter-spacing: 0.18em;
+    color: var(--dim);
+    opacity: 0.7;
+  }
+  .module-header .meta::before { content: ""; margin-right: 0; }
+  .module-body { padding: 0; }
+  .module-body.padded { padding: 14px; }
+
+  /* Telemetry rows */
+  .telemetry {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1px;
+    background: var(--border);
+  }
+  .tel-cell {
+    background: var(--surface);
+    padding: 11px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-height: 60px;
+  }
+  .tel-cell .label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: var(--dim);
+  }
+  .tel-cell .value {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.95rem;
+    color: var(--text-bright);
+    word-break: break-word;
+    font-weight: 500;
+  }
+  .tel-cell .value.text {
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 0.92rem;
+    letter-spacing: 0;
+    font-weight: 400;
+  }
+  .tel-cell .value.big {
+    font-size: 1.4rem;
+    font-weight: 600;
+  }
+  .badge {
+    display: inline-block;
+    padding: 3px 9px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    border: 1px solid;
+    border-radius: 1px;
+  }
+  .badge.land { color: var(--teal); border-color: var(--teal); background: var(--teal-soft); }
+  .badge.ocean { color: #6aaddd; border-color: #4a7ba0; background: rgba(74,123,160,0.06); }
+
+  /* Wikipedia card */
+  .wiki-card {
+    display: grid;
+    grid-template-columns: 160px 1fr;
+    gap: 16px;
+    padding: 16px;
+  }
+  .wiki-card img {
+    width: 160px; height: 160px;
+    object-fit: cover;
+    border: 1px solid var(--border);
+  }
+  .wiki-card h3 {
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 1.2rem;
+    color: var(--text-bright);
+    margin-bottom: 8px;
+    font-weight: 500;
+  }
+  .wiki-card .extract {
+    font-size: 0.88rem;
+    color: var(--text);
+    line-height: 1.6;
+  }
+  .wiki-card .meta-line {
+    margin-top: 12px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.62rem;
+    color: var(--dim);
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+  }
+  @media (max-width: 540px) {
+    .wiki-card { grid-template-columns: 1fr; }
+    .wiki-card img { width: 100%; height: 200px; }
+  }
+
+  /* Photo gallery */
+  .photo-gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 1px;
+    padding: 1px;
+    background: var(--border);
+  }
+  .photo {
+    aspect-ratio: 1 / 1;
+    background: var(--surface-2);
+    cursor: pointer;
+    overflow: hidden;
+    position: relative;
+  }
+  .photo img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: transform 0.2s;
+  }
+  .photo:hover img { transform: scale(1.05); }
+
+  .embed-frame {
+    width: 100%;
+    height: 460px;
+    border: none;
+    background: var(--surface-2);
+    display: block;
+  }
+
+  /* Empty / loading */
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--dim);
+  }
+  .empty-state .empty-icon { font-size: 3rem; opacity: 0.4; margin-bottom: 18px; }
+  .empty-state .question {
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 1.45rem;
+    color: var(--text-bright);
+    margin-bottom: 14px;
+    font-weight: 400;
+    letter-spacing: -0.01em;
+  }
+  .empty-state .instruction {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+  }
+  .loading {
+    text-align: center;
+    padding: 50px 20px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: var(--dim);
+  }
+  .loading::after {
+    content: "...";
+    animation: loadingDots 1.5s steps(4, end) infinite;
+  }
+  @keyframes loadingDots {
+    0%, 20% { content: "."; }
+    40% { content: ".."; }
+    60%, 100% { content: "..."; }
+  }
+  .ocean-note {
+    padding: 16px;
+    background: rgba(74,123,160,0.06);
+    border-left: 2px solid #6aaddd;
+    font-size: 0.88rem;
+    line-height: 1.6;
+  }
+  .ocean-note strong { color: #6aaddd; font-weight: 500; }
+  .config-hint {
+    padding: 12px 16px;
+    background: var(--bg-2);
+    border-top: 1px solid var(--border);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--dim);
+  }
+  .config-hint code {
+    color: var(--orange);
+    background: var(--surface);
+    padding: 2px 5px;
+    text-transform: none;
+    letter-spacing: 0;
+    font-size: 0.7rem;
+  }
+
+  .modal-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.92);
+    z-index: 9999;
+    display: flex; align-items: center; justify-content: center;
+    cursor: zoom-out;
+    padding: 30px;
+  }
+  .modal-img { max-width: 100%; max-height: 100%; }
+
+  /* Leaflet overrides */
+  .leaflet-container { background: #0a1218 !important; font-family: inherit; }
+  .leaflet-control-attribution {
+    font-size: 0.55rem !important;
+    background: rgba(10,18,24,0.85) !important;
+    color: var(--dim) !important;
+    font-family: 'IBM Plex Mono', monospace !important;
+  }
+  .leaflet-control-attribution a { color: var(--dim) !important; }
+  .leaflet-control-zoom a {
+    background: var(--surface-2) !important;
+    color: var(--text) !important;
+    border-color: var(--border) !important;
+    font-family: 'IBM Plex Mono', monospace !important;
+  }
+  .leaflet-control-zoom a:hover {
+    background: var(--orange-soft) !important;
+    color: var(--orange) !important;
+  }
+  .pulse-marker { background: transparent; border: none; }
+  .pulse-marker .dot {
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    border: 2px solid var(--bg);
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+  }
+  .pulse-marker .ring {
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    animation: pulseRing 2.5s infinite;
+  }
+  @keyframes pulseRing {
+    0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0.7; }
+    100% { transform: translate(-50%, -50%) scale(1.6); opacity: 0; }
+  }
+
+  footer {
+    padding: 14px 20px;
+    border-top: 1px solid var(--border);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: var(--dim);
+    text-align: center;
+    background: var(--bg);
+  }
+  footer a { color: var(--dim); text-decoration: none; }
+  footer a:hover { color: var(--orange); }
+
+  @media (max-width: 720px) {
+    .viewport-row { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; height: 56vh; }
+    .divider {
+      left: 0; right: 0; top: 50%; bottom: auto;
+      width: 100%; height: 1px;
+      background: linear-gradient(90deg, var(--orange), var(--teal));
+      transform: translateY(-0.5px);
+    }
+    .divider::before { left: 14px; top: 50%; transform: translate(0, -50%); }
+    .divider::after { left: auto; right: 14px; bottom: auto; top: 50%; transform: translate(0, -50%); }
+    .readout-strip { grid-template-columns: 1fr; gap: 10px; }
+    .readout.target { text-align: left; }
+    .readout-actions { flex-direction: row; }
+  }
+</style>
+</head>
+<body>
+<header class="console-header">
+  <div class="lhs">
+    <span class="brand"><span class="geo">Ge</span><span class="pivot">o</span><span class="puesto">puesto</span></span>
+    <span class="system-id">Antipodal Observation System</span>
+  </div>
+  <div class="status-row">
+    <span class="status-led"><span class="dot"></span> SYS · OK</span>
+    <span class="system-clock" id="systemClock">--:--:-- UTC</span>
+  </div>
+</header>
+
+<div class="viewport-row">
+  <div class="viewport origin">
+    <div class="viewport-header origin">Origin</div>
+    <div id="mapOrigin" class="map"></div>
+  </div>
+  <div class="divider"></div>
+  <div class="viewport target">
+    <div class="viewport-header target">Target / Antipode</div>
+    <div id="mapAntipode" class="map"></div>
+  </div>
+</div>
+
+<div class="readout-strip" id="readoutStrip" data-empty="true">
+  <div class="readout origin">
+    <span class="label">Origin</span>
+    <span class="value" id="originCoords">—</span>
+  </div>
+  <div class="readout-actions">
+    <button class="swap-btn" id="swapBtn" title="Swap origin and target"><span class="arrows">⇄</span> Swap</button>
+    <span class="distance">12,742 km Δ · 20,004 km arc</span>
+  </div>
+  <div class="readout target">
+    <span class="label">Target</span>
+    <span class="value" id="antipodeCoords">—</span>
+  </div>
+</div>
+
+<div class="input-panel">
+  <div class="tabs">
+    <button class="tab active" data-tab="presets">Quick Picks</button>
+    <button class="tab" data-tab="search">Search</button>
+    <button class="tab" data-tab="coords">Coordinates</button>
+    <button class="tab tab-action" id="myLocationBtn" type="button">📍 Use my location</button>
+  </div>
+  <div class="panel active" data-panel="presets">
+    <div class="presets-grid" id="presetsContainer"></div>
+  </div>
+  <div class="panel" data-panel="search">
+    <div class="search-wrap">
+      <input type="text" id="searchInput" placeholder="Type a place name (city, address, landmark)…" autocomplete="off" />
+      <div class="suggestions" id="suggestions" style="display:none;"></div>
+    </div>
+  </div>
+  <div class="panel" data-panel="coords">
+    <div class="coord-inputs">
+      <input type="number" id="latInput" placeholder="LAT" step="any" min="-90" max="90" />
+      <input type="number" id="lngInput" placeholder="LON" step="any" min="-180" max="180" />
+      <button class="btn-go" id="goBtn">Acquire</button>
+    </div>
+  </div>
+</div>
+
+<div class="cluster" id="content">
+  <div class="empty-state">
+    <div class="empty-icon">🌍</div>
+    <div class="question">What's on the opposite side of the Earth?</div>
+    <div class="instruction">Click the map · pick a city · search · enter coordinates</div>
+  </div>
+</div>
+
+<footer>
+  Geopuesto · Open data: OpenStreetMap · Nominatim · Wikipedia · Wikimedia Commons · Open-Meteo · REST Countries · sunrise-sunset · wheretheiss.at
+</footer>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// ============================================================
+//  CONFIG — paste your API keys here to unlock extra modules.
+//  All sections degrade gracefully if a key is missing.
+// ============================================================
+const CONFIG = {
+  // Google Maps Embed API key (for reliable Street View).
+  // https://console.cloud.google.com/apis/credentials  · enable "Maps Embed API"
+  googleMapsApiKey: "AIzaSyBjC4lYi3UHjoeYr2dSQhtvCP_-65NElcM",
+
+  // Mapillary client token (free, community photos).
+  // https://www.mapillary.com/dashboard/developers
+  mapillaryToken: "MLY|26686666157666050|9060300fb68512109843dad9c092dcaa",
+
+  // N2YO API key (free, satellites/debris overhead).
+  // https://www.n2yo.com/api/
+  n2yoApiKey: "JNVZKT-6ZE2PS-EJ9LMS-5QO1",
+
+  // AISStream.io API key (free, live ship positions via WebSocket).
+  // https://aisstream.io/
+  aisstreamToken: "c28d9568988eead5b9bc3055bfe2d1956e1d896a",
+};
+
+const PRESETS = [
+  // East Asia → South America
+  { name: "Beijing", dest: "Argentina", lat: 39.9042, lng: 116.4074 },
+  { name: "Shanghai", dest: "Argentina", lat: 31.2304, lng: 121.4737 },
+  { name: "Hong Kong", dest: "Argentina", lat: 22.3193, lng: 114.1694 },
+  { name: "Macau", dest: "Argentina", lat: 22.1987, lng: 113.5439 },
+  { name: "Guangzhou", dest: "Argentina", lat: 23.1291, lng: 113.2644 },
+  { name: "Shenzhen", dest: "Argentina", lat: 22.5431, lng: 114.0579 },
+  { name: "Chongqing", dest: "Argentina/Chile", lat: 29.5630, lng: 106.5516 },
+  { name: "Wuhan", dest: "Argentina", lat: 30.5928, lng: 114.3055 },
+  { name: "Xi'an", dest: "Chile", lat: 34.3416, lng: 108.9398 },
+  { name: "Chengdu", dest: "Chile coast", lat: 30.5728, lng: 104.0668 },
+  { name: "Kunming", dest: "Off Peru coast", lat: 25.0389, lng: 102.7183 },
+  { name: "Lhasa, Tibet", dest: "Off Chile coast", lat: 29.6520, lng: 91.1721 },
+  { name: "Ulaanbaatar", dest: "Patagonia", lat: 47.8864, lng: 106.9057 },
+  { name: "Seoul", dest: "Off Argentina", lat: 37.5665, lng: 126.9780 },
+  // SE Asia → South America
+  { name: "Taipei", dest: "Paraguay", lat: 25.0330, lng: 121.5654 },
+  { name: "Kaohsiung", dest: "Paraguay", lat: 22.6273, lng: 120.3014 },
+  { name: "Manila", dest: "Bolivia", lat: 14.5995, lng: 120.9842 },
+  { name: "Cebu", dest: "Brazil", lat: 10.3157, lng: 123.8854 },
+  { name: "Davao", dest: "Brazil (Pará)", lat: 7.0731, lng: 125.6128 },
+  { name: "Hanoi", dest: "Off Peru coast", lat: 21.0285, lng: 105.8542 },
+  { name: "Ho Chi Minh City", dest: "Peru", lat: 10.7626, lng: 106.6602 },
+  { name: "Da Nang", dest: "Peru", lat: 16.0544, lng: 108.2022 },
+  { name: "Bangkok", dest: "Off Peru coast", lat: 13.7563, lng: 100.5018 },
+  { name: "Phuket", dest: "Off Peru coast", lat: 7.8804, lng: 98.3923 },
+  { name: "Penang", dest: "Peru", lat: 5.4164, lng: 100.3327 },
+  { name: "Kuala Lumpur", dest: "Ecuador", lat: 3.1390, lng: 101.6869 },
+  { name: "Singapore", dest: "Ecuador (Amazon)", lat: 1.3521, lng: 103.8198 },
+  // Indonesia → S America
+  { name: "Jakarta", dest: "Colombia", lat: -6.2088, lng: 106.8456 },
+  { name: "Bandung", dest: "Colombia", lat: -6.9175, lng: 107.6191 },
+  { name: "Surabaya", dest: "Venezuela", lat: -7.2575, lng: 112.7521 },
+  { name: "Yogyakarta", dest: "Colombia", lat: -7.7956, lng: 110.3695 },
+  { name: "Medan, Sumatra", dest: "Off Peru coast", lat: 3.5952, lng: 98.6722 },
+  { name: "Padang, Sumatra", dest: "Ecuador", lat: -0.9492, lng: 100.3543 },
+  // New Zealand → Iberia
+  { name: "Wellington, NZ", dest: "Spain", lat: -41.2865, lng: 174.7762 },
+  { name: "Auckland, NZ", dest: "Southern Spain", lat: -36.8485, lng: 174.7633 },
+  { name: "Christchurch, NZ", dest: "NW Spain", lat: -43.5321, lng: 172.6362 },
+  { name: "Dunedin, NZ", dest: "Spain (Galicia)", lat: -45.8788, lng: 170.5028 },
+  { name: "Hamilton, New Zealand", dest: "Southern Spain", lat: -37.7870, lng: 175.2793 },
+  { name: "Napier, NZ", dest: "Spain", lat: -39.4928, lng: 176.9120 },
+  { name: "Antipodes Islands", dest: "SW England", lat: -49.6809, lng: 178.7747 },
+  // UK → Antipodes Islands
+  { name: "London", dest: "Antipodes Islands", lat: 51.5074, lng: -0.1278 },
+  { name: "Brighton, UK", dest: "Near Antipodes Islands", lat: 50.8225, lng: -0.1372 },
+  { name: "Cardiff", dest: "Near Antipodes Islands", lat: 51.4816, lng: -3.1791 },
+  // Iberia / SW France → New Zealand
+  { name: "Lisbon", dest: "NZ South Island", lat: 38.7223, lng: -9.1393 },
+  { name: "Porto", dest: "Off NZ coast", lat: 41.1579, lng: -8.6291 },
+  { name: "A Coruña", dest: "NZ South Island", lat: 43.3623, lng: -8.4115 },
+  { name: "Bilbao", dest: "Off NZ coast", lat: 43.2630, lng: -2.9350 },
+  { name: "San Sebastián", dest: "Off NZ coast", lat: 43.3183, lng: -1.9812 },
+  { name: "Coimbra", dest: "Off NZ coast", lat: 40.2033, lng: -8.4103 },
+  { name: "Santiago de Compostela", dest: "Off NZ coast", lat: 42.8782, lng: -8.5448 },
+  { name: "Sevilla", dest: "Near NZ", lat: 37.3891, lng: -5.9845 },
+  { name: "Bordeaux", dest: "Off NZ coast", lat: 44.8378, lng: -0.5792 },
+  // Hawaii → Botswana
+  { name: "Honolulu", dest: "Botswana", lat: 21.3069, lng: -157.8583 },
+  { name: "Hawaii (Big Island)", dest: "Botswana", lat: 19.7297, lng: -155.0900 },
+  { name: "Maui", dest: "Botswana", lat: 20.8893, lng: -156.4729 },
+  // Patagonia / S. Chile → Russia / Mongolia
+  { name: "Cape Horn", dest: "Russian Far East", lat: -55.9833, lng: -67.2667 },
+  { name: "Ushuaia", dest: "Russia (Lake Baikal)", lat: -54.8019, lng: -68.3030 },
+  { name: "Punta Arenas", dest: "Russia", lat: -53.1638, lng: -70.9171 },
+  { name: "Río Gallegos", dest: "Russia/Mongolia", lat: -51.6230, lng: -69.2168 },
+  { name: "Comodoro Rivadavia", dest: "Inner Mongolia", lat: -45.8645, lng: -67.4969 },
+  { name: "Bariloche", dest: "Inner Mongolia", lat: -41.1335, lng: -71.3103 },
+  { name: "Puerto Montt", dest: "Inner Mongolia", lat: -41.4719, lng: -72.9369 },
+  // Argentina/Uruguay/Paraguay → China/E China Sea
+  { name: "Buenos Aires", dest: "East China Sea", lat: -34.6037, lng: -58.3816 },
+  { name: "Montevideo", dest: "Off Korea/China", lat: -34.9011, lng: -56.1645 },
+  { name: "Mendoza", dest: "Central China", lat: -32.8908, lng: -68.8272 },
+  { name: "Córdoba, Argentina", dest: "Central China", lat: -31.4201, lng: -64.1888 },
+  { name: "Rosario", dest: "China coast", lat: -32.9442, lng: -60.6505 },
+  { name: "Santa Fe, Argentina", dest: "China", lat: -31.6107, lng: -60.6973 },
+  { name: "Asunción", dest: "Taiwan", lat: -25.2637, lng: -57.5759 },
+  // Peru / Chile / Bolivia → Vietnam / S China Sea
+  { name: "Lima", dest: "Cambodia/Thailand", lat: -12.0464, lng: -77.0428 },
+  { name: "Cuzco", dest: "Vietnam", lat: -13.5320, lng: -71.9675 },
+  { name: "Arequipa", dest: "Vietnam", lat: -16.4090, lng: -71.5375 },
+  { name: "Iquique, Chile", dest: "Hainan", lat: -20.2208, lng: -70.1431 },
+  { name: "San Pedro de Atacama", dest: "S. China", lat: -22.9117, lng: -68.2003 },
+  { name: "La Paz", dest: "South China Sea", lat: -16.4897, lng: -68.1193 },
+  { name: "Salar de Uyuni", dest: "South China Sea", lat: -20.1338, lng: -67.4891 },
+  { name: "Santa Cruz, Bolivia", dest: "Off Hainan", lat: -17.7833, lng: -63.1821 },
+  // Ecuador / Colombia → Indonesia
+  { name: "Quito", dest: "Sumatra", lat: -0.1807, lng: -78.4678 },
+  { name: "Guayaquil", dest: "Sumatra", lat: -2.1709, lng: -79.9224 },
+  { name: "Bogotá", dest: "Sumatra/Java", lat: 4.7110, lng: -74.0721 },
+  { name: "Medellín", dest: "Sumatra", lat: 6.2442, lng: -75.5812 },
+  { name: "Cali", dest: "Sumatra", lat: 3.4516, lng: -76.5320 },
+  // Brazilian Amazon → Indonesia / Philippines
+  { name: "Manaus", dest: "Sulawesi", lat: -3.1190, lng: -60.0217 },
+  { name: "Belém", dest: "West Papua", lat: -1.4558, lng: -48.5039 },
+  { name: "Macapá", dest: "Halmahera, Indonesia", lat: 0.0349, lng: -51.0694 },
+  // Pacific Islands → Africa / Arabia
+  { name: "Tahiti", dest: "Sudan", lat: -17.5516, lng: -149.5585 },
+  { name: "Bora Bora", dest: "Sudan/Egypt", lat: -16.5004, lng: -151.7415 },
+  { name: "Easter Island", dest: "Pakistan/India border", lat: -27.1469, lng: -109.4267 },
+  { name: "Pitcairn Island", dest: "Saudi Arabia", lat: -25.0667, lng: -130.0991 },
+  { name: "Marquesas Islands", dest: "Somalia/Ethiopia", lat: -9.7806, lng: -139.0497 },
+  { name: "Cook Islands", dest: "Libya/Chad", lat: -21.2076, lng: -159.7711 },
+  { name: "Tonga (Nuku'alofa)", dest: "Algeria/Mali", lat: -21.1336, lng: -175.2049 },
+  { name: "Samoa (Apia)", dest: "Niger", lat: -13.8333, lng: -171.7667 },
+  { name: "Fiji (Suva)", dest: "Burkina Faso", lat: -18.1248, lng: 178.4501 },
+  { name: "Niue", dest: "Niger", lat: -19.0544, lng: -169.8672 },
+  { name: "Vanuatu (Port Vila)", dest: "Mauritania/Mali", lat: -17.7333, lng: 168.3219 },
+  { name: "Palau (Koror)", dest: "Brazil (Pará)", lat: 7.3437, lng: 134.4787 },
+  // Central America / Caribbean → Indonesia / Australia
+  { name: "Panama City", dest: "Off Sumatra", lat: 8.9824, lng: -79.5199 },
+  { name: "San José, Costa Rica", dest: "Off Sumatra", lat: 9.9281, lng: -84.0907 },
+  { name: "Puerto Rico (San Juan)", dest: "Off NW Australia", lat: 18.4655, lng: -66.1057 },
+  { name: "Bermuda", dest: "Perth, Australia", lat: 32.2949, lng: -64.7813 },
+  // Australia → Atlantic (near Bermuda)
+  { name: "Perth, Australia", dest: "Bermuda", lat: -31.9505, lng: 115.8605 },
+  { name: "Geraldton, Australia", dest: "Off Bermuda", lat: -28.7774, lng: 114.6149 },
+  // Falkland Islands → Russian Far East
+  { name: "Falkland Islands", dest: "Russian Far East", lat: -51.6938, lng: -57.8519 },
+];
+
+// Esri Dark Gray Canvas — fits the Mission Control aesthetic
+const BASE_URL = "https://services.arcgisonline.com/arcgis/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}";
+const BASE_ATTR = 'Tiles &copy; <a href="https://www.esri.com">Esri</a>, HERE, Garmin, &copy; OpenStreetMap contributors';
+const LABEL_URL = "https://services.arcgisonline.com/arcgis/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}";
+
+const mapOrigin = L.map("mapOrigin", { worldCopyJump: true }).setView([20, 0], 2);
+const mapAntipode = L.map("mapAntipode", { worldCopyJump: true }).setView([-20, 180], 2);
+L.tileLayer(BASE_URL, { attribution: BASE_ATTR, maxZoom: 16 }).addTo(mapOrigin);
+L.tileLayer(LABEL_URL, { maxZoom: 16, opacity: 0.85, attribution: "" }).addTo(mapOrigin);
+L.tileLayer(BASE_URL, { attribution: BASE_ATTR, maxZoom: 16 }).addTo(mapAntipode);
+L.tileLayer(LABEL_URL, { maxZoom: 16, opacity: 0.85, attribution: "" }).addTo(mapAntipode);
+
+let originMarker = null, antipodeMarker = null;
+let activePresetName = null;
+let currentAnti = null;
+
+function makeMarker(color) {
+  return L.divIcon({
+    className: "pulse-marker",
+    html: `<div class="ring" style="background:${color};opacity:0.5;"></div><div class="dot" style="background:${color};"></div>`,
+    iconSize: [30, 30], iconAnchor: [15, 15],
+  });
+}
+
+mapOrigin.on("click", (e) => {
+  activePresetName = null;
+  renderPresets();
+  goTo(e.latlng.lat, e.latlng.lng);
+});
+
+function calcAntipode(lat, lng) {
+  return { lat: -lat, lng: lng > 0 ? lng - 180 : lng + 180 };
+}
+function fmt(n, dirs) { return Math.abs(n).toFixed(4) + "°" + (n >= 0 ? dirs[0] : dirs[1]); }
+function fmtCoord(lat, lng) { return fmt(lat, "NS") + ", " + fmt(lng, "EW"); }
+function getOcean(lat, lng) {
+  if (lat < -60) return "Southern Ocean";
+  if (lat > 65) return "Arctic Ocean";
+  if (lng >= 20 && lng <= 146 && lat >= -38 && lat <= 30) return "Indian Ocean";
+  if (lng >= -80 && lng <= 20 && lat >= -60) return "Atlantic Ocean";
+  return "Pacific Ocean";
+}
+function escapeHtml(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+function stripHtml(s) {
+  const d = document.createElement("div");
+  d.innerHTML = s || "";
+  return d.textContent || "";
+}
+function haversine(lat1, lng1, lat2, lng2) {
+  const R = 6371;
+  const toRad = d => d * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng/2)**2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+async function reverseGeocode(lat, lng) {
+  try {
+    const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=jsonv2&zoom=14&addressdetails=1&accept-language=en`;
+    const r = await fetch(url);
+    if (!r.ok) return null;
+    const d = await r.json();
+    return d.error ? null : d;
+  } catch { return null; }
+}
+async function searchPlace(q) {
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=jsonv2&limit=6&accept-language=en`;
+    const r = await fetch(url);
+    return r.ok ? await r.json() : [];
+  } catch { return []; }
+}
+
+async function checkNearby(lat, lng) {
+  const wikiUrl = `https://en.wikipedia.org/w/api.php?action=query&list=geosearch&gscoord=${lat}%7C${lng}&gsradius=10000&gslimit=1&format=json&origin=*`;
+  const commonsUrl = `https://commons.wikimedia.org/w/api.php?action=query&list=geosearch&gscoord=${lat}%7C${lng}&gsradius=5000&gslimit=12&gsnamespace=6&format=json&origin=*`;
+  const [wiki, commons] = await Promise.all([
+    fetch(wikiUrl).then(r => r.ok ? r.json() : null).catch(() => null),
+    fetch(commonsUrl).then(r => r.ok ? r.json() : null).catch(() => null),
+  ]);
+  return {
+    wikipedia: (wiki && wiki.query && wiki.query.geosearch && wiki.query.geosearch[0]) || null,
+    commonsTitles: (commons && commons.query && commons.query.geosearch || []).map(g => g.title),
+  };
+}
+
+async function fetchWikipediaSummary(pageid) {
+  try {
+    const tUrl = `https://en.wikipedia.org/w/api.php?action=query&pageids=${pageid}&format=json&origin=*`;
+    const tr = await fetch(tUrl);
+    if (!tr.ok) return null;
+    const td = await tr.json();
+    const page = td.query && td.query.pages && td.query.pages[pageid];
+    if (!page || !page.title) return null;
+    const sUrl = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(page.title)}`;
+    const sr = await fetch(sUrl);
+    if (!sr.ok) return null;
+    return await sr.json();
+  } catch { return null; }
+}
+
+async function fetchPhotoUrls(titles) {
+  if (!titles || !titles.length) return [];
+  try {
+    const url = `https://commons.wikimedia.org/w/api.php?action=query&titles=${encodeURIComponent(titles.join("|"))}&prop=imageinfo&iiprop=url|extmetadata&iiurlwidth=400&format=json&origin=*`;
+    const r = await fetch(url);
+    if (!r.ok) return [];
+    const d = await r.json();
+    const pages = (d.query && d.query.pages) || {};
+    return Object.values(pages).map(p => {
+      const ii = p.imageinfo && p.imageinfo[0];
+      if (!ii || !ii.thumburl) return null;
+      return { title: p.title, thumb: ii.thumburl, full: ii.url };
+    }).filter(Boolean);
+  } catch { return []; }
+}
+
+async function fetchSunTimes(lat, lng) {
+  try {
+    const r = await fetch(`https://api.sunrise-sunset.org/json?lat=${lat}&lng=${lng}&formatted=0`);
+    if (!r.ok) return null;
+    const d = await r.json();
+    return d.results || null;
+  } catch { return null; }
+}
+
+async function fetchWeather(lat, lng) {
+  try {
+    const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,is_day&temperature_unit=celsius&wind_speed_unit=kmh`);
+    if (!r.ok) return null;
+    const d = await r.json();
+    return d.current || null;
+  } catch { return null; }
+}
+
+async function fetchCountry(cca2) {
+  if (!cca2) return null;
+  try {
+    const r = await fetch(`https://restcountries.com/v3.1/alpha/${cca2}?fields=name,flag,capital,languages,currencies,population,region,subregion,timezones`);
+    if (!r.ok) return null;
+    const d = await r.json();
+    return Array.isArray(d) ? d[0] : d;
+  } catch { return null; }
+}
+
+async function fetchMapillaryImage(lat, lng) {
+  if (!CONFIG.mapillaryToken) return null;
+  // Tiered bbox search — 50 km, 250 km, 1000 km
+  const tiers = [50, 250, 1000];
+  for (const km of tiers) {
+    const dLat = km / 111;
+    const dLng = km / Math.max(0.1, 111 * Math.cos(lat * Math.PI / 180));
+    const minLng = lng - dLng;
+    const minLat = Math.max(-89, lat - dLat);
+    const maxLng = lng + dLng;
+    const maxLat = Math.min(89, lat + dLat);
+    try {
+      const url = `https://graph.mapillary.com/images?fields=id,thumb_2048_url,captured_at,geometry&bbox=${minLng},${minLat},${maxLng},${maxLat}&limit=15&access_token=${CONFIG.mapillaryToken}`;
+      const r = await fetch(url);
+      if (!r.ok) continue;
+      const d = await r.json();
+      if (d.data && d.data.length) {
+        let best = null;
+        for (const img of d.data) {
+          if (img.geometry && img.geometry.coordinates) {
+            const dist = haversine(lat, lng, img.geometry.coordinates[1], img.geometry.coordinates[0]);
+            if (!best || dist < best.distKm) best = { ...img, distKm: dist };
+          }
+        }
+        if (best) return best;
+      }
+    } catch {}
+  }
+  return null;
+}
+
+// Reference landmarks for "nearest land" lookup over ocean
+const LANDMARKS = [
+  ["Reykjavík", 64.13, -21.94], ["Nuuk", 64.18, -51.74], ["St. John's, NL", 47.56, -52.71],
+  ["New York", 40.71, -74.01], ["Miami", 25.76, -80.19], ["Bermuda", 32.30, -64.78],
+  ["Havana", 23.13, -82.36], ["Caracas", 10.49, -66.88], ["Belém, Brazil", -1.46, -48.50],
+  ["Recife", -8.05, -34.88], ["Rio de Janeiro", -22.91, -43.17], ["Buenos Aires", -34.60, -58.38],
+  ["Falkland Islands", -51.69, -57.85], ["Ushuaia", -54.80, -68.30], ["Punta Arenas", -53.16, -70.92],
+  ["Valparaíso, Chile", -33.05, -71.61], ["Lima", -12.05, -77.04], ["Galápagos", -0.74, -90.32],
+  ["Panama City", 8.98, -79.52], ["Acapulco", 16.86, -99.88], ["San Francisco", 37.77, -122.42],
+  ["Vancouver", 49.28, -123.12], ["Anchorage", 61.22, -149.90], ["Honolulu", 21.31, -157.86],
+  ["Hawaii (Big Island)", 19.70, -155.10], ["Tahiti", -17.55, -149.56], ["Easter Island", -27.15, -109.43],
+  ["Pitcairn Island", -25.07, -130.10], ["Marquesas Islands", -9.78, -139.05], ["Cook Islands", -21.21, -159.77],
+  ["Samoa", -13.83, -171.77], ["Tonga", -21.13, -175.20], ["Fiji", -18.12, 178.45],
+  ["New Caledonia", -22.27, 166.45], ["Auckland, NZ", -36.85, 174.76], ["Sydney", -33.87, 151.21],
+  ["Brisbane", -27.47, 153.03], ["Cairns", -16.92, 145.78], ["Darwin", -12.46, 130.84],
+  ["Perth", -31.95, 115.86], ["Singapore", 1.35, 103.82], ["Manila", 14.60, 120.98],
+  ["Taipei", 25.03, 121.57], ["Hong Kong", 22.32, 114.17], ["Shanghai", 31.23, 121.47],
+  ["Tokyo", 35.68, 139.65], ["Sapporo", 43.06, 141.35], ["Vladivostok", 43.13, 131.90],
+  ["Petropavlovsk-Kamchatsky", 53.02, 158.65], ["Mumbai", 19.08, 72.88], ["Colombo", 6.93, 79.86],
+  ["Karachi", 24.86, 67.01], ["Dubai", 25.20, 55.27], ["Aden", 12.78, 45.04],
+  ["Mogadishu", 2.05, 45.32], ["Mombasa", -4.04, 39.67], ["Antananarivo", -18.88, 47.51],
+  ["Mauritius", -20.35, 57.55], ["Cape Town", -33.92, 18.42], ["Walvis Bay", -22.96, 14.51],
+  ["Luanda", -8.84, 13.23], ["Lagos", 6.45, 3.40], ["Dakar", 14.72, -17.47],
+  ["Casablanca", 33.57, -7.59], ["Lisbon", 38.72, -9.14], ["London", 51.51, -0.13],
+  ["Oslo", 59.91, 10.75], ["Murmansk", 68.97, 33.07], ["Helsinki", 60.17, 24.94],
+  ["Saint Helena", -15.96, -5.70], ["Tristan da Cunha", -37.07, -12.31],
+  ["Antarctic Peninsula", -65.00, -64.00], ["McMurdo Station", -77.85, 166.67],
+  ["Svalbard", 78.22, 15.65],
+];
+
+function nearestLandmark(lat, lng) {
+  let best = null;
+  for (const [name, la, ln] of LANDMARKS) {
+    const d = haversine(lat, lng, la, ln);
+    if (!best || d < best.dist) best = { name, lat: la, lng: ln, dist: d };
+  }
+  return best;
+}
+
+async function fetchGoogleTimezone(lat, lng) {
+  if (!CONFIG.googleMapsApiKey) return null;
+  try {
+    const ts = Math.floor(Date.now() / 1000);
+    const r = await fetch(`https://maps.googleapis.com/maps/api/timezone/json?location=${lat},${lng}&timestamp=${ts}&key=${CONFIG.googleMapsApiKey}`);
+    if (!r.ok) return null;
+    const d = await r.json();
+    return d.status === "OK" ? d : null;
+  } catch { return null; }
+}
+
+async function fetchGoogleElevation(lat, lng) {
+  if (!CONFIG.googleMapsApiKey) return null;
+  try {
+    const r = await fetch(`https://maps.googleapis.com/maps/api/elevation/json?locations=${lat},${lng}&key=${CONFIG.googleMapsApiKey}`);
+    if (!r.ok) return null;
+    const d = await r.json();
+    return (d.status === "OK" && d.results && d.results[0]) ? d.results[0] : null;
+  } catch { return null; }
+}
+
+async function fetchISS() {
+  try {
+    const r = await fetch("https://api.wheretheiss.at/v1/satellites/25544");
+    if (!r.ok) return null;
+    return await r.json();
+  } catch { return null; }
+}
+
+async function fetchOpenSkyFlights(lat, lng) {
+  // ~200km bounding box
+  const dLat = 200 / 111;
+  const dLng = 200 / Math.max(0.1, 111 * Math.cos(lat * Math.PI / 180));
+  const lamin = Math.max(-90, lat - dLat);
+  const lamax = Math.min(90, lat + dLat);
+  const lomin = lng - dLng;
+  const lomax = lng + dLng;
+  try {
+    const r = await fetch(`https://opensky-network.org/api/states/all?lamin=${lamin}&lomin=${lomin}&lamax=${lamax}&lomax=${lomax}`);
+    if (!r.ok) return null;
+    const d = await r.json();
+    if (!d.states) return [];
+    // Map to objects, filter to airborne, compute distance
+    return d.states.map(s => ({
+      icao24: s[0],
+      callsign: (s[1] || "").trim(),
+      country: s[2],
+      lng: s[5],
+      lat: s[6],
+      onGround: s[8],
+      velocity: s[9],
+      heading: s[10],
+      altitude: s[13] || s[7],
+    })).filter(f => f.lat != null && f.lng != null && !f.onGround)
+      .map(f => ({ ...f, distKm: haversine(lat, lng, f.lat, f.lng) }))
+      .sort((a, b) => a.distKm - b.distKm);
+  } catch { return null; }
+}
+
+function fetchAISShips(lat, lng) {
+  return new Promise((resolve) => {
+    if (!CONFIG.aisstreamToken) { resolve([]); return; }
+    const dLat = 1.8;
+    const dLng = 1.8 / Math.max(0.2, Math.cos(lat * Math.PI / 180));
+    let ws;
+    try { ws = new WebSocket("wss://stream.aisstream.io/v0/stream"); }
+    catch { resolve([]); return; }
+    const ships = new Map();
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      try { ws.close(); } catch {}
+      const arr = [...ships.values()].map(s => ({ ...s, distKm: haversine(lat, lng, s.lat, s.lng) }))
+        .sort((a, b) => a.distKm - b.distKm);
+      resolve(arr);
+    };
+    const timeout = setTimeout(finish, 8000);
+    ws.onopen = () => {
+      try {
+        ws.send(JSON.stringify({
+          APIKey: CONFIG.aisstreamToken,
+          BoundingBoxes: [[[lat - dLat, lng - dLng], [lat + dLat, lng + dLng]]],
+        }));
+      } catch { clearTimeout(timeout); finish(); }
+    };
+    ws.onmessage = (e) => {
+      try {
+        const m = JSON.parse(e.data);
+        if (m.MessageType === "PositionReport" && m.MetaData) {
+          const md = m.MetaData;
+          if (typeof md.latitude === "number" && typeof md.longitude === "number") {
+            ships.set(md.MMSI, {
+              mmsi: md.MMSI,
+              name: (md.ShipName || "").trim() || `MMSI ${md.MMSI}`,
+              lat: md.latitude,
+              lng: md.longitude,
+              time: md.time_utc,
+            });
+          }
+        }
+      } catch {}
+    };
+    ws.onerror = () => { clearTimeout(timeout); finish(); };
+    ws.onclose = () => { clearTimeout(timeout); finish(); };
+  });
+}
+
+function bearing(lat1, lng1, lat2, lng2) {
+  const toRad = d => d * Math.PI / 180;
+  const toDeg = r => r * 180 / Math.PI;
+  const φ1 = toRad(lat1), φ2 = toRad(lat2);
+  const Δλ = toRad(lng2 - lng1);
+  const y = Math.sin(Δλ) * Math.cos(φ2);
+  const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+  return (toDeg(Math.atan2(y, x)) + 360) % 360;
+}
+function compass(deg) {
+  const dirs = ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"];
+  return dirs[Math.round(deg / 22.5) % 16];
+}
+
+async function fetchSatellitesAbove(lat, lng) {
+  if (!CONFIG.n2yoApiKey) return null;
+  try {
+    const url = `https://api.n2yo.com/rest/v1/satellite/above/${lat}/${lng}/0/70/0/&apiKey=${CONFIG.n2yoApiKey}`;
+    const r = await fetch(url);
+    if (!r.ok) return null;
+    return await r.json();
+  } catch { return null; }
+}
+
+const WEATHER_CODES = {
+  0: "Clear sky", 1: "Mainly clear", 2: "Partly cloudy", 3: "Overcast",
+  45: "Fog", 48: "Rime fog",
+  51: "Light drizzle", 53: "Drizzle", 55: "Heavy drizzle",
+  56: "Freezing drizzle", 57: "Heavy freezing drizzle",
+  61: "Light rain", 63: "Rain", 65: "Heavy rain",
+  66: "Freezing rain", 67: "Heavy freezing rain",
+  71: "Light snow", 73: "Snow", 75: "Heavy snow",
+  77: "Snow grains",
+  80: "Rain showers", 81: "Heavy showers", 82: "Violent showers",
+  85: "Snow showers", 86: "Heavy snow showers",
+  95: "Thunderstorm", 96: "Thunderstorm with hail", 99: "Severe thunderstorm",
+};
+
+function localSolarTime(lng) {
+  const utcMs = Date.now();
+  const localMs = utcMs + (lng / 15) * 3600 * 1000;
+  const d = new Date(localMs);
+  const hh = String(d.getUTCHours()).padStart(2, "0");
+  const mm = String(d.getUTCMinutes()).padStart(2, "0");
+  return { timeStr: `${hh}:${mm}`, hours: d.getUTCHours() };
+}
+function utcToSolarLocal(utcStr, lng) {
+  const utc = new Date(utcStr);
+  if (isNaN(utc)) return "—";
+  const local = new Date(utc.getTime() + (lng / 15) * 3600 * 1000);
+  const hh = String(local.getUTCHours()).padStart(2, "0");
+  const mm = String(local.getUTCMinutes()).padStart(2, "0");
+  return `${hh}:${mm}`;
+}
+
+async function goTo(lat, lng) {
+  lat = Math.max(-90, Math.min(90, lat));
+  lng = ((lng + 540) % 360) - 180;
+  const anti = calcAntipode(lat, lng);
+  currentAnti = anti;
+
+  if (originMarker) mapOrigin.removeLayer(originMarker);
+  if (antipodeMarker) mapAntipode.removeLayer(antipodeMarker);
+  originMarker = L.marker([lat, lng], { icon: makeMarker("#F26522") }).addTo(mapOrigin);
+  antipodeMarker = L.marker([anti.lat, anti.lng], { icon: makeMarker("#00BFA5") }).addTo(mapAntipode);
+  mapOrigin.flyTo([lat, lng], 6, { duration: 0.8 });
+  mapAntipode.flyTo([anti.lat, anti.lng], 6, { duration: 0.8 });
+
+  document.getElementById("readoutStrip").dataset.empty = "false";
+  document.getElementById("originCoords").textContent = fmtCoord(lat, lng);
+  document.getElementById("antipodeCoords").textContent = fmtCoord(anti.lat, anti.lng);
+
+  document.getElementById("content").innerHTML = '<div class="loading">Tunneling through the Earth</div>';
+
+  const [data, nearby, sun, weather, mapillary, iss, sats, flights, gtz, gelev] = await Promise.all([
+    reverseGeocode(anti.lat, anti.lng),
+    checkNearby(anti.lat, anti.lng),
+    fetchSunTimes(anti.lat, anti.lng),
+    fetchWeather(anti.lat, anti.lng),
+    fetchMapillaryImage(anti.lat, anti.lng),
+    fetchISS(),
+    fetchSatellitesAbove(anti.lat, anti.lng),
+    fetchOpenSkyFlights(anti.lat, anti.lng),
+    fetchGoogleTimezone(anti.lat, anti.lng),
+    fetchGoogleElevation(anti.lat, anti.lng),
+  ]);
+
+  const wikiPromise = nearby.wikipedia ? fetchWikipediaSummary(nearby.wikipedia.pageid) : Promise.resolve(null);
+  const photosPromise = nearby.commonsTitles.length ? fetchPhotoUrls(nearby.commonsTitles.slice(0, 12)) : Promise.resolve([]);
+  const cca2 = data && data.address && data.address.country_code;
+  const countryPromise = cca2 ? fetchCountry(cca2) : Promise.resolve(null);
+  // AIS WebSocket runs ~8s in parallel with the rest
+  const shipsPromise = fetchAISShips(anti.lat, anti.lng);
+
+  renderInfo(anti.lat, anti.lng, data, nearby, null, null, sun, weather, null, mapillary, iss, sats, flights, null, gtz, gelev);
+  const [wikiSummary, photos, country, ships] = await Promise.all([wikiPromise, photosPromise, countryPromise, shipsPromise]);
+  renderInfo(anti.lat, anti.lng, data, nearby, wikiSummary, photos, sun, weather, country, mapillary, iss, sats, flights, ships, gtz, gelev);
+}
+
+function tcell(label, value, klass = "") {
+  return `<div class="tel-cell"><span class="label">${label}</span><div class="value ${klass}">${value}</div></div>`;
+}
+
+function renderInfo(lat, lng, data, nearby, wikiSummary, photos, sun, weather, country, mapillary, iss, sats, flights, ships, gtz, gelev) {
+  const isLand = !!(data && data.address && data.address.country);
+  const addr = (data && data.address) || {};
+  const surfaceBadge = isLand ? '<span class="badge land">LAND</span>' : '<span class="badge ocean">OCEAN</span>';
+  const place = data && data.name && data.name !== addr.country ? data.name : null;
+
+  // ============ Module: Position / Address ============
+  const land = !isLand ? nearestLandmark(lat, lng) : null;
+  const posCells = [
+    tcell("Surface", surfaceBadge),
+    !isLand && land ? tcell("Nearest land", `${escapeHtml(land.name)} · ${Math.round(land.dist).toLocaleString()} km ${compass(bearing(lat, lng, land.lat, land.lng))}`, "text") : null,
+    place ? tcell("Place", escapeHtml(place), "text") : null,
+    addr.building || addr.amenity || addr.shop || addr.tourism || addr.historic ? tcell("Building / POI", escapeHtml(addr.building || addr.amenity || addr.shop || addr.tourism || addr.historic), "text") : null,
+    addr.road ? tcell("Road", escapeHtml(addr.road), "text") : null,
+    addr.suburb || addr.neighbourhood ? tcell("Neighborhood", escapeHtml(addr.suburb || addr.neighbourhood), "text") : null,
+    addr.city || addr.town || addr.village || addr.hamlet ? tcell("City / Town", escapeHtml(addr.city || addr.town || addr.village || addr.hamlet), "text") : null,
+    addr.municipality || addr.county ? tcell("Municipality", escapeHtml(addr.municipality || addr.county), "text") : null,
+    addr.state || addr.region ? tcell("State / Region", escapeHtml(addr.state || addr.region), "text") : null,
+    addr.country ? tcell("Country", escapeHtml(addr.country), "text") : null,
+    addr.postcode ? tcell("Postcode", escapeHtml(addr.postcode)) : null,
+  ].filter(Boolean);
+
+  const positionModule = `
+    <div class="module full">
+      <div class="module-header"><span>Position</span><span class="meta">Reverse-geocoded · Nominatim</span></div>
+      <div class="module-body">
+        <div class="telemetry">${posCells.join("")}</div>
+        ${!isLand ? `<div class="ocean-note">${data === null ? "Geocoding service unreachable. Likely open ocean." : `This point falls in the <strong>${getOcean(lat, lng)}</strong>. ~71% of Earth is water; only ~4% of land has a land antipode.`}</div>` : ""}
+      </div>
+    </div>`;
+
+  // ============ Module: Right Now Over There ============
+  // Prefer Google Time Zone (political tz) over solar-time fallback
+  let timeStr, tzLabel;
+  if (gtz && gtz.timeZoneId) {
+    const offsetSec = (gtz.rawOffset || 0) + (gtz.dstOffset || 0);
+    const local = new Date(Date.now() + offsetSec * 1000);
+    timeStr = String(local.getUTCHours()).padStart(2, "0") + ":" + String(local.getUTCMinutes()).padStart(2, "0");
+    const offsetHrs = offsetSec / 3600;
+    const sign = offsetHrs >= 0 ? "+" : "−";
+    const absH = Math.abs(offsetHrs);
+    const wholeH = Math.floor(absH);
+    const mins = Math.round((absH - wholeH) * 60);
+    tzLabel = `${gtz.timeZoneName || gtz.timeZoneId} · UTC${sign}${wholeH}${mins ? ":" + String(mins).padStart(2, "0") : ""}`;
+  } else {
+    const t = localSolarTime(lng);
+    timeStr = t.timeStr;
+    tzLabel = "Solar time (approx)";
+  }
+  let dayNight = "";
+  if (weather && typeof weather.is_day !== "undefined") {
+    dayNight = weather.is_day ? "Daytime" : "Nighttime";
+  } else if (sun && sun.sunrise && sun.sunset) {
+    const now = Date.now();
+    dayNight = (now > new Date(sun.sunrise).getTime() && now < new Date(sun.sunset).getTime()) ? "Daytime" : "Nighttime";
+  } else {
+    const hours = parseInt(timeStr.split(":")[0]);
+    dayNight = (hours >= 6 && hours < 19) ? "Daytime" : "Nighttime";
+  }
+  const rightNowCells = [
+    tcell("Local time", `${timeStr} <span style="opacity:0.55">· ${dayNight}</span>`, "big"),
+    tcell("Time zone", escapeHtml(tzLabel), "text"),
+    sun && sun.sunrise ? tcell("Sunrise", utcToSolarLocal(sun.sunrise, lng)) : null,
+    sun && sun.sunset ? tcell("Sunset", utcToSolarLocal(sun.sunset, lng)) : null,
+    gelev && gelev.elevation != null ? tcell("Elevation", `${Math.round(gelev.elevation).toLocaleString()} m / ${Math.round(gelev.elevation * 3.28084).toLocaleString()} ft`) : null,
+    weather && weather.temperature_2m != null ? tcell("Temperature", `${Math.round(weather.temperature_2m)}°C / ${Math.round(weather.temperature_2m * 9/5 + 32)}°F`) : null,
+    weather && weather.weather_code != null ? tcell("Conditions", WEATHER_CODES[weather.weather_code] || "—", "text") : null,
+    weather && weather.wind_speed_10m != null ? tcell("Wind", `${Math.round(weather.wind_speed_10m)} km/h`) : null,
+    weather && weather.relative_humidity_2m != null ? tcell("Humidity", `${weather.relative_humidity_2m}%`) : null,
+  ].filter(Boolean);
+  const rightNowModule = `
+    <div class="module full">
+      <div class="module-header orange"><span>Right Now Over There</span><span class="meta">Open-Meteo · sunrise-sunset.org</span></div>
+      <div class="module-body"><div class="telemetry">${rightNowCells.join("")}</div></div>
+    </div>`;
+
+  // ============ Module: Overhead ============
+  const overheadCells = [];
+  if (iss && typeof iss.latitude === "number") {
+    const dKm = haversine(lat, lng, iss.latitude, iss.longitude);
+    const overhead = dKm < 1500;
+    overheadCells.push(tcell("ISS distance", `${Math.round(dKm).toLocaleString()} km`, "big"));
+    overheadCells.push(tcell("ISS status", overhead ? "Overhead" : "Not overhead", "text"));
+    overheadCells.push(tcell("ISS altitude", `${Math.round(iss.altitude)} km`));
+    overheadCells.push(tcell("ISS speed", `${Math.round(iss.velocity).toLocaleString()} km/h`));
+  }
+  if (sats && sats.info && Array.isArray(sats.above)) {
+    overheadCells.push(tcell("Tracked above", `${sats.info.satcount}`, "big"));
+    const top = sats.above.slice(0, 6).map(s => s.satname).join(", ");
+    if (top) overheadCells.push(tcell("Examples", top, "text"));
+  }
+  const overheadModule = overheadCells.length ? `
+    <div class="module full">
+      <div class="module-header teal"><span>Overhead Right Now</span><span class="meta">wheretheiss.at${CONFIG.n2yoApiKey ? " · N2YO" : ""}</span></div>
+      <div class="module-body">
+        <div class="telemetry">${overheadCells.join("")}</div>
+        ${!CONFIG.n2yoApiKey ? `<div class="config-hint">Add an N2YO key to <code>CONFIG.n2yoApiKey</code> for live satellite & debris counts.</div>` : ""}
+      </div>
+    </div>` : "";
+
+  // ============ Module: Aircraft Overhead (OpenSky) ============
+  let aircraftModule = "";
+  if (Array.isArray(flights)) {
+    if (flights.length === 0) {
+      aircraftModule = `
+        <div class="module full">
+          <div class="module-header"><span>Aircraft Overhead</span><span class="meta">OpenSky Network · 200 km radius</span></div>
+          <div class="module-body padded"><div style="font-family:'IBM Plex Mono',monospace;font-size:0.78rem;color:var(--dim);">No aircraft currently tracked in this area.</div></div>
+        </div>`;
+    } else {
+      const cells = [tcell("In flight", `${flights.length}`, "big")];
+      flights.slice(0, 5).forEach(f => {
+        const callsign = f.callsign || "—";
+        const alt = f.altitude != null ? `${Math.round(f.altitude * 3.28084).toLocaleString()} ft` : "—";
+        const spd = f.velocity != null ? `${Math.round(f.velocity * 3.6)} km/h` : "—";
+        const brg = compass(bearing(lat, lng, f.lat, f.lng));
+        cells.push(tcell(callsign, `${escapeHtml(f.country || "—")} · ${alt} · ${spd} · ${Math.round(f.distKm)} km ${brg}`, "text"));
+      });
+      aircraftModule = `
+        <div class="module full">
+          <div class="module-header orange"><span>Aircraft Overhead</span><span class="meta">OpenSky Network · 200 km radius</span></div>
+          <div class="module-body"><div class="telemetry">${cells.join("")}</div></div>
+        </div>`;
+    }
+  }
+
+  // ============ Module: Vessels Nearby (AISStream + MarineTraffic embed) ============
+  const aisMap = `<iframe class="embed-frame" src="https://www.marinetraffic.com/en/ais/embed/zoom:7/centery:${lat}/centerx:${lng}/maptype:4/shownames:false/mmsi:0/shipid:0/fleet:/fleet_id:0/vlist:false" style="height:460px;" frameborder="0"></iframe>`;
+  let vesselsModule = "";
+  if (Array.isArray(ships) && CONFIG.aisstreamToken) {
+    let inner = "";
+    if (ships.length === 0) {
+      inner = `<div class="module-body padded"><div style="font-family:'IBM Plex Mono',monospace;font-size:0.78rem;color:var(--dim);">No vessels reported in the 8-second AIS sample window.</div></div>`;
+    } else {
+      const cells = [tcell("Vessels seen", `${ships.length}`, "big")];
+      ships.slice(0, 5).forEach(s => {
+        const brg = compass(bearing(lat, lng, s.lat, s.lng));
+        cells.push(tcell(escapeHtml(s.name), `${Math.round(s.distKm)} km ${brg} · MMSI ${s.mmsi}`, "text"));
+      });
+      inner = `<div class="module-body"><div class="telemetry">${cells.join("")}</div></div>`;
+    }
+    vesselsModule = `
+      <div class="module full">
+        <div class="module-header teal"><span>Vessels Nearby</span><span class="meta">AISStream.io · live AIS + MarineTraffic map</span></div>
+        ${inner}
+        <div class="module-body" style="padding:0;border-top:1px solid var(--border);">${aisMap}</div>
+      </div>`;
+  } else if (ships === null && CONFIG.aisstreamToken) {
+    vesselsModule = `<div class="module full"><div class="module-header"><span>Vessels Nearby</span></div><div class="module-body"><div class="loading">Listening to AIS stream</div></div><div class="module-body" style="padding:0;border-top:1px solid var(--border);">${aisMap}</div></div>`;
+  } else {
+    // No token — still show the map
+    vesselsModule = `
+      <div class="module full">
+        <div class="module-header"><span>Vessels Nearby</span><span class="meta">MarineTraffic map</span></div>
+        <div class="module-body" style="padding:0;">${aisMap}</div>
+      </div>`;
+  }
+
+  // ============ Module: Lightning (Blitzortung) ============
+  // Best effort — Blitzortung's map sets X-Frame-Options:SAMEORIGIN, so this iframe may be blank
+  // in production. Kept as a placeholder until a server-side proxy or canvas overlay is wired up.
+  const lightningModule = `
+    <div class="module full">
+      <div class="module-header"><span>Live Lightning</span><span class="meta">Blitzortung · best effort embed</span></div>
+      <div class="module-body">
+        <iframe class="embed-frame" src="https://map.blitzortung.org/#5/${lat}/${lng}" style="height:380px;" sandbox="allow-scripts allow-same-origin"></iframe>
+      </div>
+    </div>`;
+
+  // ============ Module: Country ============
+  let countryModule = "";
+  if (isLand && country) {
+    const langs = country.languages ? Object.values(country.languages).join(", ") : "";
+    const currs = country.currencies ? Object.values(country.currencies).map(c => `${c.name}${c.symbol ? " (" + c.symbol + ")" : ""}`).join(", ") : "";
+    const countryCells = [
+      tcell("Country", `${country.flag || ""} ${escapeHtml((country.name && (country.name.common || country.name)) || "")}`, "text"),
+      country.capital && country.capital.length ? tcell("Capital", escapeHtml(country.capital.join(", ")), "text") : null,
+      langs ? tcell("Languages", escapeHtml(langs), "text") : null,
+      currs ? tcell("Currency", escapeHtml(currs), "text") : null,
+      country.population ? tcell("Population", country.population.toLocaleString()) : null,
+      country.subregion || country.region ? tcell("Region", escapeHtml(country.subregion || country.region), "text") : null,
+    ].filter(Boolean);
+    countryModule = `
+      <div class="module full">
+        <div class="module-header"><span>Country</span><span class="meta">REST Countries</span></div>
+        <div class="module-body"><div class="telemetry">${countryCells.join("")}</div></div>
+      </div>`;
+  }
+
+  // ============ Module: Wikipedia ============
+  let wikiModule = "";
+  if (nearby.wikipedia && wikiSummary) {
+    const w = wikiSummary;
+    const thumb = w.thumbnail && w.thumbnail.source;
+    const distKm = (nearby.wikipedia.dist / 1000).toFixed(1);
+    wikiModule = `
+      <div class="module full">
+        <div class="module-header orange"><span>${isLand ? "About This Place" : "Nearest Article"}</span><span class="meta">Wikipedia</span></div>
+        <div class="module-body">
+          <div class="wiki-card">
+            ${thumb ? `<img src="${escapeHtml(thumb)}" alt="${escapeHtml(w.title)}">` : "<div></div>"}
+            <div>
+              <h3>${escapeHtml(w.title)}</h3>
+              <div class="extract">${escapeHtml(w.extract || "")}</div>
+              <div class="meta-line">${distKm} km from antipode</div>
+            </div>
+          </div>
+        </div>
+      </div>`;
+  } else if (nearby.wikipedia && !wikiSummary) {
+    wikiModule = `<div class="module full"><div class="module-header orange"><span>About This Place</span></div><div class="module-body"><div class="loading">Loading Wikipedia summary</div></div></div>`;
+  }
+
+  // ============ Module: Photos ============
+  let photoModule = "";
+  if (photos && photos.length) {
+    photoModule = `
+      <div class="module full">
+        <div class="module-header"><span>Geotagged Photos Near Target</span><span class="meta">Wikimedia Commons · ${photos.length} images</span></div>
+        <div class="module-body">
+          <div class="photo-gallery">
+            ${photos.slice(0, 12).map((p, i) => `<div class="photo" data-idx="${i}"><img src="${escapeHtml(p.thumb)}" alt="${escapeHtml(p.title)}" loading="lazy"></div>`).join("")}
+          </div>
+        </div>
+      </div>`;
+  } else if (nearby.commonsTitles && nearby.commonsTitles.length && photos === null) {
+    photoModule = `<div class="module full"><div class="module-header"><span>Geotagged Photos</span></div><div class="module-body"><div class="loading">Loading nearby photos</div></div></div>`;
+  }
+
+  // ============ Module: Visual feeds ============
+  const satEmbed = isLand ? `
+    <div class="module full">
+      <div class="module-header"><span>Satellite View</span><span class="meta">Google Maps · keyless</span></div>
+      <div class="module-body">
+        <iframe class="embed-frame" src="https://www.google.com/maps?q=${lat},${lng}&t=k&z=17&output=embed" allowfullscreen referrerpolicy="no-referrer-when-downgrade"></iframe>
+      </div>
+    </div>` : "";
+
+  const sv = isLand && CONFIG.googleMapsApiKey ? `
+    <div class="module full">
+      <div class="module-header orange"><span>Street View</span><span class="meta">Google Maps Embed API</span></div>
+      <div class="module-body">
+        <iframe class="embed-frame" src="https://www.google.com/maps/embed/v1/streetview?key=${CONFIG.googleMapsApiKey}&location=${lat},${lng}&heading=0&pitch=0&fov=90" allowfullscreen referrerpolicy="no-referrer-when-downgrade"></iframe>
+      </div>
+    </div>` : (isLand ? `
+    <div class="module full">
+      <div class="module-header"><span>Street View</span></div>
+      <div class="module-body"><div class="config-hint">Add a Google Maps Embed API key to <code>CONFIG.googleMapsApiKey</code> to enable.</div></div>
+    </div>` : "");
+
+  const mp = CONFIG.mapillaryToken && mapillary && mapillary.id ? `
+    <div class="module full">
+      <div class="module-header teal"><span>Mapillary · Community Photos</span><span class="meta">${mapillary.distKm ? Math.round(mapillary.distKm).toLocaleString() + " km from antipode" : ""}${mapillary.captured_at ? " · " + new Date(mapillary.captured_at).toISOString().slice(0,10) : ""}</span></div>
+      <div class="module-body">
+        <iframe class="embed-frame" src="https://www.mapillary.com/embed?image_key=${mapillary.id}&style=photo" allowfullscreen></iframe>
+      </div>
+    </div>` : (!CONFIG.mapillaryToken ? `
+    <div class="module full">
+      <div class="module-header"><span>Mapillary</span></div>
+      <div class="module-body"><div class="config-hint">Add a Mapillary token to <code>CONFIG.mapillaryToken</code> to enable community photos.</div></div>
+    </div>` : "");
+
+  const windyOverlay = isLand ? "wind" : "waves";
+  const windy = `
+    <div class="module full">
+      <div class="module-header orange"><span>Live ${isLand ? "Weather" : "Waves &amp; Weather"}</span><span class="meta">Windy.com</span></div>
+      <div class="module-body">
+        <iframe class="embed-frame" src="https://embed.windy.com/embed2.html?lat=${lat}&lon=${lng}&detailLat=${lat}&detailLon=${lng}&width=650&height=420&zoom=8&level=surface&overlay=${windyOverlay}&menu=&message=&marker=true&calendar=&pressure=&type=map&location=coordinates&detail=&metricWind=default&metricTemp=default&radarRange=-1" frameborder="0"></iframe>
+      </div>
+    </div>`;
+
+  // ============ HERO — top headline ============
+  const heroPhoto = (wikiSummary && wikiSummary.thumbnail && wikiSummary.thumbnail.source)
+    || (photos && photos[0] && photos[0].thumb)
+    || (mapillary && mapillary.thumb_2048_url)
+    || null;
+
+  let heroTitle, heroSubtitle;
+  if (isLand) {
+    heroTitle = (wikiSummary && wikiSummary.title)
+      || place
+      || addr.city || addr.town || addr.village || addr.hamlet
+      || addr.county || addr.state
+      || addr.country
+      || "Land";
+    const flag = country && country.flag ? country.flag + " " : "";
+    const parts = [addr.country, addr.state || addr.region].filter(Boolean);
+    heroSubtitle = `${flag}${escapeHtml(parts.join(" · "))}`;
+  } else {
+    heroTitle = getOcean(lat, lng);
+    heroSubtitle = land ? `${Math.round(land.dist).toLocaleString()} km from ${escapeHtml(land.name)}` : "Open ocean";
+  }
+
+  const heroFacts = [];
+  // Elevation / depth — the "woah" stat
+  if (gelev && gelev.elevation != null) {
+    const e = Math.round(gelev.elevation);
+    if (e < -50) {
+      heroFacts.push({ label: "Ocean depth", value: `${Math.abs(e).toLocaleString()} m below sea level`, big: true });
+    } else if (e > 1500) {
+      heroFacts.push({ label: "Elevation", value: `${e.toLocaleString()} m above sea level`, big: true });
+    } else if (e != 0) {
+      heroFacts.push({ label: "Elevation", value: `${e.toLocaleString()} m / ${Math.round(e * 3.28084).toLocaleString()} ft` });
+    }
+  }
+  // Day / night + time
+  heroFacts.push({ label: "Local time", value: `${timeStr} · ${dayNight}` });
+  // Weather
+  if (weather && weather.temperature_2m != null) {
+    const cond = weather.weather_code != null ? WEATHER_CODES[weather.weather_code] : "";
+    heroFacts.push({ label: "Conditions", value: `${Math.round(weather.temperature_2m)}°C${cond ? " · " + cond : ""}` });
+  }
+  // ISS overhead (only if it's close)
+  if (iss && typeof iss.latitude === "number") {
+    const dKm = haversine(lat, lng, iss.latitude, iss.longitude);
+    if (dKm < 1500) {
+      heroFacts.push({ label: "ISS", value: `Passing overhead now · ${Math.round(dKm)} km away`, big: true });
+    }
+  }
+  // For ocean: nearest land prominent if not already in subtitle position
+  if (!isLand && land) {
+    const brg = compass(bearing(lat, lng, land.lat, land.lng));
+    heroFacts.push({ label: "Nearest land", value: `${escapeHtml(land.name)} · ${Math.round(land.dist).toLocaleString()} km ${brg}` });
+  }
+
+  const heroModule = `
+    <div class="module full hero-module">
+      <div class="hero-body">
+        ${heroPhoto ? `<div class="hero-photo"><img src="${escapeHtml(heroPhoto)}" alt="" loading="lazy"></div>` : `<div></div>`}
+        <div class="hero-text">
+          <h1 class="hero-title">${escapeHtml(heroTitle)}</h1>
+          <div class="hero-subtitle">${heroSubtitle}</div>
+          <div class="hero-facts">
+            ${heroFacts.map(f => `<div class="hero-fact"><span class="hero-fact-label">${f.label}</span><span class="hero-fact-value${f.big ? " huge" : ""}">${f.value}</span></div>`).join("")}
+          </div>
+        </div>
+      </div>
+    </div>`;
+
+  document.getElementById("content").innerHTML = `
+    ${heroModule}
+    ${wikiModule}
+    ${photoModule}
+    ${rightNowModule}
+    ${sv}
+    ${satEmbed}
+    ${mp}
+    ${overheadModule}
+    ${aircraftModule}
+    ${vesselsModule}
+    ${windy}
+    ${countryModule}
+    ${positionModule}
+  `;
+
+  if (photos && photos.length) {
+    document.querySelectorAll(".photo").forEach((el, i) => {
+      el.addEventListener("click", () => openPhotoModal(photos[i]));
+    });
+  }
+}
+
+function openPhotoModal(p) {
+  const back = document.createElement("div");
+  back.className = "modal-backdrop";
+  back.innerHTML = `<img class="modal-img" src="${escapeHtml(p.full)}" alt="${escapeHtml(p.title)}">`;
+  back.addEventListener("click", () => back.remove());
+  document.body.appendChild(back);
+}
+
+function renderPresets() {
+  const c = document.getElementById("presetsContainer");
+  c.innerHTML = PRESETS.map(p => `
+    <button class="preset${activePresetName === p.name ? " active" : ""}" data-name="${escapeHtml(p.name)}">
+      <span class="city">${escapeHtml(p.name)}</span>
+      <span class="dest">${escapeHtml(p.dest)}</span>
+    </button>`).join("");
+  c.querySelectorAll(".preset").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const p = PRESETS.find(x => x.name === btn.dataset.name);
+      if (!p) return;
+      activePresetName = p.name;
+      renderPresets();
+      goTo(p.lat, p.lng);
+    });
+  });
+}
+renderPresets();
+
+document.querySelectorAll(".tab").forEach(t => {
+  t.addEventListener("click", () => {
+    document.querySelectorAll(".tab").forEach(x => x.classList.remove("active"));
+    document.querySelectorAll(".panel").forEach(x => x.classList.remove("active"));
+    t.classList.add("active");
+    document.querySelector(`.panel[data-panel="${t.dataset.tab}"]`).classList.add("active");
+  });
+});
+
+const searchInput = document.getElementById("searchInput");
+const suggestionsBox = document.getElementById("suggestions");
+let searchTimer = null;
+searchInput.addEventListener("input", () => {
+  clearTimeout(searchTimer);
+  const q = searchInput.value.trim();
+  if (q.length < 2) { suggestionsBox.style.display = "none"; return; }
+  searchTimer = setTimeout(async () => {
+    const results = await searchPlace(q);
+    if (!results.length) { suggestionsBox.style.display = "none"; return; }
+    suggestionsBox.innerHTML = results.map((r, i) => `<div class="suggestion" data-idx="${i}">${escapeHtml(r.display_name)}</div>`).join("");
+    suggestionsBox.style.display = "block";
+    suggestionsBox.querySelectorAll(".suggestion").forEach((el, i) => {
+      el.addEventListener("click", () => {
+        const r = results[i];
+        searchInput.value = r.display_name;
+        suggestionsBox.style.display = "none";
+        activePresetName = null;
+        renderPresets();
+        goTo(parseFloat(r.lat), parseFloat(r.lon));
+      });
+    });
+  }, 400);
+});
+searchInput.addEventListener("blur", () => setTimeout(() => suggestionsBox.style.display = "none", 200));
+searchInput.addEventListener("focus", () => { if (suggestionsBox.children.length) suggestionsBox.style.display = "block"; });
+
+document.getElementById("swapBtn").addEventListener("click", () => {
+  if (!currentAnti) return;
+  activePresetName = null;
+  renderPresets();
+  goTo(currentAnti.lat, currentAnti.lng);
+});
+
+// My Location button — uses browser geolocation API
+document.getElementById("myLocationBtn").addEventListener("click", () => {
+  const btn = document.getElementById("myLocationBtn");
+  if (!navigator.geolocation) {
+    alert("Geolocation is not supported by your browser.");
+    return;
+  }
+  const orig = btn.textContent;
+  btn.textContent = "Locating…";
+  btn.disabled = true;
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      btn.textContent = orig;
+      btn.disabled = false;
+      activePresetName = null;
+      renderPresets();
+      goTo(pos.coords.latitude, pos.coords.longitude);
+    },
+    (err) => {
+      btn.textContent = orig;
+      btn.disabled = false;
+      const msgs = {
+        1: "Permission denied. Allow location access in your browser to use this.",
+        2: "Position unavailable. Try again in a moment.",
+        3: "Timed out. Try again.",
+      };
+      alert(msgs[err.code] || ("Could not get your location: " + err.message));
+    },
+    { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
+  );
+});
+
+document.getElementById("goBtn").addEventListener("click", () => {
+  const lat = parseFloat(document.getElementById("latInput").value);
+  const lng = parseFloat(document.getElementById("lngInput").value);
+  if (!isNaN(lat) && !isNaN(lng)) {
+    activePresetName = null;
+    renderPresets();
+    goTo(lat, lng);
+  }
+});
+["latInput", "lngInput"].forEach(id => {
+  document.getElementById(id).addEventListener("keydown", e => {
+    if (e.key === "Enter") document.getElementById("goBtn").click();
+  });
+});
+
+window.addEventListener("resize", () => {
+  mapOrigin.invalidateSize();
+  mapAntipode.invalidateSize();
+});
+setTimeout(() => {
+  mapOrigin.invalidateSize();
+  mapAntipode.invalidateSize();
+}, 100);
+
+// System clock — UTC, mono LCD style
+function tickClock() {
+  const d = new Date();
+  const hh = String(d.getUTCHours()).padStart(2, "0");
+  const mm = String(d.getUTCMinutes()).padStart(2, "0");
+  const ss = String(d.getUTCSeconds()).padStart(2, "0");
+  document.getElementById("systemClock").textContent = `${hh}:${mm}:${ss} UTC`;
+}
+tickClock();
+setInterval(tickClock, 1000);
+</script>
+</body>
+</html>
