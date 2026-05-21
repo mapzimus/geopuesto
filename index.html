@@ -133,7 +133,7 @@
   }
   .viewport-header {
     position: absolute;
-    top: 10px; left: 10px;
+    top: 10px; right: 10px;
     z-index: 500;
     font-family: 'IBM Plex Mono', monospace;
     font-size: 0.6rem;
@@ -332,6 +332,42 @@
     color: var(--orange);
   }
   .preset.active .dest { color: var(--orange); opacity: 0.9; }
+  /* Visual grouping for antipodal pairs — stack vertically in one column slot */
+  .preset-pair {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    padding: 2px;
+    background: rgba(255,255,255,0.025);
+    border-radius: 2px;
+    border: 1px solid rgba(255,255,255,0.06);
+    grid-row: span 2;
+    align-self: stretch;
+  }
+  .preset-pair .preset { flex: 1; }
+  .preset-pair-glyph {
+    font-size: 0.85rem;
+    text-align: center;
+    padding: 1px 0;
+    font-family: 'IBM Plex Mono', monospace;
+    background: linear-gradient(90deg, var(--orange), var(--teal));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    line-height: 1;
+  }
+  .preset-pair .preset[data-role="a"] { border-color: rgba(242,101,34,0.4); }
+  .preset-pair .preset[data-role="b"] { border-color: rgba(0,191,165,0.4); }
+  .preset-pair .preset[data-role="a"]:hover { border-color: var(--orange); }
+  .preset-pair .preset[data-role="b"]:hover { border-color: var(--teal); }
+  .preset-pair .preset[data-role="b"]:hover { background: rgba(0,191,165,0.08); }
+  .preset-pair .preset[data-role="b"]:hover .dest { color: var(--teal); }
+  .preset-pair .preset[data-role="b"].active {
+    background: rgba(0,191,165,0.12);
+    border-color: var(--teal);
+    color: var(--teal);
+  }
+  .preset-pair .preset[data-role="b"].active .dest { color: var(--teal); opacity: 0.9; }
   input[type="text"], input[type="number"] {
     width: 100%;
     padding: 11px 14px;
@@ -874,140 +910,107 @@ const CONFIG = {
   aisstreamToken: "c28d9568988eead5b9bc3055bfe2d1956e1d896a",
 };
 
+// Curated antipodal pairs. Paired entries (sharing pairId) have BOTH ends with confirmed
+// Google Street View. Singles are either iconic origins with one-sided SV, or preserved
+// favorites kept for name recognition. Coords picked for the most interesting precise
+// spot at each end (Trekker landmarks, town centers, observatories, etc.).
 const PRESETS = [
-  // East Asia → South America
-  { name: "Beijing", dest: "Argentina", lat: 39.9042, lng: 116.4074 },
-  { name: "Shanghai", dest: "Argentina", lat: 31.2304, lng: 121.4737 },
-  { name: "Hong Kong", dest: "Argentina", lat: 22.3193, lng: 114.1694 },
-  { name: "Macau", dest: "Argentina", lat: 22.1987, lng: 113.5439 },
-  { name: "Guangzhou", dest: "Argentina", lat: 23.1291, lng: 113.2644 },
-  { name: "Shenzhen", dest: "Argentina", lat: 22.5431, lng: 114.0579 },
-  { name: "Chongqing", dest: "Argentina/Chile", lat: 29.5630, lng: 106.5516 },
-  { name: "Wuhan", dest: "Argentina", lat: 30.5928, lng: 114.3055 },
-  { name: "Xi'an", dest: "Chile", lat: 34.3416, lng: 108.9398 },
-  { name: "Chengdu", dest: "Chile coast", lat: 30.5728, lng: 104.0668 },
-  { name: "Kunming", dest: "Off Peru coast", lat: 25.0389, lng: 102.7183 },
-  { name: "Lhasa, Tibet", dest: "Off Chile coast", lat: 29.6520, lng: 91.1721 },
-  { name: "Ulaanbaatar", dest: "Patagonia", lat: 47.8864, lng: 106.9057 },
-  { name: "Seoul", dest: "Off Argentina", lat: 37.5665, lng: 126.9780 },
-  // SE Asia → South America
-  { name: "Taipei", dest: "Paraguay", lat: 25.0330, lng: 121.5654 },
-  { name: "Kaohsiung", dest: "Paraguay", lat: 22.6273, lng: 120.3014 },
-  { name: "Manila", dest: "Bolivia", lat: 14.5995, lng: 120.9842 },
-  { name: "Cebu", dest: "Brazil", lat: 10.3157, lng: 123.8854 },
-  { name: "Davao", dest: "Brazil (Pará)", lat: 7.0731, lng: 125.6128 },
-  { name: "Hanoi", dest: "Off Peru coast", lat: 21.0285, lng: 105.8542 },
-  { name: "Ho Chi Minh City", dest: "Peru", lat: 10.7626, lng: 106.6602 },
-  { name: "Da Nang", dest: "Peru", lat: 16.0544, lng: 108.2022 },
-  { name: "Bangkok", dest: "Off Peru coast", lat: 13.7563, lng: 100.5018 },
-  { name: "Phuket", dest: "Off Peru coast", lat: 7.8804, lng: 98.3923 },
-  { name: "Penang", dest: "Peru", lat: 5.4164, lng: 100.3327 },
-  { name: "Kuala Lumpur", dest: "Ecuador", lat: 3.1390, lng: 101.6869 },
-  { name: "Singapore", dest: "Ecuador (Amazon)", lat: 1.3521, lng: 103.8198 },
-  // Indonesia → S America
-  { name: "Jakarta", dest: "Colombia", lat: -6.2088, lng: 106.8456 },
-  { name: "Bandung", dest: "Colombia", lat: -6.9175, lng: 107.6191 },
-  { name: "Surabaya", dest: "Venezuela", lat: -7.2575, lng: 112.7521 },
-  { name: "Yogyakarta", dest: "Colombia", lat: -7.7956, lng: 110.3695 },
-  { name: "Medan, Sumatra", dest: "Off Peru coast", lat: 3.5952, lng: 98.6722 },
-  { name: "Padang, Sumatra", dest: "Ecuador", lat: -0.9492, lng: 100.3543 },
-  // New Zealand → Iberia
-  { name: "Wellington, NZ", dest: "Spain", lat: -41.2865, lng: 174.7762 },
-  { name: "Auckland, NZ", dest: "Southern Spain", lat: -36.8485, lng: 174.7633 },
-  { name: "Christchurch, NZ", dest: "NW Spain", lat: -43.5321, lng: 172.6362 },
-  { name: "Dunedin, NZ", dest: "Spain (Galicia)", lat: -45.8788, lng: 170.5028 },
-  { name: "Hamilton, New Zealand", dest: "Southern Spain", lat: -37.7870, lng: 175.2793 },
-  { name: "Napier, NZ", dest: "Spain", lat: -39.4928, lng: 176.9120 },
-  { name: "Antipodes Islands", dest: "SW England", lat: -49.6809, lng: 178.7747 },
-  // UK → Antipodes Islands
-  { name: "London", dest: "Antipodes Islands", lat: 51.5074, lng: -0.1278 },
-  { name: "Brighton, UK", dest: "Near Antipodes Islands", lat: 50.8225, lng: -0.1372 },
-  { name: "Cardiff", dest: "Near Antipodes Islands", lat: 51.4816, lng: -3.1791 },
-  // Iberia / SW France → New Zealand
-  { name: "Lisbon", dest: "NZ South Island", lat: 38.7223, lng: -9.1393 },
-  { name: "Porto", dest: "Off NZ coast", lat: 41.1579, lng: -8.6291 },
-  { name: "A Coruña", dest: "NZ South Island", lat: 43.3623, lng: -8.4115 },
-  { name: "Bilbao", dest: "Off NZ coast", lat: 43.2630, lng: -2.9350 },
-  { name: "San Sebastián", dest: "Off NZ coast", lat: 43.3183, lng: -1.9812 },
-  { name: "Coimbra", dest: "Off NZ coast", lat: 40.2033, lng: -8.4103 },
-  { name: "Santiago de Compostela", dest: "Off NZ coast", lat: 42.8782, lng: -8.5448 },
-  { name: "Sevilla", dest: "Near NZ", lat: 37.3891, lng: -5.9845 },
-  { name: "Bordeaux", dest: "Off NZ coast", lat: 44.8378, lng: -0.5792 },
-  // Hawaii → Botswana
-  { name: "Honolulu", dest: "Botswana", lat: 21.3069, lng: -157.8583 },
-  { name: "Hawaii (Big Island)", dest: "Botswana", lat: 19.7297, lng: -155.0900 },
-  { name: "Maui", dest: "Botswana", lat: 20.8893, lng: -156.4729 },
-  // Patagonia / S. Chile → Russia / Mongolia
-  { name: "Cape Horn", dest: "Russian Far East", lat: -55.9833, lng: -67.2667 },
-  { name: "Ushuaia", dest: "Russia (Lake Baikal)", lat: -54.8019, lng: -68.3030 },
-  { name: "Punta Arenas", dest: "Russia", lat: -53.1638, lng: -70.9171 },
-  { name: "Río Gallegos", dest: "Russia/Mongolia", lat: -51.6230, lng: -69.2168 },
-  { name: "Comodoro Rivadavia", dest: "Inner Mongolia", lat: -45.8645, lng: -67.4969 },
-  { name: "Bariloche", dest: "Inner Mongolia", lat: -41.1335, lng: -71.3103 },
-  { name: "Puerto Montt", dest: "Inner Mongolia", lat: -41.4719, lng: -72.9369 },
-  // Argentina/Uruguay/Paraguay → China/E China Sea
-  { name: "Buenos Aires", dest: "East China Sea", lat: -34.6037, lng: -58.3816 },
-  { name: "Montevideo", dest: "Off Korea/China", lat: -34.9011, lng: -56.1645 },
-  { name: "Mendoza", dest: "Central China", lat: -32.8908, lng: -68.8272 },
-  { name: "Córdoba, Argentina", dest: "Central China", lat: -31.4201, lng: -64.1888 },
-  { name: "Rosario", dest: "China coast", lat: -32.9442, lng: -60.6505 },
-  { name: "Santa Fe, Argentina", dest: "China", lat: -31.6107, lng: -60.6973 },
-  { name: "Asunción", dest: "Taiwan", lat: -25.2637, lng: -57.5759 },
-  // Peru / Chile / Bolivia → Vietnam / S China Sea
-  { name: "Lima", dest: "Cambodia/Thailand", lat: -12.0464, lng: -77.0428 },
-  { name: "Cuzco", dest: "Vietnam", lat: -13.5320, lng: -71.9675 },
-  { name: "Arequipa", dest: "Vietnam", lat: -16.4090, lng: -71.5375 },
-  { name: "Iquique, Chile", dest: "Hainan", lat: -20.2208, lng: -70.1431 },
-  { name: "San Pedro de Atacama", dest: "S. China", lat: -22.9117, lng: -68.2003 },
-  { name: "La Paz", dest: "South China Sea", lat: -16.4897, lng: -68.1193 },
-  { name: "Salar de Uyuni", dest: "South China Sea", lat: -20.1338, lng: -67.4891 },
-  { name: "Santa Cruz, Bolivia", dest: "Off Hainan", lat: -17.7833, lng: -63.1821 },
-  // Ecuador / Colombia → Indonesia
-  { name: "Quito", dest: "Sumatra", lat: -0.1807, lng: -78.4678 },
-  { name: "Guayaquil", dest: "Sumatra", lat: -2.1709, lng: -79.9224 },
-  { name: "Bogotá", dest: "Sumatra/Java", lat: 4.7110, lng: -74.0721 },
-  { name: "Medellín", dest: "Sumatra", lat: 6.2442, lng: -75.5812 },
-  { name: "Cali", dest: "Sumatra", lat: 3.4516, lng: -76.5320 },
-  // Brazilian Amazon → Indonesia / Philippines
-  { name: "Manaus", dest: "Sulawesi", lat: -3.1190, lng: -60.0217 },
-  { name: "Belém", dest: "West Papua", lat: -1.4558, lng: -48.5039 },
-  { name: "Macapá", dest: "Halmahera, Indonesia", lat: 0.0349, lng: -51.0694 },
-  // Pacific Islands → Africa / Arabia
-  { name: "Tahiti", dest: "Sudan", lat: -17.5516, lng: -149.5585 },
-  { name: "Bora Bora", dest: "Sudan/Egypt", lat: -16.5004, lng: -151.7415 },
-  { name: "Easter Island", dest: "Pakistan/India border", lat: -27.1469, lng: -109.4267 },
-  { name: "Pitcairn Island", dest: "Saudi Arabia", lat: -25.0667, lng: -130.0991 },
-  { name: "Marquesas Islands", dest: "Somalia/Ethiopia", lat: -9.7806, lng: -139.0497 },
-  { name: "Cook Islands", dest: "Libya/Chad", lat: -21.2076, lng: -159.7711 },
-  { name: "Tonga (Nuku'alofa)", dest: "Algeria/Mali", lat: -21.1336, lng: -175.2049 },
-  { name: "Samoa (Apia)", dest: "Niger", lat: -13.8333, lng: -171.7667 },
-  { name: "Fiji (Suva)", dest: "Burkina Faso", lat: -18.1248, lng: 178.4501 },
-  { name: "Niue", dest: "Niger", lat: -19.0544, lng: -169.8672 },
-  { name: "Vanuatu (Port Vila)", dest: "Mauritania/Mali", lat: -17.7333, lng: 168.3219 },
-  { name: "Palau (Koror)", dest: "Brazil (Pará)", lat: 7.3437, lng: 134.4787 },
-  // Central America / Caribbean → Indonesia / Australia
-  { name: "Panama City", dest: "Off Sumatra", lat: 8.9824, lng: -79.5199 },
-  { name: "San José, Costa Rica", dest: "Off Sumatra", lat: 9.9281, lng: -84.0907 },
-  { name: "Puerto Rico (San Juan)", dest: "Off NW Australia", lat: 18.4655, lng: -66.1057 },
-  { name: "Bermuda", dest: "Perth, Australia", lat: 32.2949, lng: -64.7813 },
-  // Australia → Atlantic (near Bermuda)
-  { name: "Perth, Australia", dest: "Bermuda", lat: -31.9505, lng: 115.8605 },
-  { name: "Geraldton, Australia", dest: "Off Bermuda", lat: -28.7774, lng: 114.6149 },
-  // Falkland Islands → Russian Far East
-  { name: "Falkland Islands", dest: "Russian Far East", lat: -51.6938, lng: -57.8519 },
+  // ====== TIER A — both sides have Google Street View (paired in scroller) ======
+
+  // NZ ↔ Iberia (6 pairs)
+  { name: "Wellington — Te Papa", dest: "Salamanca province, Spain", lat: -41.2904, lng: 174.7818, pairId: "wel-sal", pairRole: "a" },
+  { name: "Salamanca province, Spain", dest: "Wellington, NZ", lat: 41.2904, lng: -5.2182, pairId: "wel-sal", pairRole: "b" },
+
+  { name: "Auckland — Sky Tower", dest: "Sierra de Grazalema, Spain", lat: -36.8485, lng: 174.7633, pairId: "auc-caz", pairRole: "a" },
+  { name: "Sierra de Grazalema, Cádiz", dest: "Auckland, NZ", lat: 36.8485, lng: -5.2367, pairId: "auc-caz", pairRole: "b" },
+
+  { name: "Christchurch — Cathedral Sq", dest: "near Lugo, Galicia", lat: -43.5309, lng: 172.6366, pairId: "chc-lug", pairRole: "a" },
+  { name: "near Lugo, Galicia", dest: "Christchurch, NZ", lat: 43.5309, lng: -7.3634, pairId: "chc-lug", pairRole: "b" },
+
+  { name: "Hamilton, NZ", dest: "Lucena, Andalusia", lat: -37.7870, lng: 175.2793, pairId: "ham-luc", pairRole: "a" },
+  { name: "Lucena, Andalusia", dest: "Hamilton, NZ", lat: 37.7870, lng: -4.7207, pairId: "ham-luc", pairRole: "b" },
+
+  { name: "Napier — Marine Parade", dest: "near Tarancón, Spain", lat: -39.4839, lng: 176.9170, pairId: "nap-tar", pairRole: "a" },
+  { name: "near Tarancón, La Mancha", dest: "Napier, NZ", lat: 39.4839, lng: -3.0830, pairId: "nap-tar", pairRole: "b" },
+
+  { name: "Hokitika Beach, NZ", dest: "Muxía coast, Galicia", lat: -42.7155, lng: 170.9650, pairId: "hok-mux", pairRole: "a" },
+  { name: "Muxía coast, Galicia", dest: "Hokitika, NZ", lat: 42.7155, lng: -9.0350, pairId: "hok-mux", pairRole: "b" },
+
+  // Hawaii ↔ Botswana (2 pairs — iconic Hawaiian landmarks)
+  { name: "Diamond Head Crater, Oahu", dest: "Botswana A3 (Ghanzi-Maun)", lat: 21.2620, lng: -157.8050, pairId: "dh-bot", pairRole: "a" },
+  { name: "Botswana A3 (Ghanzi-Maun)", dest: "Diamond Head, Oahu", lat: -21.2620, lng: 22.1950, pairId: "dh-bot", pairRole: "b" },
+
+  { name: "Kīlauea, Hawaii Volcanoes NP", dest: "near Maun, Botswana", lat: 19.4194, lng: -155.2885, pairId: "kil-mau", pairRole: "a" },
+  { name: "near Maun, Botswana", dest: "Kīlauea, Big Island", lat: -19.4194, lng: 24.7115, pairId: "kil-mau", pairRole: "b" },
+
+  // East Asia ↔ Argentina/Paraguay (3 pairs)
+  { name: "Hong Kong — Victoria Peak", dest: "La Quiaca, Jujuy, Argentina", lat: 22.2759, lng: 114.1455, pairId: "hk-jjy", pairRole: "a" },
+  { name: "La Quiaca, Jujuy", dest: "Hong Kong — Victoria Peak", lat: -22.2759, lng: -65.8545, pairId: "hk-jjy", pairRole: "b" },
+
+  { name: "Macau — Senado Square", dest: "Yavi, Jujuy, Argentina", lat: 22.1925, lng: 113.5400, pairId: "mac-yav", pairRole: "a" },
+  { name: "Yavi, Jujuy", dest: "Macau — Senado Square", lat: -22.1925, lng: -66.4600, pairId: "mac-yav", pairRole: "b" },
+
+  { name: "Taipei 101", dest: "rural Paraguay E of Asunción", lat: 25.0330, lng: 121.5654, pairId: "tai-asu", pairRole: "a" },
+  { name: "rural Paraguay E of Asunción", dest: "Taipei 101", lat: -25.0330, lng: -58.4346, pairId: "tai-asu", pairRole: "b" },
+
+  // SE Asia ↔ Americas (4 pairs)
+  { name: "Singapore — Marina Bay Sands", dest: "near Tena, Ecuador", lat: 1.2834, lng: 103.8607, pairId: "sin-ten", pairRole: "a" },
+  { name: "near Tena, Ecuadorian Amazon", dest: "Singapore — Marina Bay", lat: -1.2834, lng: -76.1393, pairId: "sin-ten", pairRole: "b" },
+
+  { name: "Bogotá — Plaza Bolívar", dest: "Lubuklinggau, Sumatra", lat: 4.5981, lng: -74.0758, pairId: "bog-lub", pairRole: "a" },
+  { name: "Lubuklinggau, Sumatra", dest: "Bogotá — Plaza Bolívar", lat: -4.5981, lng: 105.9242, pairId: "bog-lub", pairRole: "b" },
+
+  { name: "Quito — Mitad del Mundo", dest: "near Pekanbaru, Sumatra", lat: 0.0022, lng: -78.4558, pairId: "qui-pek", pairRole: "a" },
+  { name: "near Pekanbaru, Sumatra (Riau)", dest: "Quito — Equator monument", lat: -0.0022, lng: 101.5442, pairId: "qui-pek", pairRole: "b" },
+
+  { name: "Penang — Georgetown UNESCO", dest: "Chiclayo coast, Peru", lat: 5.4164, lng: 100.3327, pairId: "pen-chi", pairRole: "a" },
+  { name: "Chiclayo coast, Peru", dest: "Penang — Georgetown", lat: -5.4164, lng: -79.6673, pairId: "pen-chi", pairRole: "b" },
+
+  // Iconic Islands (5 pairs)
+  { name: "Pitcairn — Adamstown", dest: "NW of Riyadh, Saudi Arabia", lat: -25.0656, lng: -130.0989, pairId: "pit-riy", pairRole: "a" },
+  { name: "NW of Riyadh, Saudi Arabia", dest: "Pitcairn — Adamstown", lat: 25.0656, lng: 49.9011, pairId: "pit-riy", pairRole: "b" },
+
+  { name: "Galápagos — Darwin Station", dest: "Magura, Bangladesh", lat: -0.7411, lng: -90.3026, pairId: "gal-mag", pairRole: "a" },
+  { name: "Magura district, Bangladesh", dest: "Galápagos — Puerto Ayora", lat: 0.7411, lng: 89.6974, pairId: "gal-mag", pairRole: "b" },
+
+  { name: "Easter Island — Ahu Tongariki", dest: "Tharparkar Desert, Pakistan", lat: -27.1255, lng: -109.2773, pairId: "ei-thar", pairRole: "a" },
+  { name: "Tharparkar Desert, Pakistan", dest: "Easter Island — Tongariki", lat: 27.1255, lng: 70.7227, pairId: "ei-thar", pairRole: "b" },
+
+  { name: "Christmas Is — Flying Fish Cove", dest: "Magdalena River, Colombia", lat: -10.4233, lng: 105.6783, pairId: "xi-mag", pairRole: "a" },
+  { name: "Magdalena River, Colombia", dest: "Christmas Is — Flying Fish Cove", lat: 10.4233, lng: -74.3217, pairId: "xi-mag", pairRole: "b" },
+
+  { name: "South Georgia — Grytviken", dest: "Sakhalin Island, Russia", lat: -54.2811, lng: -36.5092, pairId: "sgi-sak", pairRole: "a" },
+  { name: "Sakhalin — Yuzhno-Sakhalinsk", dest: "South Georgia — Grytviken", lat: 54.2811, lng: 143.4908, pairId: "sgi-sak", pairRole: "b" },
+
+  // ====== TIER B — iconic origins, one-side SV or close-ocean antipodes (singles) ======
+
+  { name: "Tahiti — Papeete waterfront", dest: "central Sudan (Kosti)", lat: -17.5410, lng: -149.5664 },
+  { name: "London — Trafalgar Square", dest: "Antipodes Islands", lat: 51.5080, lng: -0.1281 },
+  { name: "Falkland Islands — Stanley", dest: "Yakutia taiga, Russia", lat: -51.6938, lng: -57.8519 },
+  { name: "Cape Horn lighthouse", dest: "Sakha Republic, Russia", lat: -55.9758, lng: -67.2658 },
+  { name: "Bermuda — Hamilton", dest: "off Perth coast (Indian Ocean)", lat: 32.2949, lng: -64.7813 },
+  { name: "Kerguelen — Port-aux-Français", dest: "Saskatchewan farmland", lat: -49.3500, lng: 70.2167 },
+
+  // ====== PRESERVED FAVORITES — name recognition, mostly one-side SV ======
+
+  { name: "Buenos Aires — Obelisco", dest: "East China Sea (near Shanghai)", lat: -34.6037, lng: -58.3816 },
+  { name: "Lima — Plaza de Armas", dest: "Cambodia/Thailand border", lat: -12.0464, lng: -77.0428 },
+  { name: "Lisbon — Praça do Comércio", dest: "Tasman Sea (off NZ South Island)", lat: 38.7077, lng: -9.1366 },
+  { name: "Manaus — Meeting of the Waters", dest: "Sulawesi, Indonesia", lat: -3.1356, lng: -59.9056 },
+  { name: "Perth — Kings Park", dest: "Atlantic Ocean (near Bermuda)", lat: -31.9614, lng: 115.8420 },
+  { name: "Ulaanbaatar — Sükhbaatar Square", dest: "Patagonia (Chubut)", lat: 47.9188, lng: 106.9176 },
+  { name: "Salar de Uyuni — train cemetery", dest: "South China Sea", lat: -20.4783, lng: -66.8253 },
 ];
 
-// Esri Dark Gray Canvas — fits the Mission Control aesthetic
-const BASE_URL = "https://services.arcgisonline.com/arcgis/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}";
-const BASE_ATTR = 'Tiles &copy; <a href="https://www.esri.com">Esri</a>, HERE, Garmin, &copy; OpenStreetMap contributors';
-const LABEL_URL = "https://services.arcgisonline.com/arcgis/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}";
+// CARTO Dark Matter — denser labels (small cities/towns), keeps Mission Control aesthetic
+const BASE_URL = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
+const BASE_ATTR = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>';
+const TILE_OPTS = { attribution: BASE_ATTR, maxZoom: 20, subdomains: "abcd" };
 
 const mapOrigin = L.map("mapOrigin", { worldCopyJump: true }).setView([20, 0], 2);
 const mapAntipode = L.map("mapAntipode", { worldCopyJump: true }).setView([-20, 180], 2);
-L.tileLayer(BASE_URL, { attribution: BASE_ATTR, maxZoom: 16 }).addTo(mapOrigin);
-L.tileLayer(LABEL_URL, { maxZoom: 16, opacity: 0.85, attribution: "" }).addTo(mapOrigin);
-L.tileLayer(BASE_URL, { attribution: BASE_ATTR, maxZoom: 16 }).addTo(mapAntipode);
-L.tileLayer(LABEL_URL, { maxZoom: 16, opacity: 0.85, attribution: "" }).addTo(mapAntipode);
+L.tileLayer(BASE_URL, TILE_OPTS).addTo(mapOrigin);
+L.tileLayer(BASE_URL, TILE_OPTS).addTo(mapAntipode);
 
 let originMarker = null, antipodeMarker = null;
 let activePresetName = null;
@@ -1798,11 +1801,25 @@ function openPhotoModal(p) {
 
 function renderPresets() {
   const c = document.getElementById("presetsContainer");
-  c.innerHTML = PRESETS.map(p => `
-    <button class="preset${activePresetName === p.name ? " active" : ""}" data-name="${escapeHtml(p.name)}">
+  const renderBtn = (p) => `
+    <button class="preset${activePresetName === p.name ? " active" : ""}" data-name="${escapeHtml(p.name)}"${p.pairRole ? ` data-role="${p.pairRole}"` : ""}>
       <span class="city">${escapeHtml(p.name)}</span>
       <span class="dest">${escapeHtml(p.dest)}</span>
-    </button>`).join("");
+    </button>`;
+  // Group consecutive entries sharing the same pairId into a .preset-pair wrapper
+  const chunks = [];
+  let i = 0;
+  while (i < PRESETS.length) {
+    const p = PRESETS[i];
+    if (p.pairId && PRESETS[i+1] && PRESETS[i+1].pairId === p.pairId) {
+      chunks.push(`<div class="preset-pair">${renderBtn(p)}<span class="preset-pair-glyph">⇄</span>${renderBtn(PRESETS[i+1])}</div>`);
+      i += 2;
+    } else {
+      chunks.push(renderBtn(p));
+      i += 1;
+    }
+  }
+  c.innerHTML = chunks.join("");
   c.querySelectorAll(".preset").forEach(btn => {
     btn.addEventListener("click", () => {
       const p = PRESETS.find(x => x.name === btn.dataset.name);
