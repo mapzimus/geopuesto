@@ -39,12 +39,35 @@
     --border-bright: #2c4459;
     --text: #d8e0e8;
     --text-bright: #f5f8fa;
-    --dim: #6c8294;
+    --dim: #8aa0b3;        /* WCAG AA: 5.5:1 on --bg, lightened from #6c8294 (4.0:1) */
+    --dim-2: #6c8294;       /* legacy lower-contrast dim for non-text decorative use only */
     --green: #4ade80;
     --amber: #fbbf24;
     --red: #ef4444;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  /* Skip-link for screen-reader / keyboard users */
+  .skip-link {
+    position: absolute; left: -9999px;
+    background: var(--orange); color: var(--bg);
+    padding: 8px 14px; z-index: 10000;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.18em;
+  }
+  .skip-link:focus { left: 12px; top: 12px; }
+  /* Visible focus ring for keyboard users */
+  :focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
+  button:focus-visible, .preset:focus-visible, .tab:focus-visible, .swap-btn:focus-visible,
+  .btn-go:focus-visible, .tab-shuffle:focus-visible, input:focus-visible {
+    outline: 2px solid var(--orange); outline-offset: 2px;
+  }
+  /* Respect prefers-reduced-motion — disable looping animations */
+  @media (prefers-reduced-motion: reduce) {
+    .status-led .dot, .pulse-marker .ring,
+    .loading::after, .empty-icon { animation: none !important; }
+    .leaflet-fade-anim .leaflet-tile { transition: none !important; }
+    * { scroll-behavior: auto !important; }
+  }
   html, body {
     font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
     background: var(--bg);
@@ -96,16 +119,12 @@
     color: var(--dim);
     text-transform: uppercase;
     letter-spacing: 0.2em;
+    border-left: 1px solid var(--border-bright);
+    padding-left: 12px;
   }
-  .system-id::before { content: "::"; color: var(--orange); margin-right: 8px; opacity: 0.7; }
-  .tagline {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 0.65rem;
-    color: var(--dim);
-    text-transform: uppercase;
-    letter-spacing: 0.2em;
+  @media (max-width: 640px) {
+    .system-id { display: none; }   /* tighten header on phones */
   }
-  .tagline::before { content: "::"; color: var(--orange); margin-right: 8px; opacity: 0.7; }
   .status-row {
     display: flex;
     align-items: center;
@@ -204,32 +223,52 @@
   .readout-strip {
     background: var(--surface);
     border-bottom: 1px solid var(--border);
-    padding: 14px 20px;
-    display: grid;
-    grid-template-columns: 1fr auto 1fr;
-    gap: 18px;
+    padding: 12px 20px;
+    display: flex;
+    justify-content: center;
     align-items: center;
+    gap: 22px;
+    flex-wrap: wrap;
   }
   .readout-strip[data-empty="true"] { display: none; }
-  .readout { display: flex; flex-direction: column; gap: 3px; }
+  .readout {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 10px;
+    min-width: 0;
+  }
   .readout .label {
     font-family: 'IBM Plex Mono', monospace;
     font-size: 0.6rem;
     text-transform: uppercase;
-    letter-spacing: 0.2em;
+    letter-spacing: 0.22em;
     color: var(--dim);
   }
   .readout.origin .label { color: var(--orange); }
   .readout.target .label { color: var(--teal); }
   .readout .value {
     font-family: 'IBM Plex Mono', monospace;
-    font-size: 1.05rem;
+    font-size: 1rem;
     font-weight: 500;
     color: var(--text-bright);
-    letter-spacing: 0.01em;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
   }
-  .readout.target { text-align: right; }
-  .readout-actions { display: flex; flex-direction: column; gap: 7px; align-items: center; }
+  /* Hairline orange→teal divider between origin and target readouts */
+  .readout-actions {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 0 6px;
+    border-left: 1px solid;
+    border-right: 1px solid;
+    border-image: linear-gradient(180deg, var(--orange), var(--teal)) 1;
+  }
+  @media (max-width: 720px) {
+    .readout-strip { gap: 12px; }
+    .readout-actions { border: none; padding: 0; }
+  }
   .swap-btn {
     background: var(--surface-2);
     border: 1px solid var(--border-bright);
@@ -496,11 +535,13 @@
   .hero-subtitle {
     font-family: 'IBM Plex Mono', monospace;
     font-size: 0.78rem;
-    color: var(--orange);
+    color: var(--dim);
     text-transform: uppercase;
     letter-spacing: 0.18em;
     margin-bottom: 18px;
   }
+  /* Flag glyph in the hero subtitle keeps its natural color, even when text is dim */
+  .hero-subtitle .flag { color: var(--text); margin-right: 4px; }
   .hero-facts {
     display: flex;
     flex-direction: column;
@@ -542,28 +583,30 @@
     .module.half { grid-column: 1 / -1; }
   }
   .module-header {
-    padding: 9px 16px;
+    padding: 8px 16px;
     background: var(--bg-2);
     border-bottom: 1px solid var(--border);
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 14px;
     font-family: 'IBM Plex Mono', monospace;
     font-size: 0.62rem;
     text-transform: uppercase;
-    letter-spacing: 0.22em;
+    letter-spacing: 0.2em;
     color: var(--dim);
   }
-  .module-header.orange { color: var(--orange); }
-  .module-header.teal { color: var(--teal); }
-  .module-header::before { content: "::"; opacity: 0.55; margin-right: 9px; }
+  /* Small accent stripe on the left edge of the header to differentiate categories.
+     Default: faint border. Orange = origin-related / alert. Teal = environmental telemetry. */
+  .module-header { border-left: 2px solid transparent; }
+  .module-header.orange { color: var(--text-bright); border-left-color: var(--orange); }
+  .module-header.teal { color: var(--text-bright); border-left-color: var(--teal); }
   .module-header .meta {
-    font-size: 0.58rem;
-    letter-spacing: 0.18em;
+    font-size: 0.6rem;
+    letter-spacing: 0.16em;
     color: var(--dim);
-    opacity: 0.7;
+    flex-shrink: 0;
   }
-  .module-header .meta::before { content: ""; margin-right: 0; }
   .module-body { padding: 0; }
   .module-body.padded { padding: 14px; }
 
@@ -1010,9 +1053,20 @@
     }
     .divider::before { left: 14px; top: 50%; transform: translate(0, -50%); }
     .divider::after { left: auto; right: 14px; bottom: auto; top: 50%; transform: translate(0, -50%); }
-    .readout-strip { grid-template-columns: 1fr; gap: 10px; }
-    .readout.target { text-align: left; }
-    .readout-actions { flex-direction: row; }
+    .readout-strip { gap: 10px; }
+    /* Bigger touch targets for mobile */
+    .tab { padding: 12px 16px; }
+    .tab-shuffle { padding: 12px 14px; margin-left: 0; }
+    .tab.tab-action { padding: 12px 16px; }
+    .swap-btn { padding: 11px 18px; }
+    .preset { padding: 12px 14px; }
+    .preset .city { font-size: 0.92rem; }
+    .preset .dest { font-size: 0.7rem; }
+    /* Larger meta labels on phones — improves legibility below 720px */
+    .module-header { font-size: 0.7rem; padding: 10px 14px; }
+    .module-header .meta { font-size: 0.65rem; }
+    .attribution-strip { font-size: 0.65rem; }
+    .tel-cell .label { font-size: 0.65rem; }
     /* Preset scroller: switch to single-column, vertical scroll, full-width cards on mobile */
     .presets-grid {
       display: flex !important;
@@ -1076,14 +1130,14 @@
 </style>
 </head>
 <body>
-<header class="console-header">
+<a href="#content" class="skip-link">Skip to content</a>
+<header class="console-header" role="banner">
   <div class="lhs">
-    <span class="brand"><span class="geo">Ge</span><span class="pivot">o</span><span class="puesto">puesto</span></span>
-    <span class="system-id">Antipodal Observation System</span>
-    <span class="tagline">See what's happening on the exact opposite side of the Earth.</span>
+    <span class="brand" aria-label="Geopuesto"><span class="geo">Ge</span><span class="pivot">o</span><span class="puesto">puesto</span></span>
+    <span class="system-id">Antipodal Observation System · See what's happening on the opposite side of Earth</span>
   </div>
-  <div class="status-row">
-    <span class="status-led"><span class="dot"></span> SYS · OK</span>
+  <div class="status-row" role="status" aria-live="off">
+    <span class="status-led"><span class="dot" aria-hidden="true"></span> SYS · OK</span>
     <span class="system-clock" id="systemClock">--:--:-- UTC</span>
   </div>
 </header>
@@ -1105,15 +1159,14 @@
 </div>
 
 <div class="readout-strip" id="readoutStrip" data-empty="true">
-  <div class="readout origin">
+  <div class="readout origin" aria-live="polite">
     <span class="label">Origin</span>
     <span class="value" id="originCoords">—</span>
   </div>
   <div class="readout-actions">
-    <button class="swap-btn" id="swapBtn" title="Swap origin and target"><span class="arrows">⇄</span> Swap</button>
-    <span class="distance">12,742 km Δ · 20,004 km arc</span>
+    <button class="swap-btn" id="swapBtn" type="button" aria-label="Swap origin and target"><span class="arrows" aria-hidden="true">⇄</span> Swap</button>
   </div>
-  <div class="readout target">
+  <div class="readout target" aria-live="polite">
     <span class="label">Target</span>
     <span class="value" id="antipodeCoords">—</span>
   </div>
@@ -1124,34 +1177,34 @@
     <button class="tab active" data-tab="presets">Quick Picks</button>
     <button class="tab" data-tab="search">Search</button>
     <button class="tab" data-tab="coords">Coordinates</button>
-    <button class="tab tab-action" id="myLocationBtn" type="button">📍 Use my location</button>
-    <button class="tab-shuffle" id="shuffleBtn" type="button" title="Pick a random preset">🎲 Shuffle</button>
+    <button class="tab tab-action" id="myLocationBtn" type="button" aria-label="Use my current location"><span aria-hidden="true">📍</span> Use my location</button>
+    <button class="tab-shuffle" id="shuffleBtn" type="button" aria-label="Pick a random preset"><span aria-hidden="true">🎲</span> Shuffle</button>
   </div>
   <div class="panel active" data-panel="presets">
     <div class="presets-grid" id="presetsContainer"></div>
   </div>
   <div class="panel" data-panel="search">
     <div class="search-wrap">
-      <input type="text" id="searchInput" placeholder="Type a place name (city, address, landmark)…" autocomplete="off" />
+      <input type="text" id="searchInput" placeholder="Type a place name (city, address, landmark)…" autocomplete="off" aria-label="Search for a place" />
       <div class="suggestions" id="suggestions" style="display:none;"></div>
     </div>
   </div>
   <div class="panel" data-panel="coords">
     <div class="coord-inputs">
-      <input type="number" id="latInput" placeholder="LAT" step="any" min="-90" max="90" />
-      <input type="number" id="lngInput" placeholder="LON" step="any" min="-180" max="180" />
+      <input type="number" id="latInput" placeholder="LAT" step="any" min="-90" max="90" aria-label="Latitude in degrees" />
+      <input type="number" id="lngInput" placeholder="LON" step="any" min="-180" max="180" aria-label="Longitude in degrees" />
       <button class="btn-go" id="goBtn">Acquire</button>
     </div>
   </div>
 </div>
 
-<div class="cluster" id="content">
+<main class="cluster" id="content" role="main" tabindex="-1">
   <div class="empty-state">
-    <div class="empty-icon">🌍</div>
+    <div class="empty-icon" aria-hidden="true">🌍</div>
     <div class="question">What's on the opposite side of the Earth?</div>
     <div class="instruction">Click the map · pick a city · search · enter coordinates</div>
   </div>
-</div>
+</main>
 
 <footer>
   Geopuesto · Open data: OSM · Nominatim · Wikipedia · Wikimedia Commons · Open-Meteo · REST Countries · sunrise-sunset · wheretheiss.at · USGS · NOAA · radio-browser · Overpass · CARTO · Esri · OpenSky · AISStream · Mapillary · Google Maps
@@ -2168,7 +2221,7 @@ function renderInfo(lat, lng, data, nearby, wikiSummary, photos, sun, weather, c
   ].filter(Boolean);
   const rightNowModule = `
     <div class="module full">
-      <div class="module-header orange"><span>Right Now Over There</span><span class="meta">Open-Meteo · sunrise-sunset.org</span></div>
+      <div class="module-header teal"><span>Right Now Over There</span><span class="meta">Open-Meteo · sunrise-sunset.org</span></div>
       <div class="module-body"><div class="telemetry">${rightNowCells.join("")}</div></div>
     </div>`;
 
@@ -2216,7 +2269,7 @@ function renderInfo(lat, lng, data, nearby, wikiSummary, photos, sun, weather, c
       });
       aircraftModule = `
         <div class="module full">
-          <div class="module-header orange"><span>Aircraft Overhead</span><span class="meta">OpenSky Network · 200 km radius</span></div>
+          <div class="module-header"><span>Aircraft Overhead</span><span class="meta">OpenSky Network · 200 km radius</span></div>
           <div class="module-body"><div class="telemetry">${cells.join("")}</div></div>
         </div>`;
     }
@@ -2337,7 +2390,7 @@ function renderInfo(lat, lng, data, nearby, wikiSummary, photos, sun, weather, c
     ).join("");
     radioModule = `
       <div class="module full">
-        <div class="module-header orange"><span>Now Playing at the Antipode</span><span class="meta">radio-browser.info · live stream</span></div>
+        <div class="module-header"><span>Now Playing at the Antipode</span><span class="meta">radio-browser.info · live stream</span></div>
         <div class="module-body padded">
           <div class="radio-now">
             <div class="radio-meta">
@@ -2449,7 +2502,7 @@ function renderInfo(lat, lng, data, nearby, wikiSummary, photos, sun, weather, c
     }).join("") : "";
     webcamModule = `
       <div class="module full">
-        <div class="module-header teal"><span>Live Webcam Near Target</span><span class="meta">Windy.com · ${escapeHtml(distLabel)}</span></div>
+        <div class="module-header"><span>Live Webcam Near Target</span><span class="meta">Windy.com · ${escapeHtml(distLabel)}</span></div>
         <div class="module-body">
           <div class="webcam-now">
             <div>${topMedia}</div>
@@ -2469,7 +2522,7 @@ function renderInfo(lat, lng, data, nearby, wikiSummary, photos, sun, weather, c
   if (sentinelUrl) {
     sentinel2Module = `
       <div class="module full">
-        <div class="module-header teal"><span>Recent Satellite Image</span><span class="meta">Sentinel-2 · Copernicus · last 30d · &lt;20% clouds</span></div>
+        <div class="module-header"><span>Recent Satellite Image</span><span class="meta">Sentinel-2 · Copernicus · last 30d · &lt;20% clouds</span></div>
         <div class="module-body">
           <img class="embed-frame sentinel2-img" src="${escapeHtml(sentinelUrl)}" alt="Recent Sentinel-2 satellite image near the antipode" loading="lazy" onerror="this.closest('.module').style.display='none';">
         </div>
@@ -2602,7 +2655,7 @@ function renderInfo(lat, lng, data, nearby, wikiSummary, photos, sun, weather, c
 
   const sv = isLand && CONFIG.googleMapsApiKey ? `
     <div class="module full">
-      <div class="module-header orange"><span>Street View</span><span class="meta">Google Maps Embed API</span></div>
+      <div class="module-header"><span>Street View</span><span class="meta">Google Maps Embed API</span></div>
       <div class="module-body">
         <iframe class="embed-frame" src="https://www.google.com/maps/embed/v1/streetview?key=${CONFIG.googleMapsApiKey}&location=${lat},${lng}&heading=0&pitch=0&fov=90" allowfullscreen referrerpolicy="no-referrer-when-downgrade"></iframe>
       </div>
@@ -2614,7 +2667,7 @@ function renderInfo(lat, lng, data, nearby, wikiSummary, photos, sun, weather, c
 
   const mp = CONFIG.mapillaryToken && mapillary && mapillary.id ? `
     <div class="module full">
-      <div class="module-header teal"><span>Mapillary · Community Photos</span><span class="meta">${mapillary.distKm ? Math.round(mapillary.distKm).toLocaleString() + " km from antipode" : ""}${mapillary.captured_at ? " · " + new Date(mapillary.captured_at).toISOString().slice(0,10) : ""}</span></div>
+      <div class="module-header"><span>Mapillary · Community Photos</span><span class="meta">${mapillary.distKm ? Math.round(mapillary.distKm).toLocaleString() + " km from antipode" : ""}${mapillary.captured_at ? " · " + new Date(mapillary.captured_at).toISOString().slice(0,10) : ""}</span></div>
       <div class="module-body">
         <iframe class="embed-frame" src="https://www.mapillary.com/embed?image_key=${mapillary.id}&style=photo" allowfullscreen></iframe>
       </div>
@@ -2627,7 +2680,7 @@ function renderInfo(lat, lng, data, nearby, wikiSummary, photos, sun, weather, c
   const windyOverlay = isLand ? "wind" : "waves";
   const windy = `
     <div class="module full">
-      <div class="module-header orange"><span>Live ${isLand ? "Weather" : "Waves &amp; Weather"}</span><span class="meta">Windy.com</span></div>
+      <div class="module-header"><span>Live ${isLand ? "Weather" : "Waves &amp; Weather"}</span><span class="meta">Windy.com</span></div>
       <div class="module-body">
         <iframe class="embed-frame" src="https://embed.windy.com/embed2.html?lat=${lat}&lon=${lng}&detailLat=${lat}&detailLon=${lng}&width=650&height=420&zoom=8&level=surface&overlay=${windyOverlay}&menu=&message=&marker=true&calendar=&pressure=&type=map&location=coordinates&detail=&metricWind=default&metricTemp=default&radarRange=-1" frameborder="0"></iframe>
       </div>
@@ -2647,7 +2700,7 @@ function renderInfo(lat, lng, data, nearby, wikiSummary, photos, sun, weather, c
       || addr.county || addr.state
       || addr.country
       || "Land";
-    const flag = country && country.flag ? country.flag + " " : "";
+    const flag = country && country.flag ? `<span class="flag">${country.flag}</span>` : "";
     const parts = [addr.country, addr.state || addr.region].filter(Boolean);
     heroSubtitle = `${flag}${escapeHtml(parts.join(" · "))}`;
   } else {
