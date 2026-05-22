@@ -440,7 +440,13 @@
     max-width: 1320px;
     margin: 0 auto;
     display: grid;
-    gap: 14px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+    align-items: start;
+    grid-auto-flow: dense;
+  }
+  @media (max-width: 880px) {
+    .cluster { grid-template-columns: 1fr; }
   }
   .module {
     background: var(--surface);
@@ -531,6 +537,10 @@
     .hero-fact { grid-template-columns: 1fr; gap: 2px; }
   }
   .module.full { grid-column: 1 / -1; }
+  .module.half { grid-column: span 1; }
+  @media (max-width: 880px) {
+    .module.half { grid-column: 1 / -1; }
+  }
   .module-header {
     padding: 9px 16px;
     background: var(--bg-2);
@@ -2735,35 +2745,42 @@ function renderInfo(lat, lng, data, nearby, wikiSummary, photos, sun, weather, c
 
   // ============ Dynamic module ordering by signal strength ============
   // Higher priority = floats higher. Signal-strength boosts let big-deal events surface near the top.
+  // Module entries declare priority (sort order) and size (grid span: "full" = both cols, "half" = one col).
+  // Boost conditions (big quake, close volcano, aurora visible, ISS overhead, bad air) promote a module to FULL
+  // size as well as priority, so emergencies break out of the half-width grid for prominence.
+  const closeVolcano = nearestVolcano && nearestVolcano.distKm <= 250;
+  const issOverhead = issDistKm != null && issDistKm < 500;
+  const badAir = aq && aq.european_aqi >= 80;
   const modules = [
-    { html: heroModule, prio: 10000 },
-    { html: wikiModule, prio: 900 },
-    { html: quakeModule, prio: 500 + (bigQuake ? 8500 : 0) },                                              // M5+ in 24h → near top
-    { html: volcanoModule, prio: 470 + (nearestVolcano && nearestVolcano.distKm <= 250 ? 8200 : 0) },      // Close eruption → near top
-    { html: auroraModule, prio: 460 + (auroraVisibleHere ? 8000 : 0) + (kp && kp.kp >= 5 ? 200 : 0) },
-    { html: photoModule, prio: 850 },
-    { html: rightNowModule, prio: 800 },
-    { html: forecastModule, prio: 750 },                                                                    // 24h forecast right after "now"
-    { html: aqiModule, prio: 700 + (aq && aq.european_aqi >= 80 ? 1500 : 0) },                             // Bad air → boost
-    { html: sv, prio: 650 },
-    { html: sentinel2Module, prio: 630 },                                                                   // Recent Sentinel-2 imagery — fresher than Google's stale tiles
-    { html: satEmbed, prio: 620 },
-    { html: webcamModule, prio: 610 },
-    { html: radioModule, prio: 600 },
-    { html: mp, prio: 580 },
-    { html: poiModule, prio: 540 },
-    { html: overheadModule, prio: 450 + (issDistKm != null && issDistKm < 500 ? 8400 : 0) },               // ISS overhead → near top
-    { html: aircraftModule, prio: 420 },
-    { html: vesselsModule, prio: 400 },
-    { html: windy, prio: 350 },
-    { html: magModule, prio: 250 },
-    { html: countryModule, prio: 200 },
-    { html: positionModule, prio: 150 },
+    { html: heroModule, prio: 10000, size: "full" },
+    { html: wikiModule, prio: 900, size: "full" },
+    { html: quakeModule, prio: 500 + (bigQuake ? 8500 : 0), size: bigQuake ? "full" : "half" },
+    { html: volcanoModule, prio: 470 + (closeVolcano ? 8200 : 0), size: closeVolcano ? "full" : "half" },
+    { html: auroraModule, prio: 460 + (auroraVisibleHere ? 8000 : 0) + (kp && kp.kp >= 5 ? 200 : 0), size: auroraVisibleHere ? "full" : "half" },
+    { html: photoModule, prio: 850, size: "full" },
+    { html: rightNowModule, prio: 800, size: "full" },
+    { html: forecastModule, prio: 750, size: "half" },
+    { html: aqiModule, prio: 700 + (badAir ? 1500 : 0), size: badAir ? "full" : "half" },
+    { html: sv, prio: 650, size: "full" },
+    { html: sentinel2Module, prio: 630, size: "half" },
+    { html: satEmbed, prio: 620, size: "full" },
+    { html: webcamModule, prio: 610, size: "full" },
+    { html: radioModule, prio: 600, size: "half" },
+    { html: mp, prio: 580, size: "full" },
+    { html: poiModule, prio: 540, size: "full" },
+    { html: overheadModule, prio: 450 + (issOverhead ? 8400 : 0), size: issOverhead ? "full" : "half" },
+    { html: aircraftModule, prio: 420, size: "half" },
+    { html: vesselsModule, prio: 400, size: "full" },
+    { html: windy, prio: 350, size: "full" },
+    { html: magModule, prio: 250, size: "half" },
+    { html: countryModule, prio: 200, size: "half" },
+    { html: positionModule, prio: 150, size: "full" },
   ];
   document.getElementById("content").innerHTML = modules
     .filter(m => m.html)
     .sort((a, b) => b.prio - a.prio)
-    .map(m => m.html)
+    // Module HTML templates hardcode `class="module full"`. Rewrite to whichever size the entry requested.
+    .map(m => m.html.replace('class="module full', `class="module ${m.size || "full"}`))
     .join("");
 
   // Webcam alt-thumbnail switcher — swap the main player/image when clicked
