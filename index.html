@@ -916,69 +916,102 @@ const CONFIG = {
 // spot at each end (Trekker landmarks, town centers, observatories, etc.).
 const PRESETS = [
   // ====== TIER A — both sides have Google Street View (paired in scroller) ======
+  // Ordered to disperse NZ↔Iberia pairs across the scroller instead of clustering them.
+  // 10 NZ pairs interleaved with 14 non-NZ pairs (Pacific islands, Hawaii, E/SE Asia, Americas).
 
-  // NZ ↔ Iberia (6 pairs)
+  // 1 — NZ
   { name: "Wellington — Te Papa", dest: "Salamanca province, Spain", lat: -41.2904, lng: 174.7818, pairId: "wel-sal", pairRole: "a" },
   { name: "Salamanca province, Spain", dest: "Wellington, NZ", lat: 41.2904, lng: -5.2182, pairId: "wel-sal", pairRole: "b" },
 
-  { name: "Auckland — Sky Tower", dest: "Sierra de Grazalema, Spain", lat: -36.8485, lng: 174.7633, pairId: "auc-caz", pairRole: "a" },
-  { name: "Sierra de Grazalema, Cádiz", dest: "Auckland, NZ", lat: 36.8485, lng: -5.2367, pairId: "auc-caz", pairRole: "b" },
-
-  { name: "Christchurch — Cathedral Sq", dest: "near Lugo, Galicia", lat: -43.5309, lng: 172.6366, pairId: "chc-lug", pairRole: "a" },
-  { name: "near Lugo, Galicia", dest: "Christchurch, NZ", lat: 43.5309, lng: -7.3634, pairId: "chc-lug", pairRole: "b" },
-
-  { name: "Hamilton, NZ", dest: "Lucena, Andalusia", lat: -37.7870, lng: 175.2793, pairId: "ham-luc", pairRole: "a" },
-  { name: "Lucena, Andalusia", dest: "Hamilton, NZ", lat: 37.7870, lng: -4.7207, pairId: "ham-luc", pairRole: "b" },
-
-  { name: "Napier — Marine Parade", dest: "near Tarancón, Spain", lat: -39.4839, lng: 176.9170, pairId: "nap-tar", pairRole: "a" },
-  { name: "near Tarancón, La Mancha", dest: "Napier, NZ", lat: 39.4839, lng: -3.0830, pairId: "nap-tar", pairRole: "b" },
-
-  { name: "Hokitika Beach, NZ", dest: "Muxía coast, Galicia", lat: -42.7155, lng: 170.9650, pairId: "hok-mux", pairRole: "a" },
-  { name: "Muxía coast, Galicia", dest: "Hokitika, NZ", lat: 42.7155, lng: -9.0350, pairId: "hok-mux", pairRole: "b" },
-
-  // Hawaii ↔ Botswana (2 pairs — iconic Hawaiian landmarks)
-  { name: "Diamond Head Crater, Oahu", dest: "Botswana A3 (Ghanzi-Maun)", lat: 21.2620, lng: -157.8050, pairId: "dh-bot", pairRole: "a" },
-  { name: "Botswana A3 (Ghanzi-Maun)", dest: "Diamond Head, Oahu", lat: -21.2620, lng: 22.1950, pairId: "dh-bot", pairRole: "b" },
-
-  { name: "Kīlauea, Hawaii Volcanoes NP", dest: "near Maun, Botswana", lat: 19.4194, lng: -155.2885, pairId: "kil-mau", pairRole: "a" },
-  { name: "near Maun, Botswana", dest: "Kīlauea, Big Island", lat: -19.4194, lng: 24.7115, pairId: "kil-mau", pairRole: "b" },
-
-  // East Asia ↔ Argentina/Paraguay (3 pairs)
-  { name: "Hong Kong — Victoria Peak", dest: "La Quiaca, Jujuy, Argentina", lat: 22.2759, lng: 114.1455, pairId: "hk-jjy", pairRole: "a" },
-  { name: "La Quiaca, Jujuy", dest: "Hong Kong — Victoria Peak", lat: -22.2759, lng: -65.8545, pairId: "hk-jjy", pairRole: "b" },
-
-  { name: "Macau — Senado Square", dest: "Yavi, Jujuy, Argentina", lat: 22.1925, lng: 113.5400, pairId: "mac-yav", pairRole: "a" },
-  { name: "Yavi, Jujuy", dest: "Macau — Senado Square", lat: -22.1925, lng: -66.4600, pairId: "mac-yav", pairRole: "b" },
-
-  { name: "Taipei 101", dest: "rural Paraguay E of Asunción", lat: 25.0330, lng: 121.5654, pairId: "tai-asu", pairRole: "a" },
-  { name: "rural Paraguay E of Asunción", dest: "Taipei 101", lat: -25.0330, lng: -58.4346, pairId: "tai-asu", pairRole: "b" },
-
-  // SE Asia ↔ Americas (4 pairs)
-  { name: "Singapore — Marina Bay Sands", dest: "near Tena, Ecuador", lat: 1.2834, lng: 103.8607, pairId: "sin-ten", pairRole: "a" },
-  { name: "near Tena, Ecuadorian Amazon", dest: "Singapore — Marina Bay", lat: -1.2834, lng: -76.1393, pairId: "sin-ten", pairRole: "b" },
-
-  { name: "Bogotá — Plaza Bolívar", dest: "Lubuklinggau, Sumatra", lat: 4.5981, lng: -74.0758, pairId: "bog-lub", pairRole: "a" },
-  { name: "Lubuklinggau, Sumatra", dest: "Bogotá — Plaza Bolívar", lat: -4.5981, lng: 105.9242, pairId: "bog-lub", pairRole: "b" },
-
-  { name: "Quito — Mitad del Mundo", dest: "near Pekanbaru, Sumatra", lat: 0.0022, lng: -78.4558, pairId: "qui-pek", pairRole: "a" },
-  { name: "near Pekanbaru, Sumatra (Riau)", dest: "Quito — Equator monument", lat: -0.0022, lng: 101.5442, pairId: "qui-pek", pairRole: "b" },
-
-  { name: "Penang — Georgetown UNESCO", dest: "Chiclayo coast, Peru", lat: 5.4164, lng: 100.3327, pairId: "pen-chi", pairRole: "a" },
-  { name: "Chiclayo coast, Peru", dest: "Penang — Georgetown", lat: -5.4164, lng: -79.6673, pairId: "pen-chi", pairRole: "b" },
-
-  // Iconic Islands (5 pairs)
+  // 2 — Pacific island
   { name: "Pitcairn — Adamstown", dest: "NW of Riyadh, Saudi Arabia", lat: -25.0656, lng: -130.0989, pairId: "pit-riy", pairRole: "a" },
   { name: "NW of Riyadh, Saudi Arabia", dest: "Pitcairn — Adamstown", lat: 25.0656, lng: 49.9011, pairId: "pit-riy", pairRole: "b" },
 
-  { name: "Galápagos — Darwin Station", dest: "Magura, Bangladesh", lat: -0.7411, lng: -90.3026, pairId: "gal-mag", pairRole: "a" },
-  { name: "Magura district, Bangladesh", dest: "Galápagos — Puerto Ayora", lat: 0.7411, lng: 89.6974, pairId: "gal-mag", pairRole: "b" },
+  // 3 — NZ
+  { name: "Auckland — Sky Tower", dest: "Sierra de Grazalema, Spain", lat: -36.8485, lng: 174.7633, pairId: "auc-caz", pairRole: "a" },
+  { name: "Sierra de Grazalema, Cádiz", dest: "Auckland, NZ", lat: 36.8485, lng: -5.2367, pairId: "auc-caz", pairRole: "b" },
 
+  // 4 — Hawaii
+  { name: "Diamond Head Crater, Oahu", dest: "Botswana A3 (Ghanzi-Maun)", lat: 21.2620, lng: -157.8050, pairId: "dh-bot", pairRole: "a" },
+  { name: "Botswana A3 (Ghanzi-Maun)", dest: "Diamond Head, Oahu", lat: -21.2620, lng: 22.1950, pairId: "dh-bot", pairRole: "b" },
+
+  // 5 — East Asia
+  { name: "Hong Kong — Victoria Peak", dest: "La Quiaca, Jujuy, Argentina", lat: 22.2759, lng: 114.1455, pairId: "hk-jjy", pairRole: "a" },
+  { name: "La Quiaca, Jujuy", dest: "Hong Kong — Victoria Peak", lat: -22.2759, lng: -65.8545, pairId: "hk-jjy", pairRole: "b" },
+
+  // 6 — NZ
+  { name: "Christchurch — Cathedral Sq", dest: "near Lugo, Galicia", lat: -43.5309, lng: 172.6366, pairId: "chc-lug", pairRole: "a" },
+  { name: "near Lugo, Galicia", dest: "Christchurch, NZ", lat: 43.5309, lng: -7.3634, pairId: "chc-lug", pairRole: "b" },
+
+  // 7 — SE Asia
+  { name: "Singapore — Marina Bay Sands", dest: "near Tena, Ecuador", lat: 1.2834, lng: 103.8607, pairId: "sin-ten", pairRole: "a" },
+  { name: "near Tena, Ecuadorian Amazon", dest: "Singapore — Marina Bay", lat: -1.2834, lng: -76.1393, pairId: "sin-ten", pairRole: "b" },
+
+  // 8 — Pacific island
   { name: "Easter Island — Ahu Tongariki", dest: "Tharparkar Desert, Pakistan", lat: -27.1255, lng: -109.2773, pairId: "ei-thar", pairRole: "a" },
   { name: "Tharparkar Desert, Pakistan", dest: "Easter Island — Tongariki", lat: 27.1255, lng: 70.7227, pairId: "ei-thar", pairRole: "b" },
 
+  // 9 — NZ (NEW — Rotorua geothermal)
+  { name: "Rotorua — Te Puia geysers", dest: "near Bailén, Andalusia", lat: -38.1500, lng: 176.2548, pairId: "rot-bai", pairRole: "a" },
+  { name: "near Bailén, Andalusia", dest: "Rotorua geysers, NZ", lat: 38.1500, lng: -3.7452, pairId: "rot-bai", pairRole: "b" },
+
+  // 10 — Americas
+  { name: "Bogotá — Plaza Bolívar", dest: "Lubuklinggau, Sumatra", lat: 4.5981, lng: -74.0758, pairId: "bog-lub", pairRole: "a" },
+  { name: "Lubuklinggau, Sumatra", dest: "Bogotá — Plaza Bolívar", lat: -4.5981, lng: 105.9242, pairId: "bog-lub", pairRole: "b" },
+
+  // 11 — East Asia
+  { name: "Macau — Senado Square", dest: "Yavi, Jujuy, Argentina", lat: 22.1925, lng: 113.5400, pairId: "mac-yav", pairRole: "a" },
+  { name: "Yavi, Jujuy", dest: "Macau — Senado Square", lat: -22.1925, lng: -66.4600, pairId: "mac-yav", pairRole: "b" },
+
+  // 12 — NZ
+  { name: "Hamilton, NZ", dest: "Lucena, Andalusia", lat: -37.7870, lng: 175.2793, pairId: "ham-luc", pairRole: "a" },
+  { name: "Lucena, Andalusia", dest: "Hamilton, NZ", lat: 37.7870, lng: -4.7207, pairId: "ham-luc", pairRole: "b" },
+
+  // 13 — Pacific island
+  { name: "Galápagos — Darwin Station", dest: "Magura, Bangladesh", lat: -0.7411, lng: -90.3026, pairId: "gal-mag", pairRole: "a" },
+  { name: "Magura district, Bangladesh", dest: "Galápagos — Puerto Ayora", lat: 0.7411, lng: 89.6974, pairId: "gal-mag", pairRole: "b" },
+
+  // 14 — Hawaii
+  { name: "Kīlauea, Hawaii Volcanoes NP", dest: "near Maun, Botswana", lat: 19.4194, lng: -155.2885, pairId: "kil-mau", pairRole: "a" },
+  { name: "near Maun, Botswana", dest: "Kīlauea, Big Island", lat: -19.4194, lng: 24.7115, pairId: "kil-mau", pairRole: "b" },
+
+  // 15 — NZ (NEW — Mt Maunganui beach)
+  { name: "Mt Maunganui beach, NZ", dest: "near Linares, Andalusia", lat: -37.6396, lng: 176.1830, pairId: "mtm-lin", pairRole: "a" },
+  { name: "near Linares, Andalusia", dest: "Mt Maunganui, NZ", lat: 37.6396, lng: -3.8170, pairId: "mtm-lin", pairRole: "b" },
+
+  // 16 — Americas
+  { name: "Quito — Mitad del Mundo", dest: "near Pekanbaru, Sumatra", lat: 0.0022, lng: -78.4558, pairId: "qui-pek", pairRole: "a" },
+  { name: "near Pekanbaru, Sumatra (Riau)", dest: "Quito — Equator monument", lat: -0.0022, lng: 101.5442, pairId: "qui-pek", pairRole: "b" },
+
+  // 17 — NZ (NEW — New Plymouth coastal walkway)
+  { name: "New Plymouth — Te Rewa Rewa", dest: "near Cáceres, Extremadura", lat: -39.0386, lng: 174.0876, pairId: "npl-cac", pairRole: "a" },
+  { name: "near Cáceres, Extremadura", dest: "New Plymouth, NZ", lat: 39.0386, lng: -5.9124, pairId: "npl-cac", pairRole: "b" },
+
+  // 18 — Indian Ocean island
   { name: "Christmas Is — Flying Fish Cove", dest: "Magdalena River, Colombia", lat: -10.4233, lng: 105.6783, pairId: "xi-mag", pairRole: "a" },
   { name: "Magdalena River, Colombia", dest: "Christmas Is — Flying Fish Cove", lat: 10.4233, lng: -74.3217, pairId: "xi-mag", pairRole: "b" },
 
+  // 19 — NZ
+  { name: "Napier — Marine Parade", dest: "near Tarancón, Spain", lat: -39.4839, lng: 176.9170, pairId: "nap-tar", pairRole: "a" },
+  { name: "near Tarancón, La Mancha", dest: "Napier, NZ", lat: 39.4839, lng: -3.0830, pairId: "nap-tar", pairRole: "b" },
+
+  // 20 — East Asia
+  { name: "Taipei 101", dest: "rural Paraguay E of Asunción", lat: 25.0330, lng: 121.5654, pairId: "tai-asu", pairRole: "a" },
+  { name: "rural Paraguay E of Asunción", dest: "Taipei 101", lat: -25.0330, lng: -58.4346, pairId: "tai-asu", pairRole: "b" },
+
+  // 21 — NZ (NEW — Gisborne / Cook's landing)
+  { name: "Gisborne — Cook's landing site", dest: "near Cieza, Murcia", lat: -38.6623, lng: 178.0176, pairId: "gis-cie", pairRole: "a" },
+  { name: "near Cieza, Murcia", dest: "Gisborne, NZ (Cook's landing)", lat: 38.6623, lng: -1.9824, pairId: "gis-cie", pairRole: "b" },
+
+  // 22 — SE Asia
+  { name: "Penang — Georgetown UNESCO", dest: "Chiclayo coast, Peru", lat: 5.4164, lng: 100.3327, pairId: "pen-chi", pairRole: "a" },
+  { name: "Chiclayo coast, Peru", dest: "Penang — Georgetown", lat: -5.4164, lng: -79.6673, pairId: "pen-chi", pairRole: "b" },
+
+  // 23 — NZ
+  { name: "Hokitika Beach, NZ", dest: "Muxía coast, Galicia", lat: -42.7155, lng: 170.9650, pairId: "hok-mux", pairRole: "a" },
+  { name: "Muxía coast, Galicia", dest: "Hokitika, NZ", lat: 42.7155, lng: -9.0350, pairId: "hok-mux", pairRole: "b" },
+
+  // 24 — Subantarctic island
   { name: "South Georgia — Grytviken", dest: "Sakhalin Island, Russia", lat: -54.2811, lng: -36.5092, pairId: "sgi-sak", pairRole: "a" },
   { name: "Sakhalin — Yuzhno-Sakhalinsk", dest: "South Georgia — Grytviken", lat: 54.2811, lng: 143.4908, pairId: "sgi-sak", pairRole: "b" },
 
