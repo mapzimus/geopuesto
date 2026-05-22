@@ -663,6 +663,93 @@
     display: block;
   }
 
+  /* ============ Radio player module ============ */
+  .radio-now {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 14px;
+    align-items: center;
+    padding: 10px 12px;
+    background: var(--surface-2);
+    border: 1px solid var(--border-bright);
+    border-radius: 2px;
+  }
+  @media (max-width: 700px) {
+    .radio-now { grid-template-columns: 1fr; }
+  }
+  .radio-meta { min-width: 0; }
+  .radio-name {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--text-bright);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .radio-detail {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--dim);
+    margin-top: 3px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  audio#radioPlayer {
+    width: 280px;
+    max-width: 100%;
+    height: 36px;
+    filter: invert(0.92) hue-rotate(180deg);
+  }
+  .radio-alts-label {
+    margin-top: 14px;
+    margin-bottom: 8px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.62rem;
+    color: var(--dim);
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+  }
+  .radio-alts {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 6px;
+  }
+  .radio-station {
+    text-align: left;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 11px;
+    border-radius: 1px;
+    cursor: pointer;
+    font-family: inherit;
+    line-height: 1.3;
+    transition: all 0.12s;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .radio-station:hover { border-color: var(--orange); background: var(--orange-soft); }
+  .radio-station.active { border-color: var(--orange); background: var(--orange-soft); color: var(--orange); }
+  .radio-station-name {
+    font-weight: 500;
+    font-size: 0.82rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .radio-station-meta {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.6rem;
+    color: var(--dim);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
   /* Empty / loading */
   .empty-state {
     text-align: center;
@@ -1383,6 +1470,52 @@ async function fetchSatellitesAbove(lat, lng) {
   } catch { return null; }
 }
 
+// USGS earthquake feed — last 7 days, 500 km radius, M2.0+
+async function fetchEarthquakes(lat, lng) {
+  try {
+    const start = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+    const url = `https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&latitude=${lat}&longitude=${lng}&maxradiuskm=500&starttime=${start}&minmagnitude=2.0&orderby=magnitude&limit=20`;
+    const r = await fetch(url);
+    if (!r.ok) return null;
+    const d = await r.json();
+    return Array.isArray(d.features) ? d.features : [];
+  } catch { return null; }
+}
+
+// Open-Meteo Air Quality API — same provider as weather, no key
+async function fetchAirQuality(lat, lng) {
+  try {
+    const r = await fetch(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lng}&current=european_aqi,us_aqi,pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone`);
+    if (!r.ok) return null;
+    const d = await r.json();
+    return d.current || null;
+  } catch { return null; }
+}
+
+// radio-browser.info — community-maintained registry of internet radio streams.
+// Returns top-voted working stations in the antipode's country.
+async function fetchRadioStations(countryCode) {
+  if (!countryCode) return null;
+  try {
+    const url = `https://de1.api.radio-browser.info/json/stations/search?countrycode=${countryCode.toUpperCase()}&hidebroken=true&order=votes&reverse=true&limit=12`;
+    const r = await fetch(url);
+    if (!r.ok) return null;
+    const d = await r.json();
+    return Array.isArray(d) ? d.filter(s => s.url_resolved && s.lastcheckok === 1) : [];
+  } catch { return null; }
+}
+
+function formatAgo(ms) {
+  const sec = Math.floor(ms / 1000);
+  if (sec < 60) return `${sec}s ago`;
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h ago`;
+  const d = Math.floor(hr / 24);
+  return `${d}d ago`;
+}
+
 const WEATHER_CODES = {
   0: "Clear sky", 1: "Mainly clear", 2: "Partly cloudy", 3: "Overcast",
   45: "Fog", 48: "Rime fog",
@@ -1433,7 +1566,7 @@ async function goTo(lat, lng) {
 
   document.getElementById("content").innerHTML = '<div class="loading">Tunneling through the Earth</div>';
 
-  const [data, nearby, sun, weather, mapillary, iss, sats, flights, gtz, gelev] = await Promise.all([
+  const [data, nearby, sun, weather, mapillary, iss, sats, flights, gtz, gelev, quakes, aq] = await Promise.all([
     reverseGeocode(anti.lat, anti.lng),
     checkNearby(anti.lat, anti.lng),
     fetchSunTimes(anti.lat, anti.lng),
@@ -1444,25 +1577,28 @@ async function goTo(lat, lng) {
     fetchOpenSkyFlights(anti.lat, anti.lng),
     fetchGoogleTimezone(anti.lat, anti.lng),
     fetchGoogleElevation(anti.lat, anti.lng),
+    fetchEarthquakes(anti.lat, anti.lng),
+    fetchAirQuality(anti.lat, anti.lng),
   ]);
 
   const wikiPromise = nearby.wikipedia ? fetchWikipediaSummary(nearby.wikipedia.pageid) : Promise.resolve(null);
   const photosPromise = nearby.commonsTitles.length ? fetchPhotoUrls(nearby.commonsTitles.slice(0, 12)) : Promise.resolve([]);
   const cca2 = data && data.address && data.address.country_code;
   const countryPromise = cca2 ? fetchCountry(cca2) : Promise.resolve(null);
+  const radioPromise = cca2 ? fetchRadioStations(cca2) : Promise.resolve(null);
   // AIS WebSocket runs ~8s in parallel with the rest
   const shipsPromise = fetchAISShips(anti.lat, anti.lng);
 
-  renderInfo(anti.lat, anti.lng, data, nearby, null, null, sun, weather, null, mapillary, iss, sats, flights, null, gtz, gelev);
-  const [wikiSummary, photos, country, ships] = await Promise.all([wikiPromise, photosPromise, countryPromise, shipsPromise]);
-  renderInfo(anti.lat, anti.lng, data, nearby, wikiSummary, photos, sun, weather, country, mapillary, iss, sats, flights, ships, gtz, gelev);
+  renderInfo(anti.lat, anti.lng, data, nearby, null, null, sun, weather, null, mapillary, iss, sats, flights, null, gtz, gelev, quakes, aq, null);
+  const [wikiSummary, photos, country, ships, radio] = await Promise.all([wikiPromise, photosPromise, countryPromise, shipsPromise, radioPromise]);
+  renderInfo(anti.lat, anti.lng, data, nearby, wikiSummary, photos, sun, weather, country, mapillary, iss, sats, flights, ships, gtz, gelev, quakes, aq, radio);
 }
 
 function tcell(label, value, klass = "") {
   return `<div class="tel-cell"><span class="label">${label}</span><div class="value ${klass}">${value}</div></div>`;
 }
 
-function renderInfo(lat, lng, data, nearby, wikiSummary, photos, sun, weather, country, mapillary, iss, sats, flights, ships, gtz, gelev) {
+function renderInfo(lat, lng, data, nearby, wikiSummary, photos, sun, weather, country, mapillary, iss, sats, flights, ships, gtz, gelev, quakes, aq, radio) {
   const isLand = !!(data && data.address && data.address.country);
   const addr = (data && data.address) || {};
   const surfaceBadge = isLand ? '<span class="badge land">LAND</span>' : '<span class="badge ocean">OCEAN</span>';
@@ -1617,6 +1753,103 @@ function renderInfo(lat, lng, data, nearby, wikiSummary, photos, sun, weather, c
       <div class="module full">
         <div class="module-header"><span>Vessels Nearby</span><span class="meta">MarineTraffic map</span></div>
         <div class="module-body" style="padding:0;">${aisMap}</div>
+      </div>`;
+  }
+
+  // ============ Module: Recent Earthquakes (USGS) ============
+  let quakeModule = "";
+  if (Array.isArray(quakes)) {
+    if (quakes.length === 0) {
+      quakeModule = `
+        <div class="module full">
+          <div class="module-header"><span>Recent Earthquakes</span><span class="meta">USGS · 500 km · 7d · M2.0+</span></div>
+          <div class="module-body padded"><div style="font-family:'IBM Plex Mono',monospace;font-size:0.78rem;color:var(--dim);">Seismically quiet — no quakes M2.0+ within 500 km in the last 7 days.</div></div>
+        </div>`;
+    } else {
+      const recent24h = quakes.filter(q => q.properties && Date.now() - q.properties.time < 86400000);
+      const sortedByTime = [...quakes].sort((a, b) => b.properties.time - a.properties.time);
+      const top = quakes[0]; // largest (we sorted by magnitude server-side)
+      const cells = [
+        tcell("Largest (7d)", `M${top.properties.mag.toFixed(1)}`, "big"),
+        tcell("Within 500km", `${quakes.length}`, "big"),
+        recent24h.length ? tcell("Last 24h", `${recent24h.length}`) : null,
+      ].filter(Boolean);
+      sortedByTime.slice(0, 5).forEach(q => {
+        const p = q.properties;
+        const c = q.geometry && q.geometry.coordinates;
+        if (!c) return;
+        const distKm = haversine(lat, lng, c[1], c[0]);
+        const brg = compass(bearing(lat, lng, c[1], c[0]));
+        const ago = formatAgo(Date.now() - p.time);
+        const depth = c[2] != null ? `${Math.round(c[2])}km deep` : "";
+        const place = p.place || "Unknown";
+        cells.push(tcell(`M${p.mag.toFixed(1)}`, `${escapeHtml(place)} · ${Math.round(distKm)} km ${brg} · ${depth} · ${ago}`, "text"));
+      });
+      const headerClass = top.properties.mag >= 5.0 && recent24h.length ? "orange" : "";
+      quakeModule = `
+        <div class="module full">
+          <div class="module-header ${headerClass}"><span>Recent Earthquakes</span><span class="meta">USGS · 500 km · 7d · M2.0+</span></div>
+          <div class="module-body"><div class="telemetry">${cells.join("")}</div></div>
+        </div>`;
+    }
+  }
+
+  // ============ Module: Air Quality (Open-Meteo) ============
+  let aqiModule = "";
+  if (aq && (aq.european_aqi != null || aq.us_aqi != null)) {
+    const e = aq.european_aqi;
+    // EAQI bands per official 0-100+ scale
+    let band = "—", bandColor = "var(--dim)";
+    if (e != null) {
+      if (e <= 20) { band = "Good"; bandColor = "#4caf50"; }
+      else if (e <= 40) { band = "Fair"; bandColor = "#9acd32"; }
+      else if (e <= 60) { band = "Moderate"; bandColor = "#ffb300"; }
+      else if (e <= 80) { band = "Poor"; bandColor = "#ff6f00"; }
+      else if (e <= 100) { band = "Very Poor"; bandColor = "#d32f2f"; }
+      else { band = "Extremely Poor"; bandColor = "#7b1fa2"; }
+    }
+    const aqCells = [
+      e != null ? tcell("European AQI", `<span style="color:${bandColor};font-weight:600">${Math.round(e)} · ${band}</span>`, "big") : null,
+      aq.us_aqi != null ? tcell("US AQI", `${Math.round(aq.us_aqi)}`) : null,
+      aq.pm2_5 != null ? tcell("PM2.5", `${Number(aq.pm2_5).toFixed(1)} µg/m³`) : null,
+      aq.pm10 != null ? tcell("PM10", `${Number(aq.pm10).toFixed(1)} µg/m³`) : null,
+      aq.nitrogen_dioxide != null ? tcell("NO₂", `${Number(aq.nitrogen_dioxide).toFixed(1)} µg/m³`) : null,
+      aq.ozone != null ? tcell("Ozone (O₃)", `${Number(aq.ozone).toFixed(1)} µg/m³`) : null,
+      aq.sulphur_dioxide != null ? tcell("SO₂", `${Number(aq.sulphur_dioxide).toFixed(1)} µg/m³`) : null,
+      aq.carbon_monoxide != null ? tcell("CO", `${Number(aq.carbon_monoxide).toFixed(0)} µg/m³`) : null,
+    ].filter(Boolean);
+    aqiModule = `
+      <div class="module full">
+        <div class="module-header teal"><span>Air Quality</span><span class="meta">Open-Meteo · EAQI &amp; pollutants</span></div>
+        <div class="module-body"><div class="telemetry">${aqCells.join("")}</div></div>
+      </div>`;
+  }
+
+  // ============ Module: Now Playing at the Antipode (radio-browser) ============
+  let radioModule = "";
+  if (isLand && Array.isArray(radio) && radio.length > 0) {
+    const top = radio[0];
+    const alts = radio.slice(1, 6);
+    const tagStr = (s) => (s.tags || "").split(",").filter(Boolean).slice(0, 2).join(" · ");
+    const altList = alts.map(s =>
+      `<button class="radio-station" data-url="${escapeHtml(s.url_resolved)}" data-name="${escapeHtml(s.name)}" data-codec="${escapeHtml(s.codec || "")}" data-bitrate="${s.bitrate || ""}" data-tags="${escapeHtml(tagStr(s))}">
+         <span class="radio-station-name">${escapeHtml(s.name.trim() || "Untitled")}</span>
+         <span class="radio-station-meta">${escapeHtml(s.codec || "—")}${s.bitrate ? " · " + s.bitrate + "k" : ""}${tagStr(s) ? " · " + escapeHtml(tagStr(s)) : ""}</span>
+       </button>`
+    ).join("");
+    radioModule = `
+      <div class="module full">
+        <div class="module-header orange"><span>Now Playing at the Antipode</span><span class="meta">radio-browser.info · live stream</span></div>
+        <div class="module-body padded">
+          <div class="radio-now">
+            <div class="radio-meta">
+              <div class="radio-name" id="radioNowName">${escapeHtml(top.name.trim() || "Untitled")}</div>
+              <div class="radio-detail" id="radioNowDetail">${escapeHtml(top.codec || "—")}${top.bitrate ? " · " + top.bitrate + " kbps" : ""}${tagStr(top) ? " · " + escapeHtml(tagStr(top)) : ""}</div>
+            </div>
+            <audio id="radioPlayer" controls preload="none" src="${escapeHtml(top.url_resolved)}"></audio>
+          </div>
+          ${altList ? `<div class="radio-alts-label">Or try:</div><div class="radio-alts">${altList}</div>` : ""}
+        </div>
       </div>`;
   }
 
@@ -1804,10 +2037,13 @@ function renderInfo(lat, lng, data, nearby, wikiSummary, photos, sun, weather, c
   document.getElementById("content").innerHTML = `
     ${heroModule}
     ${wikiModule}
+    ${quakeModule}
     ${photoModule}
     ${rightNowModule}
+    ${aqiModule}
     ${sv}
     ${satEmbed}
+    ${radioModule}
     ${mp}
     ${overheadModule}
     ${aircraftModule}
@@ -1822,6 +2058,24 @@ function renderInfo(lat, lng, data, nearby, wikiSummary, photos, sun, weather, c
       el.addEventListener("click", () => openPhotoModal(photos[i]));
     });
   }
+
+  // Radio station switcher — click an alt station to swap the player source
+  document.querySelectorAll(".radio-station").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const player = document.getElementById("radioPlayer");
+      if (!player) return;
+      player.src = btn.dataset.url;
+      player.play().catch(() => {/* user gesture required on some browsers; ignore */});
+      document.getElementById("radioNowName").textContent = btn.dataset.name;
+      const codec = btn.dataset.codec;
+      const bitrate = btn.dataset.bitrate;
+      const tags = btn.dataset.tags;
+      document.getElementById("radioNowDetail").textContent =
+        `${codec || "—"}${bitrate ? " · " + bitrate + " kbps" : ""}${tags ? " · " + tags : ""}`;
+      document.querySelectorAll(".radio-station").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+    });
+  });
 }
 
 function openPhotoModal(p) {
