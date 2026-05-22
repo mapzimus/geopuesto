@@ -677,6 +677,16 @@
     display: block;
   }
 
+  /* ============ Sentinel-2 satellite image ============ */
+  .sentinel2-img {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    object-fit: cover;
+    background: #0a1218;
+    display: block;
+    border: none;
+  }
+
   /* ============ Windy Webcam module ============ */
   .webcam-now {
     display: grid;
@@ -1175,6 +1185,14 @@ const CONFIG = {
   // Currently held in reserve — wiring a custom Windy weather tile overlay on the Leaflet maps
   // would replace/augment the basic embed iframe. Left as CONFIG-only for future use.
   windyMapForecastKey: "kVlPv680uiU7skU5m9M2tx3MwBbFFXfS",
+
+  // Copernicus Data Space Ecosystem (CDSE) Sentinel Hub WMS Instance ID.
+  // Used to embed recent cloud-free Sentinel-2 satellite imagery at the antipode.
+  // Set this to your "Configuration Utility" instance ID (a UUID), and `cdseLayer` to a layer
+  // name defined inside that configuration (usually "TRUE-COLOR-S2L2A" for the Python template).
+  // 30k free requests/month. Restrict by referrer in the CDSE Configuration Utility for safety.
+  cdseInstanceId: "c4a1ef51-ab15-4827-8dae-dbf9fc18c80e",
+  cdseLayer: "TRUE-COLOR-S2L2A",
 };
 
 // Curated antipodal pairs. Paired entries (sharing pairId) have BOTH ends with confirmed
@@ -1701,6 +1719,35 @@ function formatAgo(ms) {
   if (hr < 24) return `${hr}h ago`;
   const d = Math.floor(hr / 24);
   return `${d}d ago`;
+}
+
+// Build a CDSE Sentinel Hub WMS URL for a small bbox around the antipode.
+// No API call from JS — the URL embeds directly into an <img> tag and the WMS does the work.
+function sentinelWmsUrl(lat, lng) {
+  if (!CONFIG.cdseInstanceId) return null;
+  const halfDeg = 0.05; // ~5.5 km half-width → ~11 km bbox
+  const minLat = Math.max(-89, lat - halfDeg);
+  const maxLat = Math.min(89, lat + halfDeg);
+  const minLng = lng - halfDeg;
+  const maxLng = lng + halfDeg;
+  const end = new Date();
+  const start = new Date(end.getTime() - 30 * 86400000);
+  const fmtDate = (d) => d.toISOString().slice(0, 10);
+  const params = new URLSearchParams({
+    REQUEST: "GetMap",
+    SERVICE: "WMS",
+    VERSION: "1.3.0",
+    LAYERS: CONFIG.cdseLayer || "TRUE-COLOR-S2L2A",
+    CRS: "EPSG:4326",
+    BBOX: `${minLat},${minLng},${maxLat},${maxLng}`,
+    WIDTH: 700,
+    HEIGHT: 700,
+    FORMAT: "image/jpeg",
+    MAXCC: 20,
+    TIME: `${fmtDate(start)}/${fmtDate(end)}`,
+    PRIORITY: "leastCC",
+  });
+  return `https://sh.dataspace.copernicus.eu/ogc/wms/${CONFIG.cdseInstanceId}?${params.toString()}`;
 }
 
 // Windy Point Forecast API v2 — hourly forecast (POST request)
@@ -2406,6 +2453,19 @@ function renderInfo(lat, lng, data, nearby, wikiSummary, photos, sun, weather, c
       </div>`;
   }
 
+  // ============ Module: Recent Satellite Image (CDSE Sentinel-2 WMS) ============
+  let sentinel2Module = "";
+  const sentinelUrl = sentinelWmsUrl(lat, lng);
+  if (sentinelUrl) {
+    sentinel2Module = `
+      <div class="module full">
+        <div class="module-header teal"><span>Recent Satellite Image</span><span class="meta">Sentinel-2 · Copernicus · last 30d · &lt;20% clouds</span></div>
+        <div class="module-body">
+          <img class="embed-frame sentinel2-img" src="${escapeHtml(sentinelUrl)}" alt="Recent Sentinel-2 satellite image near the antipode" loading="lazy" onerror="this.closest('.module').style.display='none';">
+        </div>
+      </div>`;
+  }
+
   // ============ Module: 24-Hour Forecast (Windy Point Forecast) ============
   let forecastModule = "";
   if (windyForecast && Array.isArray(windyForecast.ts) && windyForecast.ts.length) {
@@ -2686,6 +2746,7 @@ function renderInfo(lat, lng, data, nearby, wikiSummary, photos, sun, weather, c
     { html: forecastModule, prio: 750 },                                                                    // 24h forecast right after "now"
     { html: aqiModule, prio: 700 + (aq && aq.european_aqi >= 80 ? 1500 : 0) },                             // Bad air → boost
     { html: sv, prio: 650 },
+    { html: sentinel2Module, prio: 630 },                                                                   // Recent Sentinel-2 imagery — fresher than Google's stale tiles
     { html: satEmbed, prio: 620 },
     { html: webcamModule, prio: 610 },
     { html: radioModule, prio: 600 },

@@ -49,6 +49,7 @@ All free-tier, CORS-enabled, no auth wall:
 - **OpenStreetMap Overpass** — nearby POIs (viewpoints, peaks, monuments, etc.)
 - **radio-browser.info** — live internet-radio stations in the antipode's country
 - **Smithsonian GVP** — active volcanoes (static cached list, refreshed manually)
+- **Copernicus Data Space Ecosystem (Sentinel Hub WMS)** — recent cloud-free Sentinel-2 imagery (free 30k req/month, needs WMS Instance ID)
 - **CARTO Dark Matter** — basemap tiles (keyless)
 - **N2YO** — full satellite/debris overhead counts (needs key)
 - **AISStream.io** — vessel positions via WebSocket (needs key)
