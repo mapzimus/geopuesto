@@ -1164,6 +1164,17 @@ const CONFIG = {
   // https://api.windy.com/  · scope: Webcams API v3
   // RESTRICT THIS KEY to HTTP referrer `maxwellhowegis.com/*` + `localhost/*` in the Windy dashboard.
   windyWebcamsKey: "doXjGHqNId1n4ATkKcoyRF7p75X5ql60",
+
+  // Windy.com Point Forecast API key — hourly forecast for next 8-10 days from GFS / ECMWF.
+  // https://api.windy.com/  · scope: Point Forecast API v2
+  // Used by "24-Hour Forecast" module to augment the now-only Open-Meteo card.
+  windyPointForecastKey: "gZF78v9TS6ahoC39om4EdL8fp2KKZ0HD",
+
+  // Windy.com Map Forecast API key — programmatic access to weather tiles + extended embed config.
+  // https://api.windy.com/  · scope: Map Forecast API
+  // Currently held in reserve — wiring a custom Windy weather tile overlay on the Leaflet maps
+  // would replace/augment the basic embed iframe. Left as CONFIG-only for future use.
+  windyMapForecastKey: "kVlPv680uiU7skU5m9M2tx3MwBbFFXfS",
 };
 
 // Curated antipodal pairs. Paired entries (sharing pairId) have BOTH ends with confirmed
@@ -1692,6 +1703,49 @@ function formatAgo(ms) {
   return `${d}d ago`;
 }
 
+// Windy Point Forecast API v2 — hourly forecast (POST request)
+async function fetchWindyForecast(lat, lng) {
+  if (!CONFIG.windyPointForecastKey) return null;
+  try {
+    const r = await fetch("https://api.windy.com/api/point-forecast/v2", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        lat, lon: lng,
+        model: "gfs",
+        parameters: ["temp", "wind", "precip"],
+        levels: ["surface"],
+        key: CONFIG.windyPointForecastKey,
+      }),
+    });
+    if (!r.ok) return null;
+    const d = await r.json();
+    return (d && Array.isArray(d.ts)) ? d : null;
+  } catch { return null; }
+}
+
+// Smart map zoom — pick a level based on what's at the location.
+// Tight zoom in cities, mid zoom for rural land, wide zoom for ocean.
+function pickZoom(geoData) {
+  // No reverse-geocode hit at all → likely open ocean. Zoom far out for basin context.
+  if (!geoData || !geoData.address) return 4;
+  const a = geoData.address;
+  // Coastal / island where Nominatim returned a country but nothing finer → mid zoom
+  if (!a.city && !a.town && !a.village && !a.hamlet && !a.county && !a.municipality && !a.state && !a.region && !a.suburb && !a.neighbourhood) {
+    return a.country ? 7 : 4;
+  }
+  // Urban granularity wins — pick the most specific available
+  if (a.house_number || a.building || a.amenity || a.shop || a.tourism) return 16;
+  if (a.road && (a.suburb || a.neighbourhood)) return 15;
+  if (a.suburb || a.neighbourhood) return 14;
+  if (a.city) return 12;
+  if (a.town) return 13;
+  if (a.village || a.hamlet) return 13;
+  if (a.county || a.municipality) return 9;
+  if (a.state || a.region) return 7;
+  return 6;
+}
+
 // Windy Webcams API v3 — nearby live webcams (image + embed iframe URL)
 async function fetchWindyWebcams(lat, lng) {
   if (!CONFIG.windyWebcamsKey) return null;
@@ -1923,8 +1977,12 @@ async function goTo(lat, lng) {
   if (antipodeMarker) mapAntipode.removeLayer(antipodeMarker);
   originMarker = L.marker([lat, lng], { icon: makeMarker("#F26522") }).addTo(mapOrigin);
   antipodeMarker = L.marker([anti.lat, anti.lng], { icon: makeMarker("#00BFA5") }).addTo(mapAntipode);
-  mapOrigin.flyTo([lat, lng], 6, { duration: 0.8 });
-  mapAntipode.flyTo([anti.lat, anti.lng], 6, { duration: 0.8 });
+  // Initial quick flyTo at zoom 5 for immediate visual feedback — smart-zoom kicks in once reverse-geocode resolves
+  mapOrigin.flyTo([lat, lng], 5, { duration: 0.5 });
+  mapAntipode.flyTo([anti.lat, anti.lng], 5, { duration: 0.5 });
+
+  // Kick off origin reverse-geocode in parallel (used for smart-zoom and not yet exposed elsewhere)
+  const originGeoPromise = reverseGeocode(lat, lng);
 
   document.getElementById("readoutStrip").dataset.empty = "false";
   document.getElementById("originCoords").textContent = fmtCoord(lat, lng);
@@ -1937,7 +1995,7 @@ async function goTo(lat, lng) {
 
   const volcanoes = findNearbyVolcanoes(anti.lat, anti.lng, 500);
 
-  const [data, nearby, sun, weather, mapillary, iss, sats, flights, gtz, gelev, quakes, aq, kp, magDec, pois, webcams] = await Promise.all([
+  const [data, nearby, sun, weather, mapillary, iss, sats, flights, gtz, gelev, quakes, aq, kp, magDec, pois, webcams, windyForecast] = await Promise.all([
     reverseGeocode(anti.lat, anti.lng),
     checkNearby(anti.lat, anti.lng),
     fetchSunTimes(anti.lat, anti.lng),
@@ -1954,7 +2012,15 @@ async function goTo(lat, lng) {
     fetchMagDeclination(anti.lat, anti.lng),
     fetchOverpassPOIs(anti.lat, anti.lng),
     fetchWindyWebcams(anti.lat, anti.lng),
+    fetchWindyForecast(anti.lat, anti.lng),
   ]);
+
+  // Smart-zoom both maps based on what's at each end
+  const originGeo = await originGeoPromise;
+  const originZoom = pickZoom(originGeo);
+  const antipodeZoom = pickZoom(data);
+  mapOrigin.flyTo([lat, lng], originZoom, { duration: 0.9 });
+  mapAntipode.flyTo([anti.lat, anti.lng], antipodeZoom, { duration: 0.9 });
 
   const wikiPromise = nearby.wikipedia ? fetchWikipediaSummary(nearby.wikipedia.pageid) : Promise.resolve(null);
   const photosPromise = nearby.commonsTitles.length ? fetchPhotoUrls(nearby.commonsTitles.slice(0, 12)) : Promise.resolve([]);
@@ -1964,16 +2030,16 @@ async function goTo(lat, lng) {
   // AIS WebSocket runs ~8s in parallel with the rest
   const shipsPromise = fetchAISShips(anti.lat, anti.lng);
 
-  renderInfo(anti.lat, anti.lng, data, nearby, null, null, sun, weather, null, mapillary, iss, sats, flights, null, gtz, gelev, quakes, aq, null, kp, magDec, pois, volcanoes, webcams);
+  renderInfo(anti.lat, anti.lng, data, nearby, null, null, sun, weather, null, mapillary, iss, sats, flights, null, gtz, gelev, quakes, aq, null, kp, magDec, pois, volcanoes, webcams, windyForecast);
   const [wikiSummary, photos, country, ships, radio] = await Promise.all([wikiPromise, photosPromise, countryPromise, shipsPromise, radioPromise]);
-  renderInfo(anti.lat, anti.lng, data, nearby, wikiSummary, photos, sun, weather, country, mapillary, iss, sats, flights, ships, gtz, gelev, quakes, aq, radio, kp, magDec, pois, volcanoes, webcams);
+  renderInfo(anti.lat, anti.lng, data, nearby, wikiSummary, photos, sun, weather, country, mapillary, iss, sats, flights, ships, gtz, gelev, quakes, aq, radio, kp, magDec, pois, volcanoes, webcams, windyForecast);
 }
 
 function tcell(label, value, klass = "") {
   return `<div class="tel-cell"><span class="label">${label}</span><div class="value ${klass}">${value}</div></div>`;
 }
 
-function renderInfo(lat, lng, data, nearby, wikiSummary, photos, sun, weather, country, mapillary, iss, sats, flights, ships, gtz, gelev, quakes, aq, radio, kp, magDec, pois, volcanoes, webcams) {
+function renderInfo(lat, lng, data, nearby, wikiSummary, photos, sun, weather, country, mapillary, iss, sats, flights, ships, gtz, gelev, quakes, aq, radio, kp, magDec, pois, volcanoes, webcams, windyForecast) {
   const isLand = !!(data && data.address && data.address.country);
   const addr = (data && data.address) || {};
   const surfaceBadge = isLand ? '<span class="badge land">LAND</span>' : '<span class="badge ocean">OCEAN</span>';
@@ -2340,6 +2406,50 @@ function renderInfo(lat, lng, data, nearby, wikiSummary, photos, sun, weather, c
       </div>`;
   }
 
+  // ============ Module: 24-Hour Forecast (Windy Point Forecast) ============
+  let forecastModule = "";
+  if (windyForecast && Array.isArray(windyForecast.ts) && windyForecast.ts.length) {
+    const ts = windyForecast.ts;
+    const temps = windyForecast["temp-surface"];
+    const windU = windyForecast["wind_u-surface"];
+    const windV = windyForecast["wind_v-surface"];
+    const precip = windyForecast["past3hprecip-surface"];
+    // Sample at hour offsets 0, 6, 12, 18, 24 (matches roughly to 3-hourly GFS output spacing)
+    // Use timestamps to find the closest index for each target offset
+    const startMs = ts[0];
+    const findIdx = (targetMs) => {
+      let best = 0, bestDelta = Infinity;
+      for (let i = 0; i < ts.length; i++) {
+        const dt = Math.abs(ts[i] - targetMs);
+        if (dt < bestDelta) { bestDelta = dt; best = i; }
+      }
+      return best;
+    };
+    const offsetsH = [0, 6, 12, 18, 24];
+    const cells = [];
+    for (const oh of offsetsH) {
+      const idx = findIdx(startMs + oh * 3600 * 1000);
+      if (idx == null) continue;
+      const t = new Date(ts[idx]);
+      const tempC = temps && temps[idx] != null ? Math.round(temps[idx] - 273.15) : null;
+      const windKmh = (windU && windV && windU[idx] != null && windV[idx] != null)
+        ? Math.round(Math.sqrt(windU[idx]**2 + windV[idx]**2) * 3.6) : null;
+      const rain = precip && precip[idx] != null ? Number(precip[idx]) : 0;
+      const label = oh === 0 ? "Now" : `+${oh}h`;
+      const timeLabel = `${String(t.getUTCHours()).padStart(2, "0")}:${String(t.getUTCMinutes()).padStart(2, "0")}Z`;
+      const parts = [];
+      if (tempC != null) parts.push(`${tempC}°C / ${Math.round(tempC * 9/5 + 32)}°F`);
+      if (windKmh != null) parts.push(`${windKmh} km/h wind`);
+      if (rain > 0.1) parts.push(`${rain.toFixed(1)} mm precip`);
+      cells.push(tcell(`${label} <span style="opacity:0.5">· ${timeLabel}</span>`, parts.join(" · ") || "—", "text"));
+    }
+    forecastModule = `
+      <div class="module full">
+        <div class="module-header teal"><span>24-Hour Forecast</span><span class="meta">Windy Point Forecast · GFS model · UTC</span></div>
+        <div class="module-body"><div class="telemetry">${cells.join("")}</div></div>
+      </div>`;
+  }
+
   // ============ Module: Lightning (Blitzortung) ============
   // Best effort — Blitzortung's map sets X-Frame-Options:SAMEORIGIN, so this iframe may be blank
   // in production. Kept as a placeholder until a server-side proxy or canvas overlay is wired up.
@@ -2573,6 +2683,7 @@ function renderInfo(lat, lng, data, nearby, wikiSummary, photos, sun, weather, c
     { html: auroraModule, prio: 460 + (auroraVisibleHere ? 8000 : 0) + (kp && kp.kp >= 5 ? 200 : 0) },
     { html: photoModule, prio: 850 },
     { html: rightNowModule, prio: 800 },
+    { html: forecastModule, prio: 750 },                                                                    // 24h forecast right after "now"
     { html: aqiModule, prio: 700 + (aq && aq.european_aqi >= 80 ? 1500 : 0) },                             // Bad air → boost
     { html: sv, prio: 650 },
     { html: satEmbed, prio: 620 },
