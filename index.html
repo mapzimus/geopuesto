@@ -2379,7 +2379,14 @@ function renderInfo(lat, lng, data, nearby, wikiSummary, photos, sun, weather, c
 
   // ============ Module: Now Playing at the Antipode (radio-browser) ============
   let radioModule = "";
-  if (isLand && Array.isArray(radio) && radio.length > 0) {
+  if (isLand && Array.isArray(radio) && radio.length === 0) {
+    const ctry = addr.country ? ` in ${escapeHtml(addr.country)}` : "";
+    radioModule = `
+      <div class="module full">
+        <div class="module-header"><span>Now Playing at the Antipode</span><span class="meta">radio-browser.info</span></div>
+        <div class="module-body padded"><div style="font-family:'IBM Plex Mono',monospace;font-size:0.78rem;color:var(--dim);">No internet-radio stations registered${ctry}.</div></div>
+      </div>`;
+  } else if (isLand && Array.isArray(radio) && radio.length > 0) {
     const top = radio[0];
     const alts = radio.slice(1, 6);
     const tagStr = (s) => (s.tags || "").split(",").filter(Boolean).slice(0, 2).join(" · ");
@@ -2453,7 +2460,13 @@ function renderInfo(lat, lng, data, nearby, wikiSummary, photos, sun, weather, c
 
   // ============ Module: What's at This Exact Spot (Overpass POIs) ============
   let poiModule = "";
-  if (Array.isArray(pois) && pois.length > 0) {
+  if (Array.isArray(pois) && pois.length === 0) {
+    poiModule = `
+      <div class="module full">
+        <div class="module-header"><span>What's at This Exact Spot</span><span class="meta">OpenStreetMap · Overpass · 2 km</span></div>
+        <div class="module-body padded"><div style="font-family:'IBM Plex Mono',monospace;font-size:0.78rem;color:var(--dim);">No notable points of interest within 2 km. (Try zooming the map to scan for unmapped features.)</div></div>
+      </div>`;
+  } else if (Array.isArray(pois) && pois.length > 0) {
     const cells = [tcell("POIs within 2 km", `${pois.length}`, "big")];
     pois.slice(0, 8).forEach(p => {
       const brg = compass(bearing(lat, lng, p.lat, p.lng));
@@ -2486,7 +2499,13 @@ function renderInfo(lat, lng, data, nearby, wikiSummary, photos, sun, weather, c
 
   // ============ Module: Live Webcam Near Target (Windy) ============
   let webcamModule = "";
-  if (Array.isArray(webcams) && webcams.length > 0) {
+  if (Array.isArray(webcams) && webcams.length === 0) {
+    webcamModule = `
+      <div class="module full">
+        <div class="module-header"><span>Live Webcam Near Target</span><span class="meta">Windy.com · 250 km radius</span></div>
+        <div class="module-body padded"><div style="font-family:'IBM Plex Mono',monospace;font-size:0.78rem;color:var(--dim);">No public webcams found within 250 km of the antipode.</div></div>
+      </div>`;
+  } else if (Array.isArray(webcams) && webcams.length > 0) {
     const top = webcams[0];
     const alts = webcams.slice(1, 6);
     const distLabel = top.distKm != null ? `${Math.round(top.distKm)} km from antipode` : "";
@@ -2532,7 +2551,13 @@ function renderInfo(lat, lng, data, nearby, wikiSummary, photos, sun, weather, c
 
   // ============ Module: 24-Hour Forecast (Windy Point Forecast) ============
   let forecastModule = "";
-  if (windyForecast && Array.isArray(windyForecast.ts) && windyForecast.ts.length) {
+  if (windyForecast === null) {
+    forecastModule = `
+      <div class="module full">
+        <div class="module-header teal"><span>24-Hour Forecast</span><span class="meta">Windy Point Forecast · GFS</span></div>
+        <div class="module-body padded"><div style="font-family:'IBM Plex Mono',monospace;font-size:0.78rem;color:var(--dim);">Forecast unavailable. (Windy API hiccup or daily quota.)</div></div>
+      </div>`;
+  } else if (windyForecast && Array.isArray(windyForecast.ts) && windyForecast.ts.length) {
     const ts = windyForecast.ts;
     const temps = windyForecast["temp-surface"];
     const windU = windyForecast["wind_u-surface"];
