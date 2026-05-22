@@ -1054,12 +1054,13 @@
     .divider::before { left: 14px; top: 50%; transform: translate(0, -50%); }
     .divider::after { left: auto; right: 14px; bottom: auto; top: 50%; transform: translate(0, -50%); }
     .readout-strip { gap: 10px; }
-    /* Bigger touch targets for mobile */
-    .tab { padding: 12px 16px; }
-    .tab-shuffle { padding: 12px 14px; margin-left: 0; }
-    .tab.tab-action { padding: 12px 16px; }
-    .swap-btn { padding: 11px 18px; }
-    .preset { padding: 12px 14px; }
+    /* WCAG 2.5.5 — interactive controls ≥44×44px on touch devices */
+    .tab { padding: 12px 16px; min-height: 44px; }
+    .tab-shuffle { padding: 12px 14px; margin-left: 0; min-height: 44px; }
+    .tab.tab-action { padding: 12px 16px; min-height: 44px; }
+    .swap-btn { padding: 11px 18px; min-height: 44px; }
+    .btn-go { padding: 12px 22px; min-height: 44px; }
+    .preset { padding: 12px 14px; min-height: 44px; }
     .preset .city { font-size: 0.92rem; }
     .preset .dest { font-size: 0.7rem; }
     /* Larger meta labels on phones — improves legibility below 720px */
