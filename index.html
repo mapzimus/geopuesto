@@ -677,6 +677,91 @@
     display: block;
   }
 
+  /* ============ Windy Webcam module ============ */
+  .webcam-now {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 14px;
+    align-items: start;
+  }
+  @media (max-width: 700px) { .webcam-now { grid-template-columns: 1fr; } }
+  .webcam-embed { height: 360px; }
+  .webcam-img {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+  }
+  .webcam-meta {
+    padding: 10px 12px;
+    background: var(--surface-2);
+    border: 1px solid var(--border-bright);
+    border-radius: 2px;
+  }
+  .webcam-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.95rem;
+    color: var(--text-bright);
+    font-weight: 500;
+  }
+  .webcam-loc {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--teal);
+    margin-top: 4px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .webcam-alts-label {
+    margin-top: 14px;
+    margin-bottom: 8px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.62rem;
+    color: var(--dim);
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+  }
+  .webcam-alts {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 6px;
+  }
+  .webcam-alt {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 0;
+    border-radius: 1px;
+    cursor: pointer;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    transition: all 0.12s;
+    text-align: left;
+  }
+  .webcam-alt img {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+    display: block;
+  }
+  .webcam-alt-title {
+    padding: 6px 8px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.62rem;
+    color: var(--dim);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .webcam-alt:hover { border-color: var(--teal); }
+  .webcam-alt:hover .webcam-alt-title { color: var(--teal); }
+  .webcam-alt.active { border-color: var(--teal); }
+  .webcam-alt.active .webcam-alt-title { color: var(--teal); }
+
   /* ============ Radio player module ============ */
   .radio-now {
     display: grid;
@@ -1074,6 +1159,11 @@ const CONFIG = {
   // AISStream.io API key (free, live ship positions via WebSocket).
   // https://aisstream.io/
   aisstreamToken: "c28d9568988eead5b9bc3055bfe2d1956e1d896a",
+
+  // Windy.com Webcams API key (free tier, live webcam thumbnails/embeds near antipode).
+  // https://api.windy.com/  · scope: Webcams API v3
+  // RESTRICT THIS KEY to HTTP referrer `maxwellhowegis.com/*` + `localhost/*` in the Windy dashboard.
+  windyWebcamsKey: "doXjGHqNId1n4ATkKcoyRF7p75X5ql60",
 };
 
 // Curated antipodal pairs. Paired entries (sharing pairId) have BOTH ends with confirmed
@@ -1602,6 +1692,39 @@ function formatAgo(ms) {
   return `${d}d ago`;
 }
 
+// Windy Webcams API v3 — nearby live webcams (image + embed iframe URL)
+async function fetchWindyWebcams(lat, lng) {
+  if (!CONFIG.windyWebcamsKey) return null;
+  try {
+    const url = `https://api.windy.com/webcams/api/v3/webcams?nearby=${lat},${lng},250&limit=10&include=images,location,player`;
+    const r = await fetch(url, { headers: { "x-windy-key": CONFIG.windyWebcamsKey } });
+    if (!r.ok) return null;
+    const d = await r.json();
+    const list = Array.isArray(d.webcams) ? d.webcams : [];
+    return list
+      .map(w => {
+        const loc = w.location || {};
+        const imgs = w.images && w.images.current ? w.images.current : {};
+        const player = w.player || {};
+        const wlat = loc.latitude;
+        const wlng = loc.longitude;
+        return {
+          id: w.webcamId || w.id,
+          title: w.title,
+          city: loc.city,
+          country: loc.country,
+          lat: wlat,
+          lng: wlng,
+          thumb: imgs.preview || imgs.thumbnail || null,
+          embed: player.day || player.live || player.month || null,
+          distKm: (wlat != null && wlng != null) ? haversine(lat, lng, wlat, wlng) : null,
+        };
+      })
+      .filter(w => w.thumb || w.embed)
+      .sort((a, b) => (a.distKm ?? 1e9) - (b.distKm ?? 1e9));
+  } catch { return null; }
+}
+
 // NOAA Space Weather Prediction Center — planetary K-index (geomagnetic disturbance)
 async function fetchKpIndex() {
   try {
@@ -1814,7 +1937,7 @@ async function goTo(lat, lng) {
 
   const volcanoes = findNearbyVolcanoes(anti.lat, anti.lng, 500);
 
-  const [data, nearby, sun, weather, mapillary, iss, sats, flights, gtz, gelev, quakes, aq, kp, magDec, pois] = await Promise.all([
+  const [data, nearby, sun, weather, mapillary, iss, sats, flights, gtz, gelev, quakes, aq, kp, magDec, pois, webcams] = await Promise.all([
     reverseGeocode(anti.lat, anti.lng),
     checkNearby(anti.lat, anti.lng),
     fetchSunTimes(anti.lat, anti.lng),
@@ -1830,6 +1953,7 @@ async function goTo(lat, lng) {
     fetchKpIndex(),
     fetchMagDeclination(anti.lat, anti.lng),
     fetchOverpassPOIs(anti.lat, anti.lng),
+    fetchWindyWebcams(anti.lat, anti.lng),
   ]);
 
   const wikiPromise = nearby.wikipedia ? fetchWikipediaSummary(nearby.wikipedia.pageid) : Promise.resolve(null);
@@ -1840,16 +1964,16 @@ async function goTo(lat, lng) {
   // AIS WebSocket runs ~8s in parallel with the rest
   const shipsPromise = fetchAISShips(anti.lat, anti.lng);
 
-  renderInfo(anti.lat, anti.lng, data, nearby, null, null, sun, weather, null, mapillary, iss, sats, flights, null, gtz, gelev, quakes, aq, null, kp, magDec, pois, volcanoes);
+  renderInfo(anti.lat, anti.lng, data, nearby, null, null, sun, weather, null, mapillary, iss, sats, flights, null, gtz, gelev, quakes, aq, null, kp, magDec, pois, volcanoes, webcams);
   const [wikiSummary, photos, country, ships, radio] = await Promise.all([wikiPromise, photosPromise, countryPromise, shipsPromise, radioPromise]);
-  renderInfo(anti.lat, anti.lng, data, nearby, wikiSummary, photos, sun, weather, country, mapillary, iss, sats, flights, ships, gtz, gelev, quakes, aq, radio, kp, magDec, pois, volcanoes);
+  renderInfo(anti.lat, anti.lng, data, nearby, wikiSummary, photos, sun, weather, country, mapillary, iss, sats, flights, ships, gtz, gelev, quakes, aq, radio, kp, magDec, pois, volcanoes, webcams);
 }
 
 function tcell(label, value, klass = "") {
   return `<div class="tel-cell"><span class="label">${label}</span><div class="value ${klass}">${value}</div></div>`;
 }
 
-function renderInfo(lat, lng, data, nearby, wikiSummary, photos, sun, weather, country, mapillary, iss, sats, flights, ships, gtz, gelev, quakes, aq, radio, kp, magDec, pois, volcanoes) {
+function renderInfo(lat, lng, data, nearby, wikiSummary, photos, sun, weather, country, mapillary, iss, sats, flights, ships, gtz, gelev, quakes, aq, radio, kp, magDec, pois, volcanoes, webcams) {
   const isLand = !!(data && data.address && data.address.country);
   const addr = (data && data.address) || {};
   const surfaceBadge = isLand ? '<span class="badge land">LAND</span>' : '<span class="badge ocean">OCEAN</span>';
@@ -2183,6 +2307,39 @@ function renderInfo(lat, lng, data, nearby, wikiSummary, photos, sun, weather, c
       </div>`;
   }
 
+  // ============ Module: Live Webcam Near Target (Windy) ============
+  let webcamModule = "";
+  if (Array.isArray(webcams) && webcams.length > 0) {
+    const top = webcams[0];
+    const alts = webcams.slice(1, 6);
+    const distLabel = top.distKm != null ? `${Math.round(top.distKm)} km from antipode` : "";
+    const topLoc = [top.city, top.country].filter(Boolean).join(" · ");
+    const topMedia = top.embed
+      ? `<iframe class="embed-frame webcam-embed" src="${escapeHtml(top.embed)}" allowfullscreen frameborder="0" id="webcamEmbed"></iframe>`
+      : `<img class="webcam-img" src="${escapeHtml(top.thumb)}" alt="${escapeHtml(top.title || "")}" loading="lazy" id="webcamEmbed">`;
+    const altGrid = alts.length ? alts.map(w => {
+      const wLoc = [w.city, w.country].filter(Boolean).join(" · ");
+      return `<button class="webcam-alt" data-embed="${escapeHtml(w.embed || "")}" data-thumb="${escapeHtml(w.thumb || "")}" data-title="${escapeHtml(w.title || "")}" data-loc="${escapeHtml(wLoc)}" data-dist="${w.distKm != null ? Math.round(w.distKm) : ""}">
+        <img src="${escapeHtml(w.thumb || "")}" alt="" loading="lazy">
+        <span class="webcam-alt-title">${escapeHtml(w.title || "")}</span>
+      </button>`;
+    }).join("") : "";
+    webcamModule = `
+      <div class="module full">
+        <div class="module-header teal"><span>Live Webcam Near Target</span><span class="meta">Windy.com · ${escapeHtml(distLabel)}</span></div>
+        <div class="module-body">
+          <div class="webcam-now">
+            <div>${topMedia}</div>
+            <div class="webcam-meta">
+              <div class="webcam-title" id="webcamTitle">${escapeHtml(top.title || "Untitled")}</div>
+              <div class="webcam-loc" id="webcamLoc">${escapeHtml(topLoc)}</div>
+            </div>
+          </div>
+          ${altGrid ? `<div class="webcam-alts-label">Other cameras nearby:</div><div class="webcam-alts">${altGrid}</div>` : ""}
+        </div>
+      </div>`;
+  }
+
   // ============ Module: Lightning (Blitzortung) ============
   // Best effort — Blitzortung's map sets X-Frame-Options:SAMEORIGIN, so this iframe may be blank
   // in production. Kept as a placeholder until a server-side proxy or canvas overlay is wired up.
@@ -2419,6 +2576,7 @@ function renderInfo(lat, lng, data, nearby, wikiSummary, photos, sun, weather, c
     { html: aqiModule, prio: 700 + (aq && aq.european_aqi >= 80 ? 1500 : 0) },                             // Bad air → boost
     { html: sv, prio: 650 },
     { html: satEmbed, prio: 620 },
+    { html: webcamModule, prio: 610 },
     { html: radioModule, prio: 600 },
     { html: mp, prio: 580 },
     { html: poiModule, prio: 540 },
@@ -2435,6 +2593,29 @@ function renderInfo(lat, lng, data, nearby, wikiSummary, photos, sun, weather, c
     .sort((a, b) => b.prio - a.prio)
     .map(m => m.html)
     .join("");
+
+  // Webcam alt-thumbnail switcher — swap the main player/image when clicked
+  document.querySelectorAll(".webcam-alt").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const slot = document.getElementById("webcamEmbed");
+      if (!slot) return;
+      const parent = slot.parentElement;
+      const embed = btn.dataset.embed;
+      const thumb = btn.dataset.thumb;
+      const title = btn.dataset.title;
+      const loc = btn.dataset.loc;
+      const fresh = embed
+        ? `<iframe class="embed-frame webcam-embed" src="${embed}" allowfullscreen frameborder="0" id="webcamEmbed"></iframe>`
+        : `<img class="webcam-img" src="${thumb}" alt="${title}" loading="lazy" id="webcamEmbed">`;
+      parent.innerHTML = fresh;
+      const titleEl = document.getElementById("webcamTitle");
+      const locEl = document.getElementById("webcamLoc");
+      if (titleEl) titleEl.textContent = title || "Untitled";
+      if (locEl) locEl.textContent = loc || "";
+      document.querySelectorAll(".webcam-alt").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+    });
+  });
 
   // If the hero photo fails to load, swap in the SVG fallback
   document.querySelectorAll(".hero-photo img[data-fallback]").forEach(img => {
