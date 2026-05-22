@@ -7,12 +7,18 @@
 <meta name="description" content="See what's on the exact opposite side of Earth from any location." />
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%230a1218'/%3E%3Ccircle cx='32' cy='50' r='18' fill='%23F26522'/%3E%3Ccircle cx='68' cy='50' r='18' fill='%2300BFA5'/%3E%3Cline x1='50' y1='10' x2='50' y2='90' stroke='url(%23g)' stroke-width='2'/%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23F26522'/%3E%3Cstop offset='1' stop-color='%2300BFA5'/%3E%3C/linearGradient%3E%3C/defs%3E%3C/svg%3E" />
 <meta property="og:title" content="Geopuesto · Antipodal Observation System" />
-<meta property="og:description" content="See what's on the exact opposite side of Earth from any location — with live weather, photos, Street View, satellites overhead, and more." />
+<meta property="og:description" content="See what's on the exact opposite side of Earth from any location — with live weather, earthquakes, radio, air quality, Street View, satellites overhead, and more." />
 <meta property="og:type" content="website" />
 <meta property="og:url" content="https://maxwellhowegis.com/geopuesto/" />
+<meta property="og:image" content="https://maxwellhowegis.com/geopuesto/og-image.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:type" content="image/png" />
+<meta property="og:image:alt" content="Geopuesto — antipodal observation system wordmark over a dark mission-control background with origin/target coordinates" />
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content="Geopuesto · Antipodal Observation System" />
 <meta name="twitter:description" content="See what's on the exact opposite side of Earth from any location." />
+<meta name="twitter:image" content="https://maxwellhowegis.com/geopuesto/og-image.png" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -894,7 +900,66 @@
     .readout-strip { grid-template-columns: 1fr; gap: 10px; }
     .readout.target { text-align: left; }
     .readout-actions { flex-direction: row; }
+    /* Preset scroller: switch to single-column, vertical scroll, full-width cards on mobile */
+    .presets-grid {
+      display: flex !important;
+      flex-direction: column;
+      grid-template-rows: none !important;
+      grid-auto-flow: row !important;
+      grid-auto-columns: none !important;
+      max-height: 320px;
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+    .preset { width: 100%; }
+    .preset-pair { display: flex !important; flex-direction: row !important; grid-row: auto !important; width: 100%; }
+    .preset-pair .preset { flex: 1; }
+    .preset-pair-glyph { writing-mode: horizontal-tb; padding: 0 4px; }
   }
+
+  /* ============ Shuffle button (sits next to tabs) ============ */
+  .tab-shuffle {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--teal);
+    padding: 7px 12px;
+    border-radius: 1px;
+    cursor: pointer;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    margin-left: auto;
+    transition: all 0.12s;
+  }
+  .tab-shuffle:hover { background: var(--teal-soft); border-color: var(--teal); color: var(--teal); }
+
+  /* ============ Combined attribution strip (replaces Leaflet's per-map corner) ============ */
+  .attribution-strip {
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    padding: 5px 18px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.55rem;
+    color: var(--dim);
+    letter-spacing: 0.1em;
+    text-align: right;
+  }
+  .attribution-strip a { color: var(--dim); text-decoration: none; }
+  .attribution-strip a:hover { color: var(--orange); }
+
+  /* ============ Hero SVG fallback (when all photo sources fail) ============ */
+  .hero-photo.svg-fallback {
+    background: linear-gradient(135deg, var(--bg-2), var(--surface));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 240px;
+    border: 1px solid var(--border);
+    position: relative;
+    overflow: hidden;
+  }
+  .hero-photo.svg-fallback svg { width: 100%; height: 100%; max-height: 320px; }
 </style>
 </head>
 <body>
@@ -920,6 +985,10 @@
     <div id="mapAntipode" class="map"></div>
   </div>
 </div>
+<div class="attribution-strip">
+  Tiles &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a> &middot;
+  Data &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors
+</div>
 
 <div class="readout-strip" id="readoutStrip" data-empty="true">
   <div class="readout origin">
@@ -942,6 +1011,7 @@
     <button class="tab" data-tab="search">Search</button>
     <button class="tab" data-tab="coords">Coordinates</button>
     <button class="tab tab-action" id="myLocationBtn" type="button">📍 Use my location</button>
+    <button class="tab-shuffle" id="shuffleBtn" type="button" title="Pick a random preset">🎲 Shuffle</button>
   </div>
   <div class="panel active" data-panel="presets">
     <div class="presets-grid" id="presetsContainer"></div>
@@ -970,7 +1040,7 @@
 </div>
 
 <footer>
-  Geopuesto · Open data: OpenStreetMap · Nominatim · Wikipedia · Wikimedia Commons · Open-Meteo · REST Countries · sunrise-sunset · wheretheiss.at
+  Geopuesto · Open data: OSM · Nominatim · Wikipedia · Wikimedia Commons · Open-Meteo · REST Countries · sunrise-sunset · wheretheiss.at · USGS · NOAA · radio-browser · Overpass · CARTO · Esri · OpenSky · AISStream · Mapillary · Google Maps
 </footer>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -1127,10 +1197,13 @@ const BASE_URL = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
 const BASE_ATTR = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>';
 const TILE_OPTS = { attribution: BASE_ATTR, maxZoom: 20, subdomains: "abcd" };
 
-const mapOrigin = L.map("mapOrigin", { worldCopyJump: true }).setView([20, 0], 2);
-const mapAntipode = L.map("mapAntipode", { worldCopyJump: true }).setView([-20, 180], 2);
-L.tileLayer(BASE_URL, TILE_OPTS).addTo(mapOrigin);
-L.tileLayer(BASE_URL, TILE_OPTS).addTo(mapAntipode);
+// Attribution rendered separately in the .attribution-strip below the viewports
+const MAP_OPTS = { worldCopyJump: true, attributionControl: false };
+const TILE_OPTS_NOATTR = { maxZoom: TILE_OPTS.maxZoom, subdomains: TILE_OPTS.subdomains };
+const mapOrigin = L.map("mapOrigin", MAP_OPTS).setView([20, 0], 2);
+const mapAntipode = L.map("mapAntipode", MAP_OPTS).setView([-20, 180], 2);
+L.tileLayer(BASE_URL, TILE_OPTS_NOATTR).addTo(mapOrigin);
+L.tileLayer(BASE_URL, TILE_OPTS_NOATTR).addTo(mapAntipode);
 
 let originMarker = null, antipodeMarker = null;
 let activePresetName = null;
@@ -1270,6 +1343,9 @@ async function fetchCountry(cca2) {
 
 async function fetchMapillaryImage(lat, lng) {
   if (!CONFIG.mapillaryToken) return null;
+  // sessionStorage cache by 10km grid cell — avoids re-querying when user clicks adjacent presets
+  const cached = getMapillaryCache(lat, lng);
+  if (cached !== undefined) return cached;
   // Tiered bbox search — 50 km, 250 km, 1000 km
   const tiers = [50, 250, 1000];
   for (const km of tiers) {
@@ -1292,10 +1368,11 @@ async function fetchMapillaryImage(lat, lng) {
             if (!best || dist < best.distKm) best = { ...img, distKm: dist };
           }
         }
-        if (best) return best;
+        if (best) { setMapillaryCache(lat, lng, best); return best; }
       }
     } catch {}
   }
+  setMapillaryCache(lat, lng, null);
   return null;
 }
 
@@ -1516,6 +1593,163 @@ function formatAgo(ms) {
   return `${d}d ago`;
 }
 
+// NOAA Space Weather Prediction Center — planetary K-index (geomagnetic disturbance)
+async function fetchKpIndex() {
+  try {
+    const r = await fetch("https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json");
+    if (!r.ok) return null;
+    const d = await r.json();
+    // First row is headers; data rows are [time_tag, Kp, a_running, station_count]
+    if (!Array.isArray(d) || d.length < 2) return null;
+    const latest = d[d.length - 1];
+    return { kp: parseFloat(latest[1]), time: latest[0] };
+  } catch { return null; }
+}
+
+// NOAA NCEI World Magnetic Model — magnetic declination at a point
+async function fetchMagDeclination(lat, lng) {
+  try {
+    const year = new Date().getFullYear();
+    const url = `https://www.ngdc.noaa.gov/geomag-web/calculators/calculateDeclination?lat1=${lat}&lon1=${lng}&model=WMM&startYear=${year}&resultFormat=json`;
+    const r = await fetch(url);
+    if (!r.ok) return null;
+    const d = await r.json();
+    const result = d && d.result && d.result[0];
+    return result ? { declination: result.declination, dlat: result.declination_sv, year } : null;
+  } catch { return null; }
+}
+
+// Overpass API — what's at this exact spot (POIs within ~2km)
+async function fetchOverpassPOIs(lat, lng) {
+  try {
+    const r = 2000; // 2 km
+    const q = `[out:json][timeout:10];(node["tourism"~"viewpoint|attraction|museum|artwork"](around:${r},${lat},${lng});node["natural"~"peak|volcano|cave_entrance|geyser|spring|waterfall"](around:${r},${lat},${lng});node["historic"~"castle|monument|memorial|ruins|archaeological_site"](around:${r},${lat},${lng});node["amenity"="place_of_worship"](around:${r},${lat},${lng});node["leisure"="park"](around:${r},${lat},${lng}););out 15;`;
+    const url = "https://overpass-api.de/api/interpreter?data=" + encodeURIComponent(q);
+    const resp = await fetch(url);
+    if (!resp.ok) return null;
+    const d = await resp.json();
+    if (!Array.isArray(d.elements)) return [];
+    return d.elements
+      .filter(e => e.tags && e.tags.name)
+      .map(e => ({
+        name: e.tags.name,
+        lat: e.lat,
+        lng: e.lon,
+        kind: e.tags.tourism || e.tags.natural || e.tags.historic || e.tags.amenity || e.tags.leisure || "POI",
+        distKm: haversine(lat, lng, e.lat, e.lon),
+      }))
+      .sort((a, b) => a.distKm - b.distKm)
+      .slice(0, 10);
+  } catch { return null; }
+}
+
+// Static list of currently/recently erupting volcanoes (Smithsonian GVP latest known list).
+// Updates slowly — refresh manually every few months.
+const ACTIVE_VOLCANOES = [
+  { name: "Kīlauea", lat: 19.421, lng: -155.287, country: "USA" },
+  { name: "Mount Etna", lat: 37.751, lng: 14.993, country: "Italy" },
+  { name: "Stromboli", lat: 38.789, lng: 15.213, country: "Italy" },
+  { name: "Sakurajima", lat: 31.585, lng: 130.657, country: "Japan" },
+  { name: "Aso", lat: 32.884, lng: 131.104, country: "Japan" },
+  { name: "Suwanose-jima", lat: 29.638, lng: 129.715, country: "Japan" },
+  { name: "Shiveluch", lat: 56.653, lng: 161.360, country: "Russia" },
+  { name: "Klyuchevskoy", lat: 56.057, lng: 160.638, country: "Russia" },
+  { name: "Bezymianny", lat: 55.973, lng: 160.595, country: "Russia" },
+  { name: "Karymsky", lat: 54.049, lng: 159.443, country: "Russia" },
+  { name: "Ebeko", lat: 50.686, lng: 156.014, country: "Russia (Kurils)" },
+  { name: "Merapi", lat: -7.541, lng: 110.446, country: "Indonesia" },
+  { name: "Semeru", lat: -8.108, lng: 112.922, country: "Indonesia" },
+  { name: "Ibu", lat: 1.488, lng: 127.630, country: "Indonesia" },
+  { name: "Dukono", lat: 1.693, lng: 127.880, country: "Indonesia" },
+  { name: "Lewotobi Laki-laki", lat: -8.530, lng: 122.775, country: "Indonesia" },
+  { name: "Anak Krakatau", lat: -6.102, lng: 105.423, country: "Indonesia" },
+  { name: "Reventador", lat: -0.078, lng: -77.656, country: "Ecuador" },
+  { name: "Sangay", lat: -2.005, lng: -78.341, country: "Ecuador" },
+  { name: "Nevados de Chillán", lat: -36.868, lng: -71.378, country: "Chile" },
+  { name: "Villarrica", lat: -39.421, lng: -71.939, country: "Chile" },
+  { name: "Popocatépetl", lat: 19.023, lng: -98.628, country: "Mexico" },
+  { name: "Fuego", lat: 14.473, lng: -90.880, country: "Guatemala" },
+  { name: "Santiaguito", lat: 14.756, lng: -91.568, country: "Guatemala" },
+  { name: "Nyiragongo", lat: -1.520, lng: 29.250, country: "DRC" },
+  { name: "Nyamuragira", lat: -1.408, lng: 29.200, country: "DRC" },
+  { name: "Erta Ale", lat: 13.601, lng: 40.665, country: "Ethiopia" },
+  { name: "Whakaari (White Island)", lat: -37.521, lng: 177.182, country: "New Zealand" },
+  { name: "Yasur", lat: -19.532, lng: 169.447, country: "Vanuatu" },
+  { name: "Ambrym", lat: -16.250, lng: 168.120, country: "Vanuatu" },
+  { name: "Manam", lat: -4.080, lng: 145.037, country: "Papua New Guinea" },
+  { name: "Ulawun", lat: -5.050, lng: 151.330, country: "Papua New Guinea" },
+  { name: "Bagana", lat: -6.137, lng: 155.196, country: "Papua New Guinea" },
+];
+
+function findNearbyVolcanoes(lat, lng, maxKm = 500) {
+  return ACTIVE_VOLCANOES
+    .map(v => ({ ...v, distKm: haversine(lat, lng, v.lat, v.lng) }))
+    .filter(v => v.distKm <= maxKm)
+    .sort((a, b) => a.distKm - b.distKm);
+}
+
+// localStorage persistence for last antipode
+const LS_KEY = "geopuesto:last";
+function saveLastLocation(lat, lng, presetName) {
+  try { localStorage.setItem(LS_KEY, JSON.stringify({ lat, lng, presetName, t: Date.now() })); } catch {}
+}
+function loadLastLocation() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return null;
+    const o = JSON.parse(raw);
+    return (typeof o.lat === "number" && typeof o.lng === "number") ? o : null;
+  } catch { return null; }
+}
+
+// SVG hero fallback when no photo is available
+function svgHeroFallback(lat, lng, title) {
+  const latLabel = `${Math.abs(lat).toFixed(2)}°${lat >= 0 ? "N" : "S"}`;
+  const lngLabel = `${Math.abs(lng).toFixed(2)}°${lng >= 0 ? "E" : "W"}`;
+  return `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 360" preserveAspectRatio="xMidYMid meet">
+      <defs>
+        <linearGradient id="hg" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#0e1820"/>
+          <stop offset="1" stop-color="#14222d"/>
+        </linearGradient>
+        <linearGradient id="hp" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="#F26522"/>
+          <stop offset="1" stop-color="#00BFA5"/>
+        </linearGradient>
+      </defs>
+      <rect width="600" height="360" fill="url(#hg)"/>
+      <circle cx="180" cy="180" r="80" fill="none" stroke="#F26522" stroke-width="2" stroke-opacity="0.55"/>
+      <circle cx="420" cy="180" r="80" fill="none" stroke="#00BFA5" stroke-width="2" stroke-opacity="0.55"/>
+      <line x1="300" y1="80" x2="300" y2="280" stroke="url(#hp)" stroke-width="1"/>
+      <circle cx="300" cy="80" r="5" fill="#F26522"/>
+      <circle cx="300" cy="280" r="5" fill="#00BFA5"/>
+      <text x="300" y="178" font-family="IBM Plex Mono,monospace" font-size="22" fill="#f5f8fa" text-anchor="middle" letter-spacing="3">${escapeHtml(latLabel)}</text>
+      <text x="300" y="208" font-family="IBM Plex Mono,monospace" font-size="22" fill="#f5f8fa" text-anchor="middle" letter-spacing="3">${escapeHtml(lngLabel)}</text>
+      <text x="300" y="332" font-family="IBM Plex Mono,monospace" font-size="11" fill="#6c8294" text-anchor="middle" letter-spacing="4">NO IMAGERY AVAILABLE</text>
+    </svg>`;
+}
+
+// Mapillary sessionStorage cache — keyed by 10km grid cell
+const _mapillaryCache = {};
+function mapillaryCacheKey(lat, lng) {
+  // ~10km grid: 0.1° lat ≈ 11km
+  return `mly:${Math.round(lat * 10)}:${Math.round(lng * 10)}`;
+}
+function getMapillaryCache(lat, lng) {
+  const k = mapillaryCacheKey(lat, lng);
+  if (_mapillaryCache[k] !== undefined) return _mapillaryCache[k];
+  try {
+    const raw = sessionStorage.getItem(k);
+    return raw ? JSON.parse(raw) : undefined;
+  } catch { return undefined; }
+}
+function setMapillaryCache(lat, lng, val) {
+  const k = mapillaryCacheKey(lat, lng);
+  _mapillaryCache[k] = val;
+  try { sessionStorage.setItem(k, JSON.stringify(val)); } catch {}
+}
+
 const WEATHER_CODES = {
   0: "Clear sky", 1: "Mainly clear", 2: "Partly cloudy", 3: "Overcast",
   45: "Fog", 48: "Rime fog",
@@ -1566,7 +1800,12 @@ async function goTo(lat, lng) {
 
   document.getElementById("content").innerHTML = '<div class="loading">Tunneling through the Earth</div>';
 
-  const [data, nearby, sun, weather, mapillary, iss, sats, flights, gtz, gelev, quakes, aq] = await Promise.all([
+  // Persist last location for repeat visitors
+  saveLastLocation(lat, lng, activePresetName);
+
+  const volcanoes = findNearbyVolcanoes(anti.lat, anti.lng, 500);
+
+  const [data, nearby, sun, weather, mapillary, iss, sats, flights, gtz, gelev, quakes, aq, kp, magDec, pois] = await Promise.all([
     reverseGeocode(anti.lat, anti.lng),
     checkNearby(anti.lat, anti.lng),
     fetchSunTimes(anti.lat, anti.lng),
@@ -1579,6 +1818,9 @@ async function goTo(lat, lng) {
     fetchGoogleElevation(anti.lat, anti.lng),
     fetchEarthquakes(anti.lat, anti.lng),
     fetchAirQuality(anti.lat, anti.lng),
+    fetchKpIndex(),
+    fetchMagDeclination(anti.lat, anti.lng),
+    fetchOverpassPOIs(anti.lat, anti.lng),
   ]);
 
   const wikiPromise = nearby.wikipedia ? fetchWikipediaSummary(nearby.wikipedia.pageid) : Promise.resolve(null);
@@ -1589,16 +1831,16 @@ async function goTo(lat, lng) {
   // AIS WebSocket runs ~8s in parallel with the rest
   const shipsPromise = fetchAISShips(anti.lat, anti.lng);
 
-  renderInfo(anti.lat, anti.lng, data, nearby, null, null, sun, weather, null, mapillary, iss, sats, flights, null, gtz, gelev, quakes, aq, null);
+  renderInfo(anti.lat, anti.lng, data, nearby, null, null, sun, weather, null, mapillary, iss, sats, flights, null, gtz, gelev, quakes, aq, null, kp, magDec, pois, volcanoes);
   const [wikiSummary, photos, country, ships, radio] = await Promise.all([wikiPromise, photosPromise, countryPromise, shipsPromise, radioPromise]);
-  renderInfo(anti.lat, anti.lng, data, nearby, wikiSummary, photos, sun, weather, country, mapillary, iss, sats, flights, ships, gtz, gelev, quakes, aq, radio);
+  renderInfo(anti.lat, anti.lng, data, nearby, wikiSummary, photos, sun, weather, country, mapillary, iss, sats, flights, ships, gtz, gelev, quakes, aq, radio, kp, magDec, pois, volcanoes);
 }
 
 function tcell(label, value, klass = "") {
   return `<div class="tel-cell"><span class="label">${label}</span><div class="value ${klass}">${value}</div></div>`;
 }
 
-function renderInfo(lat, lng, data, nearby, wikiSummary, photos, sun, weather, country, mapillary, iss, sats, flights, ships, gtz, gelev, quakes, aq, radio) {
+function renderInfo(lat, lng, data, nearby, wikiSummary, photos, sun, weather, country, mapillary, iss, sats, flights, ships, gtz, gelev, quakes, aq, radio, kp, magDec, pois, volcanoes) {
   const isLand = !!(data && data.address && data.address.country);
   const addr = (data && data.address) || {};
   const surfaceBadge = isLand ? '<span class="badge land">LAND</span>' : '<span class="badge ocean">OCEAN</span>';
@@ -1853,6 +2095,85 @@ function renderInfo(lat, lng, data, nearby, wikiSummary, photos, sun, weather, c
       </div>`;
   }
 
+  // ============ Module: Active Volcanoes Nearby ============
+  let volcanoModule = "";
+  if (Array.isArray(volcanoes) && volcanoes.length > 0) {
+    const cells = [
+      tcell("Active volcanoes within 500km", `${volcanoes.length}`, "big"),
+    ];
+    volcanoes.slice(0, 6).forEach(v => {
+      const brg = compass(bearing(lat, lng, v.lat, v.lng));
+      cells.push(tcell(`🌋 ${escapeHtml(v.name)}`, `${escapeHtml(v.country)} · ${Math.round(v.distKm)} km ${brg}`, "text"));
+    });
+    volcanoModule = `
+      <div class="module full">
+        <div class="module-header orange"><span>Active Volcanoes Nearby</span><span class="meta">Smithsonian GVP (cached) · 500 km radius</span></div>
+        <div class="module-body"><div class="telemetry">${cells.join("")}</div></div>
+      </div>`;
+  }
+
+  // ============ Module: Geomagnetic Activity (NOAA SWPC) ============
+  let auroraModule = "";
+  if (kp && kp.kp != null) {
+    const k = kp.kp;
+    let band = "Quiet", bandColor = "var(--dim)", auroraNote = "";
+    if (k >= 7) { band = "Severe storm"; bandColor = "#d32f2f"; auroraNote = "Aurora possible to lat ±45°"; }
+    else if (k >= 6) { band = "Strong storm"; bandColor = "#ff6f00"; auroraNote = "Aurora possible to lat ±50°"; }
+    else if (k >= 5) { band = "Storm"; bandColor = "#ffb300"; auroraNote = "Aurora possible to lat ±55°"; }
+    else if (k >= 4) { band = "Unsettled"; bandColor = "#9acd32"; auroraNote = "Aurora possible to lat ±60°"; }
+    else { band = "Quiet"; bandColor = "#4caf50"; auroraNote = "Aurora only above ±65° lat (polar circle)"; }
+    const here = Math.abs(lat);
+    let visibleHere = "Not visible here";
+    if (k >= 7 && here >= 45) visibleHere = "Possibly visible here";
+    else if (k >= 6 && here >= 50) visibleHere = "Possibly visible here";
+    else if (k >= 5 && here >= 55) visibleHere = "Possibly visible here";
+    else if (k >= 4 && here >= 60) visibleHere = "Possibly visible here";
+    else if (here >= 65) visibleHere = "Likely visible here (polar)";
+    const cells = [
+      tcell("Kp index (now)", `<span style="color:${bandColor};font-weight:600">${k.toFixed(1)} · ${band}</span>`, "big"),
+      tcell("Aurora forecast", auroraNote, "text"),
+      tcell("At this latitude", visibleHere, "text"),
+    ];
+    auroraModule = `
+      <div class="module full">
+        <div class="module-header teal"><span>Geomagnetic Activity</span><span class="meta">NOAA SWPC · planetary K-index</span></div>
+        <div class="module-body"><div class="telemetry">${cells.join("")}</div></div>
+      </div>`;
+  }
+
+  // ============ Module: What's at This Exact Spot (Overpass POIs) ============
+  let poiModule = "";
+  if (Array.isArray(pois) && pois.length > 0) {
+    const cells = [tcell("POIs within 2 km", `${pois.length}`, "big")];
+    pois.slice(0, 8).forEach(p => {
+      const brg = compass(bearing(lat, lng, p.lat, p.lng));
+      const distLabel = p.distKm < 1 ? `${Math.round(p.distKm * 1000)} m` : `${p.distKm.toFixed(1)} km`;
+      cells.push(tcell(escapeHtml(p.name), `${escapeHtml(p.kind)} · ${distLabel} ${brg}`, "text"));
+    });
+    poiModule = `
+      <div class="module full">
+        <div class="module-header"><span>What's at This Exact Spot</span><span class="meta">OpenStreetMap · Overpass · 2 km</span></div>
+        <div class="module-body"><div class="telemetry">${cells.join("")}</div></div>
+      </div>`;
+  }
+
+  // ============ Module: Magnetic Declination ============
+  let magModule = "";
+  if (magDec && typeof magDec.declination === "number") {
+    const dec = magDec.declination;
+    const dir = dec >= 0 ? "E" : "W";
+    const cells = [
+      tcell("Magnetic declination", `${Math.abs(dec).toFixed(2)}° ${dir}`, "big"),
+      tcell("Compass note", `True north is ${Math.abs(dec).toFixed(1)}° ${dec >= 0 ? "west of" : "east of"} magnetic north`, "text"),
+      magDec.dlat != null ? tcell("Annual change", `${magDec.dlat > 0 ? "+" : ""}${magDec.dlat.toFixed(2)}°/yr`) : null,
+    ].filter(Boolean);
+    magModule = `
+      <div class="module full">
+        <div class="module-header"><span>Magnetic Field</span><span class="meta">NOAA WMM ${magDec.year}</span></div>
+        <div class="module-body"><div class="telemetry">${cells.join("")}</div></div>
+      </div>`;
+  }
+
   // ============ Module: Lightning (Blitzortung) ============
   // Best effort — Blitzortung's map sets X-Frame-Options:SAMEORIGIN, so this iframe may be blank
   // in production. Kept as a placeholder until a server-side proxy or canvas overlay is wired up.
@@ -1988,7 +2309,46 @@ function renderInfo(lat, lng, data, nearby, wikiSummary, photos, sun, weather, c
     heroSubtitle = land ? `${Math.round(land.dist).toLocaleString()} km from ${escapeHtml(land.name)}` : "Open ocean";
   }
 
+  // Compute big-deal signals — used both for Hero callouts and module priority boosts
+  const bigQuake = Array.isArray(quakes)
+    ? quakes.find(q => q.properties && q.properties.mag >= 5.0 && (Date.now() - q.properties.time) < 86400000)
+    : null;
+  const nearestVolcano = Array.isArray(volcanoes) && volcanoes.length > 0 ? volcanoes[0] : null;
+  const issDistKm = (iss && typeof iss.latitude === "number") ? haversine(lat, lng, iss.latitude, iss.longitude) : null;
+  const auroraVisibleHere = kp && kp.kp != null && (
+    (kp.kp >= 4 && Math.abs(lat) >= 60) ||
+    (kp.kp >= 5 && Math.abs(lat) >= 55) ||
+    (kp.kp >= 6 && Math.abs(lat) >= 50) ||
+    (kp.kp >= 7 && Math.abs(lat) >= 45) ||
+    Math.abs(lat) >= 65
+  );
+  const hasExtremeWeather = weather && (
+    (weather.temperature_2m != null && (weather.temperature_2m >= 35 || weather.temperature_2m <= -20)) ||
+    (weather.wind_speed_10m != null && weather.wind_speed_10m >= 60)
+  );
+
   const heroFacts = [];
+  // Big-deal callouts first
+  if (bigQuake) {
+    const p = bigQuake.properties;
+    const c = bigQuake.geometry.coordinates;
+    const distKm = haversine(lat, lng, c[1], c[0]);
+    heroFacts.push({ label: "🌋 Earthquake", value: `M${p.mag.toFixed(1)} · ${Math.round(distKm)} km away · ${formatAgo(Date.now() - p.time)}`, big: true });
+  }
+  if (nearestVolcano && nearestVolcano.distKm <= 250) {
+    heroFacts.push({ label: "🌋 Active volcano", value: `${escapeHtml(nearestVolcano.name)} · ${Math.round(nearestVolcano.distKm)} km away`, big: true });
+  }
+  if (auroraVisibleHere && kp) {
+    heroFacts.push({ label: "🌌 Aurora", value: `Possibly visible tonight · Kp ${kp.kp.toFixed(1)}`, big: true });
+  }
+  if (hasExtremeWeather) {
+    const t = weather.temperature_2m;
+    let value = "";
+    if (t != null && t >= 35) value = `Heatwave · ${Math.round(t)}°C / ${Math.round(t * 9/5 + 32)}°F`;
+    else if (t != null && t <= -20) value = `Bitter cold · ${Math.round(t)}°C / ${Math.round(t * 9/5 + 32)}°F`;
+    else if (weather.wind_speed_10m >= 60) value = `Gale-force winds · ${Math.round(weather.wind_speed_10m)} km/h`;
+    if (value) heroFacts.push({ label: "🌡️ Extreme weather", value, big: true });
+  }
   // Elevation / depth — the "woah" stat
   if (gelev && gelev.elevation != null) {
     const e = Math.round(gelev.elevation);
@@ -2002,28 +2362,31 @@ function renderInfo(lat, lng, data, nearby, wikiSummary, photos, sun, weather, c
   }
   // Day / night + time
   heroFacts.push({ label: "Local time", value: `${timeStr} · ${dayNight}` });
-  // Weather
-  if (weather && weather.temperature_2m != null) {
+  // Weather (skip if extreme — already shown)
+  if (weather && weather.temperature_2m != null && !hasExtremeWeather) {
     const cond = weather.weather_code != null ? WEATHER_CODES[weather.weather_code] : "";
     heroFacts.push({ label: "Conditions", value: `${Math.round(weather.temperature_2m)}°C${cond ? " · " + cond : ""}` });
   }
-  // ISS overhead (only if it's close)
-  if (iss && typeof iss.latitude === "number") {
-    const dKm = haversine(lat, lng, iss.latitude, iss.longitude);
-    if (dKm < 1500) {
-      heroFacts.push({ label: "ISS", value: `Passing overhead now · ${Math.round(dKm)} km away`, big: true });
-    }
+  // ISS overhead
+  if (issDistKm != null && issDistKm < 1500) {
+    heroFacts.push({ label: "🛰️ ISS", value: `Passing overhead now · ${Math.round(issDistKm)} km away`, big: true });
   }
-  // For ocean: nearest land prominent if not already in subtitle position
+  // For ocean: nearest land
   if (!isLand && land) {
     const brg = compass(bearing(lat, lng, land.lat, land.lng));
     heroFacts.push({ label: "Nearest land", value: `${escapeHtml(land.name)} · ${Math.round(land.dist).toLocaleString()} km ${brg}` });
   }
 
+  // Hero image: photo if available, generated SVG fallback otherwise (never blank)
+  const fallbackSvg = svgHeroFallback(lat, lng, heroTitle);
+  const heroImg = heroPhoto
+    ? `<div class="hero-photo"><img src="${escapeHtml(heroPhoto)}" alt="" loading="lazy" data-fallback="1"></div>`
+    : `<div class="hero-photo svg-fallback">${fallbackSvg}</div>`;
+
   const heroModule = `
     <div class="module full hero-module">
       <div class="hero-body">
-        ${heroPhoto ? `<div class="hero-photo"><img src="${escapeHtml(heroPhoto)}" alt="" loading="lazy"></div>` : `<div></div>`}
+        ${heroImg}
         <div class="hero-text">
           <h1 class="hero-title">${escapeHtml(heroTitle)}</h1>
           <div class="hero-subtitle">${heroSubtitle}</div>
@@ -2034,24 +2397,45 @@ function renderInfo(lat, lng, data, nearby, wikiSummary, photos, sun, weather, c
       </div>
     </div>`;
 
-  document.getElementById("content").innerHTML = `
-    ${heroModule}
-    ${wikiModule}
-    ${quakeModule}
-    ${photoModule}
-    ${rightNowModule}
-    ${aqiModule}
-    ${sv}
-    ${satEmbed}
-    ${radioModule}
-    ${mp}
-    ${overheadModule}
-    ${aircraftModule}
-    ${vesselsModule}
-    ${windy}
-    ${countryModule}
-    ${positionModule}
-  `;
+  // ============ Dynamic module ordering by signal strength ============
+  // Higher priority = floats higher. Signal-strength boosts let big-deal events surface near the top.
+  const modules = [
+    { html: heroModule, prio: 10000 },
+    { html: wikiModule, prio: 900 },
+    { html: quakeModule, prio: 500 + (bigQuake ? 8500 : 0) },                                              // M5+ in 24h → near top
+    { html: volcanoModule, prio: 470 + (nearestVolcano && nearestVolcano.distKm <= 250 ? 8200 : 0) },      // Close eruption → near top
+    { html: auroraModule, prio: 460 + (auroraVisibleHere ? 8000 : 0) + (kp && kp.kp >= 5 ? 200 : 0) },
+    { html: photoModule, prio: 850 },
+    { html: rightNowModule, prio: 800 },
+    { html: aqiModule, prio: 700 + (aq && aq.european_aqi >= 80 ? 1500 : 0) },                             // Bad air → boost
+    { html: sv, prio: 650 },
+    { html: satEmbed, prio: 620 },
+    { html: radioModule, prio: 600 },
+    { html: mp, prio: 580 },
+    { html: poiModule, prio: 540 },
+    { html: overheadModule, prio: 450 + (issDistKm != null && issDistKm < 500 ? 8400 : 0) },               // ISS overhead → near top
+    { html: aircraftModule, prio: 420 },
+    { html: vesselsModule, prio: 400 },
+    { html: windy, prio: 350 },
+    { html: magModule, prio: 250 },
+    { html: countryModule, prio: 200 },
+    { html: positionModule, prio: 150 },
+  ];
+  document.getElementById("content").innerHTML = modules
+    .filter(m => m.html)
+    .sort((a, b) => b.prio - a.prio)
+    .map(m => m.html)
+    .join("");
+
+  // If the hero photo fails to load, swap in the SVG fallback
+  document.querySelectorAll(".hero-photo img[data-fallback]").forEach(img => {
+    img.addEventListener("error", () => {
+      const parent = img.parentElement;
+      if (!parent) return;
+      parent.classList.add("svg-fallback");
+      parent.innerHTML = fallbackSvg;
+    });
+  });
 
   if (photos && photos.length) {
     document.querySelectorAll(".photo").forEach((el, i) => {
@@ -2228,6 +2612,24 @@ function tickClock() {
 }
 tickClock();
 setInterval(tickClock, 1000);
+
+// Shuffle button — pick a random preset and go there
+document.getElementById("shuffleBtn").addEventListener("click", () => {
+  if (!PRESETS.length) return;
+  const p = PRESETS[Math.floor(Math.random() * PRESETS.length)];
+  activePresetName = p.name;
+  renderPresets();
+  goTo(p.lat, p.lng);
+});
+
+// Restore last visited location on page load (skip empty state for repeat visitors)
+const _last = loadLastLocation();
+if (_last) {
+  activePresetName = _last.presetName || null;
+  renderPresets();
+  // Slight delay so maps finish initializing layout before flyTo
+  setTimeout(() => goTo(_last.lat, _last.lng), 250);
+}
 </script>
 </body>
 </html>

@@ -37,35 +37,59 @@ All free-tier, CORS-enabled, no auth wall:
 - **OpenStreetMap Nominatim** — forward search + reverse geocoding
 - **Wikipedia GeoSearch + REST summary API** — nearest article + intro/thumbnail
 - **Wikimedia Commons GeoSearch + imageinfo** — geotagged photo gallery
-- **Open-Meteo** — current weather (temp, conditions, wind, humidity, is_day)
+- **Open-Meteo Forecast** — current weather (temp, conditions, wind, humidity, is_day)
+- **Open-Meteo Air Quality** — European AQI, US AQI, PM2.5, PM10, NO₂, O₃, SO₂, CO
 - **sunrise-sunset.org** — sunrise/sunset times
 - **REST Countries** — flag, capital, languages, currency, population
 - **wheretheiss.at** — ISS current position
 - **OpenSky Network** — live aircraft positions (anonymous, rate-limited)
+- **USGS FDSN** — earthquake feed (last 7 days, 500 km radius, M2.0+)
+- **NOAA SWPC** — planetary K-index (geomagnetic activity / aurora forecast)
+- **NOAA NCEI World Magnetic Model** — magnetic declination at a point
+- **OpenStreetMap Overpass** — nearby POIs (viewpoints, peaks, monuments, etc.)
+- **radio-browser.info** — live internet-radio stations in the antipode's country
+- **Smithsonian GVP** — active volcanoes (static cached list, refreshed manually)
+- **CARTO Dark Matter** — basemap tiles (keyless)
 - **N2YO** — full satellite/debris overhead counts (needs key)
 - **AISStream.io** — vessel positions via WebSocket (needs key)
-- **Mapillary Graph API** — community street imagery (needs token)
-- **Esri ArcGIS** — basemap tiles (keyless)
+- **Mapillary Graph API** — community street imagery (needs token, sessionStorage-cached by 10km grid)
 - **Google Maps Platform** — Street View embed, Time Zone, Elevation, Geocoding (needs key)
 - **MarineTraffic** — public ship tracker iframe embed (no key)
 
-## Module order (top to bottom in renderInfo)
+## Module order (dynamic, by signal strength)
 
-Sorted by "woah" factor descending:
+Modules now render via priority sort, not a static list. Each module declares a `prio` integer; signal-strength boosts let big-deal events float to the top. See the `modules = [...]` array in `renderInfo`.
 
-1. **Hero** — large photo + place name + 3-5 standout facts (elevation/depth, time, weather, ISS-overhead-now). Big orange callouts for ocean depth >50m, elevation >1500m, or ISS within 1500km.
-2. **Wikipedia card** — title, thumbnail, extract, distance from antipode
-3. **Photo gallery** — Wikimedia Commons geotagged photos (click for modal)
-4. **Right Now Over There** — full time/weather telemetry grid
-5. **Street View** — Google Maps Embed (needs key)
-6. **Satellite View** — Google Maps keyless `output=embed`
-7. **Mapillary** — tiered search 50/250/1000 km, shows nearest community photo
-8. **Overhead Right Now** — ISS + N2YO satellite counts
-9. **Aircraft Overhead** — OpenSky bbox query, count + 5 nearest
-10. **Vessels Nearby** — AIS stream sample + MarineTraffic map iframe (always shown)
-11. **Live Weather** — Windy iframe
-12. **Country** — REST Countries data
-13. **Position** — full reverse-geocoded address (last because it's reference data)
+Hero is pinned at the top (prio 10000). Big-deal boosts (additive +8000–+8500) surface when:
+- An M5+ earthquake hit within 24h in the 500 km radius
+- An active volcano is within 250 km of the antipode
+- Aurora is visible at the antipode's latitude (Kp + lat lookup)
+- The ISS is within 500 km of the antipode
+- European AQI ≥ 80 (Poor or worse)
+
+Base priority order (no signals):
+1. Hero — photo + standout facts + headline. Hero callouts now include earthquake, aurora, active volcano, extreme weather (>=35°C, <=-20°C, >=60 km/h winds) alongside elevation/depth and ISS.
+2. Wikipedia card
+3. Photo gallery (Commons)
+4. Right Now Over There (time/weather grid)
+5. Air Quality (Open-Meteo)
+6. Street View (Google)
+7. Satellite View (Google)
+8. Now Playing at the Antipode (radio-browser.info live audio)
+9. Mapillary
+10. What's at This Exact Spot (Overpass POIs)
+11. Recent Earthquakes (USGS)
+12. Active Volcanoes Nearby (Smithsonian GVP cached)
+13. Geomagnetic Activity / Aurora (NOAA SWPC Kp)
+14. Overhead Right Now (ISS + N2YO)
+15. Aircraft Overhead (OpenSky)
+16. Vessels Nearby (AIS + MarineTraffic)
+17. Live Weather (Windy iframe)
+18. Magnetic Field (NOAA WMM)
+19. Country (REST Countries)
+20. Position (reverse-geocoded address)
+
+Hero photo cascades: Wikipedia thumb → Commons photo → Mapillary image → generated SVG fallback (lat/lng art in brand colors).
 
 ## Quick Picks
 

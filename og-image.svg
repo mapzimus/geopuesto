@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0a1218"/>
+      <stop offset="0.5" stop-color="#0e1820"/>
+      <stop offset="1" stop-color="#14222d"/>
+    </linearGradient>
+    <linearGradient id="pivot" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#F26522"/>
+      <stop offset="1" stop-color="#00BFA5"/>
+    </linearGradient>
+    <radialGradient id="orangeGlow" cx="0.25" cy="0.5" r="0.45">
+      <stop offset="0" stop-color="#F26522" stop-opacity="0.85"/>
+      <stop offset="0.7" stop-color="#F26522" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="tealGlow" cx="0.75" cy="0.5" r="0.45">
+      <stop offset="0" stop-color="#00BFA5" stop-opacity="0.75"/>
+      <stop offset="0.7" stop-color="#00BFA5" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="scan" width="2" height="3" patternUnits="userSpaceOnUse">
+      <rect width="2" height="1" fill="#ffffff" fill-opacity="0.018"/>
+    </pattern>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <circle cx="300" cy="315" r="220" fill="url(#orangeGlow)"/>
+  <circle cx="900" cy="315" r="220" fill="url(#tealGlow)"/>
+  <rect width="1200" height="630" fill="url(#scan)"/>
+
+  <!-- Corner brackets -->
+  <g stroke="#2c4459" stroke-width="2" fill="none">
+    <polyline points="40,40 40,80 80,80" transform="translate(0,0)"/>
+    <polyline points="1160,40 1160,80 1120,80" transform="rotate(90 1160 40) translate(0,0)" stroke="none"/>
+    <path d="M 1160 40 L 1160 80 M 1160 40 L 1120 40"/>
+    <path d="M 40 590 L 40 550 M 40 590 L 80 590"/>
+    <path d="M 1160 590 L 1160 550 M 1160 590 L 1120 590"/>
+  </g>
+
+  <!-- LED + status text -->
+  <g transform="translate(80, 80)">
+    <circle cx="0" cy="0" r="5" fill="#4ade80"/>
+    <circle cx="0" cy="0" r="10" fill="#4ade80" fill-opacity="0.18"/>
+    <text x="22" y="5" font-family="IBM Plex Mono, monospace" font-size="14" fill="#6c8294" letter-spacing="3">SYS · OK · ANTIPODAL OBSERVATION SYSTEM</text>
+  </g>
+
+  <!-- Center wordmark -->
+  <g transform="translate(600, 315)" text-anchor="middle">
+    <text y="0" font-family="IBM Plex Sans, sans-serif" font-weight="600" font-size="156" fill="#f5f8fa" letter-spacing="-3">
+      <tspan>Ge</tspan><tspan fill="url(#pivot)">o</tspan><tspan>puesto</tspan>
+    </text>
+    <text y="64" font-family="IBM Plex Mono, monospace" font-size="22" fill="#6c8294" letter-spacing="8">WHAT&apos;S ON THE OPPOSITE SIDE OF EARTH?</text>
+  </g>
+
+  <!-- Coords readout -->
+  <g font-family="IBM Plex Mono, monospace" font-size="16" letter-spacing="2">
+    <text x="160" y="500" fill="#F26522">ORIGIN</text>
+    <text x="160" y="528" fill="#f5f8fa" font-size="22">41.29°N · 174.78°E</text>
+    <text x="1040" y="500" fill="#00BFA5" text-anchor="end">TARGET</text>
+    <text x="1040" y="528" fill="#f5f8fa" font-size="22" text-anchor="end">41.29°S · 5.22°W</text>
+    <line x1="600" y1="486" x2="600" y2="540" stroke="url(#pivot)" stroke-width="1"/>
+    <circle cx="600" cy="486" r="4" fill="#F26522"/>
+    <circle cx="600" cy="540" r="4" fill="#00BFA5"/>
+  </g>
+
+  <!-- Footer URL -->
+  <text x="600" y="595" font-family="IBM Plex Mono, monospace" font-size="14" fill="#6c8294" text-anchor="middle" letter-spacing="4">maxwellhowegis.com/geopuesto</text>
+</svg>
