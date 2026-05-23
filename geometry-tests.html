@@ -1,0 +1,448 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Geopuesto · Geometry Invariant Tests</title>
+  <style>
+    :root {
+      --bg: #0a0e14;
+      --fg: #e8e4d8;
+      --muted: #7c8aa8;
+      --pass: #00bfa5;
+      --fail: #ff5a4a;
+      --accent: #f26522;
+      --border: #2a3550;
+      --mono: 'IBM Plex Mono', 'JetBrains Mono', 'Consolas', monospace;
+      --sans: 'IBM Plex Sans', system-ui, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--sans); }
+    body { padding: 24px 16px 60px; max-width: 920px; margin: 0 auto; }
+    header { border-bottom: 1px solid var(--border); padding-bottom: 16px; margin-bottom: 24px; }
+    h1 { margin: 0 0 8px; font-size: 22px; font-weight: 500; letter-spacing: -0.01em; }
+    .tagline { color: var(--muted); font-family: var(--mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; }
+    .summary { margin: 18px 0 28px; display: flex; gap: 16px; font-family: var(--mono); font-size: 14px; }
+    .summary .chip { padding: 10px 16px; border: 1px solid var(--border); border-radius: 6px; }
+    .summary .chip.pass { color: var(--pass); border-color: var(--pass); }
+    .summary .chip.fail { color: var(--fail); border-color: var(--fail); }
+    .summary .chip.total { color: var(--muted); }
+    section { margin-bottom: 28px; }
+    section > h2 { font-size: 13px; font-weight: 600; color: var(--accent); font-family: var(--mono); letter-spacing: 0.1em; text-transform: uppercase; margin: 0 0 12px; border-bottom: 1px dashed var(--border); padding-bottom: 8px; }
+    .test { display: grid; grid-template-columns: 18px 1fr auto; gap: 12px; align-items: baseline; padding: 7px 0; border-bottom: 1px solid rgba(42, 53, 80, 0.4); font-family: var(--mono); font-size: 13px; }
+    .test .icon { font-weight: 700; text-align: center; }
+    .test.pass .icon { color: var(--pass); }
+    .test.fail .icon { color: var(--fail); }
+    .test .label { color: var(--fg); }
+    .test .detail { color: var(--muted); font-size: 11px; text-align: right; }
+    .test.fail .detail { color: var(--fail); }
+    footer { color: var(--muted); font-family: var(--mono); font-size: 11px; margin-top: 32px; padding-top: 16px; border-top: 1px solid var(--border); }
+    footer a { color: var(--accent); text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+    .stub-note { background: rgba(242, 101, 34, 0.08); border-left: 3px solid var(--accent); padding: 10px 14px; margin-bottom: 12px; color: var(--fg); font-size: 12px; font-family: var(--mono); border-radius: 4px; }
+    .stub-note code { background: rgba(255, 255, 255, 0.06); padding: 1px 5px; border-radius: 3px; font-family: var(--mono); }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="tagline">Geopuesto v2 · Phase 1 · Invariant Test Suite</div>
+    <h1>Spherical Geometry Self-Tests</h1>
+  </header>
+
+  <div class="summary">
+    <div class="chip pass" id="chip-pass">— passed</div>
+    <div class="chip fail" id="chip-fail">— failed</div>
+    <div class="chip total" id="chip-total">— total</div>
+  </div>
+
+  <div id="results"></div>
+
+  <footer>
+    Tests reference <a href="docs/geopuesto_master_spec.md">geopuesto_master_spec.md §13</a> (verification tests)
+    and <a href="docs/geopuesto_master_spec.md">§20</a> (pre-launch validation).
+    Implementation under test: <code>geometry.js</code>.
+  </footer>
+
+  <script src="geometry.js"></script>
+  <script>
+    (function () {
+      'use strict';
+      const G = window.Geometry;
+
+      // ---------------------------------------------------------------------
+      // Tiny DOM helper — element(tag, {class, text}, [children])
+      // No innerHTML anywhere. textContent only.
+      // ---------------------------------------------------------------------
+      function el(tag, attrs, children) {
+        const node = document.createElement(tag);
+        if (attrs) {
+          if (attrs.class) node.className = attrs.class;
+          if (attrs.text != null) node.textContent = attrs.text;
+          if (attrs.id) node.id = attrs.id;
+        }
+        if (children) {
+          for (const c of children) {
+            if (c) node.appendChild(c);
+          }
+        }
+        return node;
+      }
+
+      // ---------------------------------------------------------------------
+      // Test runner
+      // ---------------------------------------------------------------------
+      let passCount = 0, failCount = 0;
+      const sections = {};
+      const resultsRoot = document.getElementById('results');
+
+      function ensureSection(name) {
+        if (sections[name]) return sections[name];
+        const sec = el('section', null, [el('h2', { text: name })]);
+        resultsRoot.appendChild(sec);
+        sections[name] = sec;
+        return sec;
+      }
+
+      function record(sectionName, label, ok, detail) {
+        const sec = ensureSection(sectionName);
+        const row = el('div', { class: 'test ' + (ok ? 'pass' : 'fail') }, [
+          el('span', { class: 'icon', text: ok ? '✓' : '✗' }),
+          el('span', { class: 'label', text: label }),
+          el('span', { class: 'detail', text: detail || '' }),
+        ]);
+        sec.appendChild(row);
+        if (ok) passCount++; else failCount++;
+      }
+
+      function addNote(sectionName, parts) {
+        // parts: array of { text, code, bold } objects rendered as inline runs
+        const sec = ensureSection(sectionName);
+        const note = el('div', { class: 'stub-note' });
+        for (const p of parts) {
+          if (p.bold)      note.appendChild(el('b',    { text: p.text }));
+          else if (p.code) note.appendChild(el('code', { text: p.code }));
+          else             note.appendChild(document.createTextNode(p.text));
+        }
+        sec.appendChild(note);
+      }
+
+      function approx(actual, expected, tol, units) {
+        const diff = Math.abs(actual - expected);
+        const ok = diff <= tol;
+        const u = units || '';
+        const detail = ok
+          ? 'expected ' + expected.toFixed(3) + u + ', got ' + actual.toFixed(3) + u +
+            ' (Δ ' + diff.toFixed(4) + u + ', tol ' + tol + u + ')'
+          : 'EXPECTED ' + expected.toFixed(3) + u + ', GOT ' + actual.toFixed(3) + u +
+            ' (Δ ' + diff.toFixed(4) + u + ')';
+        return { ok, detail };
+      }
+
+      function near(label, section, actual, expected, tol, units) {
+        const r = approx(actual, expected, tol, units);
+        record(section, label, r.ok, r.detail);
+      }
+
+      function isTrue(label, section, ok, detail) {
+        record(section, label, !!ok, detail || '');
+      }
+
+      // ---------------------------------------------------------------------
+      // Fixtures — well-known points from the spec/demo
+      // ---------------------------------------------------------------------
+      const SALEM    = { name: 'Salem, MA',  lat:  42.52, lon:  -70.90 };
+      const TOKYO    = { name: 'Tokyo',      lat:  35.68, lon:  139.69 };
+      const CAPETOWN = { name: 'Cape Town',  lat: -33.92, lon:   18.42 };
+      const BOSTON   = { name: 'Boston',     lat:  42.36, lon:  -71.06 };
+      const NYC      = { name: 'New York',   lat:  40.71, lon:  -74.01 };
+      const POLAR    = { name: 'Near N pole', lat:  89.90, lon:    0.00 };
+      const ANTIMERI = { name: 'On antimeridian-near', lat: 0.00, lon: 175.00 };
+
+      const HALF_CIRC_KM = Math.PI * G.EARTH_R_KM;          // ~20,015 km
+      const QUARTER_CIRC = HALF_CIRC_KM / 2;                // ~10,007.5 km
+
+      // ---------------------------------------------------------------------
+      // §13 invariants — Antipodal ring (v1)
+      // ---------------------------------------------------------------------
+      function v1Invariants(origin) {
+        const sec = '§13 Antipodal Ring (origin: ' + origin.name + ')';
+        const P = G.latLonToXYZ(origin.lat, origin.lon);
+        const Pneg = G.negate(P);
+        const { Nperp, Eperp } = G.perpendicularBasis(P);
+        const Sperp = G.negate(Nperp);
+        const Wperp = G.negate(Eperp);
+
+        // Half-circumference: origin ↔ antipode
+        near('origin ↔ antipode = 180° / ~20,015 km',
+             sec, G.angularKm(P, Pneg), HALF_CIRC_KM, 1.0, ' km');
+
+        // Quarter-circumference: origin ↔ each perpendicular point
+        near('origin ↔ N* = 90° / ~10,007.5 km',
+             sec, G.angularKm(P, Nperp), QUARTER_CIRC, 0.5, ' km');
+        near('origin ↔ E* = 90° / ~10,007.5 km',
+             sec, G.angularKm(P, Eperp), QUARTER_CIRC, 0.5, ' km');
+
+        // Symmetric: antipode ↔ each perpendicular point
+        near('antipode ↔ N* = 90°',
+             sec, G.angularKm(Pneg, Nperp), QUARTER_CIRC, 0.5, ' km');
+        near('antipode ↔ E* = 90°',
+             sec, G.angularKm(Pneg, Eperp), QUARTER_CIRC, 0.5, ' km');
+
+        // Diametric pairs on the ring
+        near('N* ↔ S* = 180°',
+             sec, G.angularKm(Nperp, Sperp), HALF_CIRC_KM, 1.0, ' km');
+        near('E* ↔ W* = 180°',
+             sec, G.angularKm(Eperp, Wperp), HALF_CIRC_KM, 1.0, ' km');
+        near('N* ↔ E* = 90°',
+             sec, G.angularKm(Nperp, Eperp), QUARTER_CIRC, 0.5, ' km');
+
+        // Orthogonality (P, Nperp, Eperp form an orthonormal basis)
+        near('P · Nperp = 0', sec, G.dot(P, Nperp), 0, 1e-10);
+        near('P · Eperp = 0', sec, G.dot(P, Eperp), 0, 1e-10);
+        near('Nperp · Eperp = 0', sec, G.dot(Nperp, Eperp), 0, 1e-10);
+
+        // N* lies on the ring iff dot(N*, P) = 0 (P is the normal of the ring)
+        near('N* lies on ring (dot(N*, P) ≈ 0)',
+             sec, G.dot(Nperp, P), 0, 1e-10);
+      }
+
+      // Run for several origins so we catch a broad surface
+      v1Invariants(SALEM);
+      v1Invariants(TOKYO);
+      v1Invariants(CAPETOWN);
+
+      // ---------------------------------------------------------------------
+      // Polar edge case (spec §8.3 fallback)
+      // ---------------------------------------------------------------------
+      (function polarEdgeCase() {
+        const sec = '§8.3 Polar Edge Case';
+        const P = G.latLonToXYZ(POLAR.lat, POLAR.lon);
+        let basis = null, err = null;
+        try { basis = G.perpendicularBasis(P); }
+        catch (e) { err = e; }
+        isTrue('perpendicularBasis(near-pole) does not throw', sec, !err,
+               err ? String(err) : 'OK');
+        if (basis) {
+          near('Nperp is unit length', sec, G.norm(basis.Nperp), 1, 1e-10);
+          near('Eperp is unit length', sec, G.norm(basis.Eperp), 1, 1e-10);
+          near('Nperp ⊥ Eperp', sec, G.dot(basis.Nperp, basis.Eperp), 0, 1e-10);
+          near('Nperp ⊥ P', sec, G.dot(basis.Nperp, P), 0, 1e-10);
+        }
+      })();
+
+      // ---------------------------------------------------------------------
+      // Round-trip: lat/lon ↔ XYZ ↔ lat/lon
+      // ---------------------------------------------------------------------
+      (function roundTrip() {
+        const sec = 'Coordinate round-trip';
+        const samples = [SALEM, TOKYO, CAPETOWN, BOSTON, NYC, POLAR,
+                         { name: 'Equator/0', lat: 0, lon: 0 },
+                         { name: 'Antimeridian', lat: 12.34, lon: 179.99 },
+                         { name: 'S pole', lat: -89.99, lon: 100 }];
+        for (const s of samples) {
+          const v = G.latLonToXYZ(s.lat, s.lon);
+          const back = G.xyzToLatLon(v);
+          const isPole = Math.abs(s.lat) > 89.5;
+          near('lat round-trip (' + s.name + ')', sec, back.lat, s.lat, 1e-9);
+          if (!isPole) {
+            near('lon round-trip (' + s.name + ')', sec, back.lon, s.lon, 1e-9);
+          }
+        }
+      })();
+
+      // ---------------------------------------------------------------------
+      // §22 — General equidistant ring (v2)
+      // ---------------------------------------------------------------------
+      (function v2RingInvariants() {
+        const pairs = [
+          { name: 'Salem ↔ Tokyo',     A: SALEM,  B: TOKYO },
+          { name: 'Salem ↔ Cape Town', A: SALEM,  B: CAPETOWN },
+          { name: 'Boston ↔ NYC',      A: BOSTON, B: NYC },
+        ];
+        for (const p of pairs) {
+          const sec = '§22 Equidistant Ring (' + p.name + ')';
+          const A = G.latLonToXYZ(p.A.lat, p.A.lon);
+          const B = G.latLonToXYZ(p.B.lat, p.B.lon);
+          const ring = G.equidistantRing(A, B, 720);
+
+          // Defining property: every Q on ring has dist(Q, A) = dist(Q, B).
+          // Bonus invariants: min distance on the ring = arc/2 (at M_near);
+          //                   max distance on the ring = π·R − arc/2 (at M_far).
+          const arc = G.angularKm(A, B);
+          const expectedMin = arc / 2;
+          const expectedMax = HALF_CIRC_KM - arc / 2;
+          let maxDeltaAB = 0;
+          let minDist = Infinity, maxDist = 0;
+          for (const pt of ring) {
+            const Q = G.latLonToXYZ(pt[0], pt[1]);
+            const dA = G.angularKm(Q, A);
+            const dB = G.angularKm(Q, B);
+            const deltaAB = Math.abs(dA - dB);
+            if (deltaAB > maxDeltaAB) maxDeltaAB = deltaAB;
+            if (dA < minDist) minDist = dA;
+            if (dA > maxDist) maxDist = dA;
+          }
+          isTrue('every Q on ring: dist(Q,A) = dist(Q,B)',
+                 sec, maxDeltaAB < 0.01,
+                 'max |dA - dB| = ' + maxDeltaAB.toExponential(2) + ' km');
+          near('min dist on ring ≈ arc/2 (M_near)',
+               sec, minDist, expectedMin, 5, ' km');
+          near('max dist on ring ≈ π·R − arc/2 (M_far)',
+               sec, maxDist, expectedMax, 5, ' km');
+        }
+      })();
+
+      // ---------------------------------------------------------------------
+      // §23 — The Midpoint Pair / Geomates (the IP)
+      // ---------------------------------------------------------------------
+      (function geomatesInvariants() {
+        const pairs = [
+          { name: 'Salem ↔ Tokyo',     A: SALEM,  B: TOKYO },
+          { name: 'Salem ↔ Cape Town', A: SALEM,  B: CAPETOWN },
+          { name: 'Boston ↔ NYC',      A: BOSTON, B: NYC },
+        ];
+        for (const p of pairs) {
+          const sec = '§23 Geomates (' + p.name + ')';
+          const A = G.latLonToXYZ(p.A.lat, p.A.lon);
+          const B = G.latLonToXYZ(p.B.lat, p.B.lon);
+          const mids = G.midpointPair(A, B);
+          const N = G.latLonToXYZ(mids.near.lat, mids.near.lon);
+          const F = G.latLonToXYZ(mids.far.lat,  mids.far.lon);
+
+          // M_near ↔ M_far should be 180° (antipodal pair)
+          near('M_near ↔ M_far = 180°',
+               sec, G.angularKm(N, F), HALF_CIRC_KM, 0.5, ' km');
+
+          // M_near is equidistant from A and B
+          near('arc(M_near, A) = arc(M_near, B)',
+               sec, G.angularKm(N, A), G.angularKm(N, B), 0.1, ' km');
+
+          // M_far is equidistant from A and B
+          near('arc(M_far,  A) = arc(M_far,  B)',
+               sec, G.angularKm(F, A), G.angularKm(F, B), 0.1, ' km');
+
+          // M_near and M_far both sit on the equidistant ring (normal = A − B)
+          const normal = G.normalize(G.sub(A, B));
+          near('M_near · (A − B) = 0',
+               sec, G.dot(N, normal), 0, 1e-10);
+          near('M_far  · (A − B) = 0',
+               sec, G.dot(F, normal), 0, 1e-10);
+
+          // M_near is the CLOSER of the two midpoints to A
+          const dNearA = G.angularKm(N, A);
+          const dFarA = G.angularKm(F, A);
+          isTrue('M_near is closer to A than M_far is',
+                 sec, dNearA < dFarA,
+                 'dist(M_near, A) = ' + dNearA.toFixed(1) + ' km vs ' +
+                 'dist(M_far, A) = ' + dFarA.toFixed(1) + ' km');
+        }
+      })();
+
+      // ---------------------------------------------------------------------
+      // Antipodal degenerate case — midpointPair should throw
+      // ---------------------------------------------------------------------
+      (function antipodalGuard() {
+        const sec = 'Degenerate cases';
+        const A = G.latLonToXYZ(SALEM.lat, SALEM.lon);
+        const Aanti = G.negate(A);
+        let threw = false;
+        try { G.midpointPair(A, Aanti); }
+        catch (e) { threw = true; }
+        isTrue('midpointPair(A, antipode(A)) throws', sec, threw,
+               threw ? 'guarded' : 'NO throw — bug!');
+      })();
+
+      // ---------------------------------------------------------------------
+      // Antimeridian splitting — USER CONTRIBUTION pending
+      // ---------------------------------------------------------------------
+      (function antimeridianTests() {
+        const sec = 'Antimeridian splitting (§11.2, §17.1)';
+        addNote(sec, [
+          { bold: true, text: 'USER CONTRIBUTION PENDING. ' },
+          { text: 'The function ' },
+          { code: 'antimeridianSplit()' },
+          { text: ' is currently a stub. The tests below will fail until you implement it (see geometry.js).' },
+        ]);
+
+        const P = G.latLonToXYZ(ANTIMERI.lat, ANTIMERI.lon);
+        const ring = G.sampleGreatCircle(P, 360);
+
+        // Find how many wraps the raw polyline has
+        let wraps = 0;
+        for (let i = 1; i < ring.length; i++) {
+          if (Math.abs(ring[i][1] - ring[i - 1][1]) > 180) wraps++;
+        }
+        isTrue('test fixture: raw ring has at least one antimeridian wrap',
+               sec, wraps >= 1,
+               wraps + ' wrap(s) detected in raw polyline');
+
+        const segments = G.antimeridianSplit(ring);
+
+        isTrue('antimeridianSplit returns at least 2 segments for a wrapping ring',
+               sec, segments.length >= 2,
+               'got ' + segments.length + ' segment(s)');
+
+        // No segment may have an internal wrap
+        let anyInternalWrap = false;
+        for (const seg of segments) {
+          for (let i = 1; i < seg.length; i++) {
+            if (Math.abs(seg[i][1] - seg[i - 1][1]) > 180) {
+              anyInternalWrap = true;
+              break;
+            }
+          }
+          if (anyInternalWrap) break;
+        }
+        isTrue('no segment contains an internal antimeridian wrap',
+               sec, !anyInternalWrap,
+               anyInternalWrap ? 'a segment still wraps' : 'all segments clean');
+      })();
+
+      // ---------------------------------------------------------------------
+      // Cities query — small smoke test (real dataset in Phase 2)
+      // ---------------------------------------------------------------------
+      (function citiesSmokeTest() {
+        const sec = 'City queries (smoke test, real data in Phase 2)';
+        // Build a tiny synthetic cities array — 3 cities, only 1 on the
+        // Salem-antipodal ring
+        const onRingPoint = (function () {
+          const P = G.latLonToXYZ(SALEM.lat, SALEM.lon);
+          const basis = G.perpendicularBasis(P);
+          const ll = G.xyzToLatLon(basis.Nperp);
+          return { name: 'Synthetic-On-Ring', lat: ll.lat, lon: ll.lon, population: 50000 };
+        })();
+        const cities = [
+          onRingPoint,
+          { name: 'Salem itself',      lat: SALEM.lat,  lon: SALEM.lon,         population: 50000 },
+          { name: 'Antipode of Salem', lat: -SALEM.lat, lon: SALEM.lon + 180,   population: 50000 },
+        ];
+
+        const P = G.latLonToXYZ(SALEM.lat, SALEM.lon);
+        const results = G.citiesOnGreatCircle(P, cities, { toleranceKm: 100, minPop: 15000 });
+
+        const ok = results.length === 1 && results[0].name === onRingPoint.name;
+        const detail = results.length === 1
+          ? 'result: "' + results[0].name + '", dCircle = ' +
+            results[0].distanceFromCircleKm.toFixed(2) + ' km'
+          : 'got ' + results.length + ' result(s): ' +
+            results.map(function (r) { return r.name; }).join(', ');
+        isTrue('exactly the synthetic on-ring city is returned', sec, ok, detail);
+      })();
+
+      // ---------------------------------------------------------------------
+      // Update header summary
+      // ---------------------------------------------------------------------
+      document.getElementById('chip-pass').textContent  = passCount + ' passed';
+      document.getElementById('chip-fail').textContent  = failCount + ' failed';
+      document.getElementById('chip-total').textContent = (passCount + failCount) + ' total';
+
+      // Reflect aggregate state in the page title for at-a-glance feedback
+      if (failCount === 0) {
+        document.title = '✓ ' + document.title;
+      } else {
+        document.title = '✗ (' + failCount + ') ' + document.title;
+      }
+    })();
+  </script>
+</body>
+</html>
