@@ -140,14 +140,28 @@ GitHub Pages at `maxwellhowegis.com/geopuesto/`:
 
 ## Files
 
-- `index.html` — the entire app
-- `geopuesto.jsx` — original React artifact version (reference only, superseded by index.html)
+- `index.html` — the entire app (production)
+- `generate-og.py` — generates `og-image.png` from `og-image.svg` (build helper, run manually after editing the SVG)
+- `og-image.svg` / `og-image.png` — Open Graph social-card image (3.4 KB SVG → 88.8 KB rendered PNG)
 - `CLAUDE.md` — this file
+- `docs/` — planning + reference materials (not deployed)
+  - `docs/V2_PLAN.md` — current implementation plan (v2: antipodal ring, general equidistant ring, Geomates)
+  - `docs/geopuesto_master_spec.md` — full v2+ master spec with math, novelty claims, and long-term roadmap
+  - `docs/equidistant_geometry_demo.jsx` — Three.js visualization reference for v2 features
 
-## Roadmap ideas
+## Current development
+
+**v2 is in active planning.** See [`docs/V2_PLAN.md`](docs/V2_PLAN.md) for the phased implementation plan. Headline features:
+
+1. **Antipodal Ring (v1 ship)** — cities along your "personal equator," the great circle perpendicular to your antipodal axis
+2. **General Equidistant Ring (v2 ship)** — same ring math generalized to any two user-picked points
+3. **Geomates (v2 IP)** — the Midpoint Pair (`M_near` = surface midpoint, `M_far` = its antipode) surfaced as a novel paired-discovery feature
+
+Stack stays pure JS — no FastAPI backend, no React rewrite, no service tier. The whole effort is an extension of `index.html` plus new sibling files (`geometry.js`, `data/cities15000.json`).
+
+## Smaller roadmap items (not in v2 scope)
 
 - Wire up Google Geocoding as Nominatim fallback when Nominatim returns null/error
 - Persist last-visited location in localStorage
-- Mobile layout audit (Mission Control may be cramped on phone screens)
+- Mobile layout audit (covered by v2 Phase 7 but also relevant standalone)
 - Replace nearest-landmark hardcoded list with an Overpass API call to OSM for nearest coastal POI
-- OG preview image (currently no `og:image`, so link previews are just text)
