@@ -62,4 +62,16 @@
       }
       return [];
     });
+
+  // Sync-readable cache for the renderInfo path, which is itself sync. Stays
+  // undefined until the fetch resolves; consumers should treat null/undefined
+  // as a "still loading" state and render a placeholder.
+  window.GeopuestoCitiesResolved = null;
+  window.GeopuestoCities.then(function (cities) {
+    window.GeopuestoCitiesResolved = cities;
+    // Notify any UI that wants to re-render itself when data arrives.
+    if (typeof window.dispatchEvent === 'function') {
+      window.dispatchEvent(new CustomEvent('geopuesto:cities-ready', { detail: { count: cities.length } }));
+    }
+  });
 })(window);

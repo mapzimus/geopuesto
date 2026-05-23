@@ -610,6 +610,113 @@
   .module-body { padding: 0; }
   .module-body.padded { padding: 14px; }
 
+  /* ============ Phase 3b: Personal Equator module ============ */
+  .equator-controls {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 12px 14px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+  .equator-ctrl {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+  .equator-ctrl-label {
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--dim);
+  }
+  .equator-ctrl select {
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 4px 8px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.8rem;
+    min-width: 110px;
+    min-height: 32px;   /* WCAG touch target */
+    cursor: pointer;
+  }
+  .equator-ctrl select:hover { border-color: var(--orange); }
+  .equator-ctrl select:focus { outline: 2px solid var(--orange); outline-offset: 1px; }
+
+  .equator-list {
+    max-height: 380px;
+    overflow-y: auto;
+    background: var(--bg);
+  }
+  .equator-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 8px;
+    align-items: center;
+    padding: 9px 14px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background-color 120ms ease, border-color 120ms ease;
+    min-height: 44px;   /* WCAG 2.5.5 touch target */
+  }
+  .equator-row:hover {
+    background: var(--surface);
+    border-left: 2px solid var(--orange);
+    padding-left: 12px;
+  }
+  .equator-row:last-child { border-bottom: none; }
+  .equator-row-main {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    min-width: 0;
+  }
+  .equator-row-name {
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-weight: 500;
+    color: var(--text-bright);
+    font-size: 0.95rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .equator-row-country {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--dim);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    flex-shrink: 0;
+  }
+  .equator-row-meta {
+    display: flex;
+    gap: 12px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--dim);
+    flex-shrink: 0;
+  }
+  .equator-row-pop { color: var(--text); }
+  .equator-row-dist { color: var(--orange); }
+  .equator-empty {
+    padding: 24px 14px;
+    text-align: center;
+    color: var(--dim);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.8rem;
+    font-style: italic;
+  }
+  @media (max-width: 768px) {
+    .equator-controls { padding: 10px; gap: 8px; }
+    .equator-ctrl select { min-width: 90px; font-size: 0.75rem; }
+    .equator-row { padding: 8px 12px; }
+    .equator-row-meta { font-size: 0.7rem; gap: 8px; }
+    .equator-list { max-height: 50vh; }
+  }
+
   /* Telemetry rows */
   .telemetry {
     display: grid;
@@ -1446,6 +1553,161 @@ function renderPersonalEquator(lat, lng) {
   }
 }
 
+// ============================================================
+//  Phase 3b — "Your Personal Equator" module
+//  Renders the city-list panel that pairs with the ring above.
+//  Filter/sort state lives at module scope and persists across
+//  origin changes. Filter changes refresh the module in-place
+//  via DOMParser + replaceWith (no full renderInfo re-run).
+// ============================================================
+const equatorFilters = {
+  toleranceKm: 100,   // 50 / 100 / 250
+  minPop: 15000,      // 1000 / 15000 / 100000 / 1000000
+  sortBy: "closeness" // closeness | population | bearing
+};
+let currentOriginForEquator = null;  // {lat, lng}, set by goTo
+
+function buildEquatorModuleHtml(lat, lng, cities, filters) {
+  // Loading state: cities promise hasn't resolved yet (rare — only on first
+  // visit + immediate origin pick within ~200 ms of page load)
+  if (!window.Geometry || !cities || cities.length === 0) {
+    return `
+    <div class="module full" id="equator-module">
+      <div class="module-header orange">
+        <span>Your Personal Equator</span>
+        <span class="meta">Loading city data…</span>
+      </div>
+      <div class="module-body">
+        <div class="equator-empty">Cities still loading from GeoNames. Pick another origin in a moment to refresh.</div>
+      </div>
+    </div>`;
+  }
+
+  const P = Geometry.latLonToXYZ(lat, lng);
+  const matches = Geometry.citiesOnGreatCircle(P, cities, {
+    toleranceKm: filters.toleranceKm,
+    minPop: filters.minPop,
+  });
+
+  // Re-sort if user picked something other than closeness (the default)
+  const sorted = matches.slice();
+  if (filters.sortBy === "population") {
+    sorted.sort((a, b) => b.population - a.population);
+  } else if (filters.sortBy === "bearing") {
+    sorted.sort((a, b) => a.bearingAlongCircleDeg - b.bearingAlongCircleDeg);
+  }
+
+  const subtitle = sorted.length === 0
+    ? `No cities match these filters · all ~10,007 km from you and your antipode`
+    : `${sorted.length.toLocaleString()} cit${sorted.length === 1 ? "y" : "ies"} on your equator · each ~10,007 km from you and from your antipode`;
+
+  const controlsHtml = `
+    <div class="equator-controls">
+      <label class="equator-ctrl">
+        <span class="equator-ctrl-label">Tolerance</span>
+        <select data-equator-ctrl="toleranceKm" aria-label="Tolerance from ring in km">
+          <option value="50"${filters.toleranceKm === 50 ? " selected" : ""}>±50 km</option>
+          <option value="100"${filters.toleranceKm === 100 ? " selected" : ""}>±100 km</option>
+          <option value="250"${filters.toleranceKm === 250 ? " selected" : ""}>±250 km</option>
+        </select>
+      </label>
+      <label class="equator-ctrl">
+        <span class="equator-ctrl-label">Min population</span>
+        <select data-equator-ctrl="minPop" aria-label="Minimum population filter">
+          <option value="1000"${filters.minPop === 1000 ? " selected" : ""}>1 k+</option>
+          <option value="15000"${filters.minPop === 15000 ? " selected" : ""}>15 k+</option>
+          <option value="100000"${filters.minPop === 100000 ? " selected" : ""}>100 k+</option>
+          <option value="1000000"${filters.minPop === 1000000 ? " selected" : ""}>1 M+</option>
+        </select>
+      </label>
+      <label class="equator-ctrl">
+        <span class="equator-ctrl-label">Sort by</span>
+        <select data-equator-ctrl="sortBy" aria-label="Sort order">
+          <option value="closeness"${filters.sortBy === "closeness" ? " selected" : ""}>Closest to ring</option>
+          <option value="population"${filters.sortBy === "population" ? " selected" : ""}>Population</option>
+          <option value="bearing"${filters.sortBy === "bearing" ? " selected" : ""}>Bearing on ring</option>
+        </select>
+      </label>
+    </div>`;
+
+  const listHtml = sorted.length === 0
+    ? `<div class="equator-empty">No cities match. Try widening tolerance to ±250 km or lowering min pop.</div>`
+    : `<div class="equator-list">${sorted.map(c => `
+        <div class="equator-row" data-equator-city="1" data-lat="${c.lat}" data-lng="${c.lon}" tabindex="0" role="button" title="Click to make this your new origin">
+          <div class="equator-row-main">
+            <span class="equator-row-name">${escapeHtml(c.name)}</span>
+            <span class="equator-row-country">${escapeHtml(c.country)}</span>
+          </div>
+          <div class="equator-row-meta">
+            <span class="equator-row-pop">${c.population.toLocaleString()}</span>
+            <span class="equator-row-dist">d_ring ${c.distanceFromCircleKm.toFixed(0)} km</span>
+          </div>
+        </div>`).join("")}</div>`;
+
+  return `
+    <div class="module full" id="equator-module">
+      <div class="module-header orange">
+        <span>Your Personal Equator</span>
+        <span class="meta">${subtitle}</span>
+      </div>
+      <div class="module-body">
+        ${controlsHtml}
+        ${listHtml}
+      </div>
+    </div>`;
+}
+
+function refreshEquatorModule() {
+  if (!currentOriginForEquator) return;
+  const cities = window.GeopuestoCitiesResolved || [];
+  const html = buildEquatorModuleHtml(currentOriginForEquator.lat, currentOriginForEquator.lng, cities, equatorFilters);
+  // DOMParser instead of innerHTML — parsed docs are inert, no script execution
+  const parsed = new DOMParser().parseFromString(html, "text/html");
+  const fresh = parsed.body.firstElementChild;
+  const existing = document.getElementById("equator-module");
+  if (existing && fresh) existing.replaceWith(fresh);
+}
+
+// Re-render when cities finish loading (covers the case where user picked an
+// origin BEFORE the eager fetch resolved)
+window.addEventListener("geopuesto:cities-ready", refreshEquatorModule);
+
+// Filter changes (delegated): any <select data-equator-ctrl="...">
+document.addEventListener("change", (e) => {
+  const ctrl = e.target.closest("[data-equator-ctrl]");
+  if (!ctrl) return;
+  const key = ctrl.getAttribute("data-equator-ctrl");
+  const val = ctrl.value;
+  if (key === "sortBy") {
+    equatorFilters.sortBy = val;
+  } else {
+    const n = parseInt(val, 10);
+    if (Number.isFinite(n)) equatorFilters[key] = n;
+  }
+  refreshEquatorModule();
+});
+
+// Click on a city row → set as new origin (delegated)
+document.addEventListener("click", (e) => {
+  const row = e.target.closest("[data-equator-city]");
+  if (!row) return;
+  const lat = parseFloat(row.getAttribute("data-lat"));
+  const lng = parseFloat(row.getAttribute("data-lng"));
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+  activePresetName = null;
+  if (typeof renderPresets === "function") renderPresets();
+  goTo(lat, lng);
+});
+
+// Keyboard activation (Enter / Space) for accessibility
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Enter" && e.key !== " ") return;
+  const row = e.target.closest("[data-equator-city]");
+  if (!row) return;
+  e.preventDefault();
+  row.click();
+});
+
 mapOrigin.on("click", (e) => {
   activePresetName = null;
   renderPresets();
@@ -2128,6 +2390,9 @@ async function goTo(lat, lng) {
   // Phase 3a: render the personal equator ring on both maps. Pure-local math,
   // no API wait — appears at the same instant as the markers.
   renderPersonalEquator(lat, lng);
+  // Phase 3b: remember current origin so refreshEquatorModule() can rebuild
+  // the city list on filter changes without needing to re-call renderInfo.
+  currentOriginForEquator = { lat: lat, lng: lng };
   // Initial quick flyTo at zoom 5 for immediate visual feedback — smart-zoom kicks in once reverse-geocode resolves
   mapOrigin.flyTo([lat, lng], 5, { duration: 0.5 });
   mapAntipode.flyTo([anti.lat, anti.lng], 5, { duration: 0.5 });
@@ -2870,8 +3135,19 @@ function renderInfo(lat, lng, data, nearby, wikiSummary, photos, sun, weather, c
   const closeVolcano = nearestVolcano && nearestVolcano.distKm <= 250;
   const issOverhead = issDistKm != null && issDistKm < 500;
   const badAir = aq && aq.european_aqi >= 80;
+  // Phase 3b: "Your Personal Equator" module — slim card list of cities
+  // along the great circle perpendicular to the antipodal axis. Renders with
+  // a "loading" placeholder if cities haven't resolved yet; will refresh
+  // automatically via the geopuesto:cities-ready event.
+  const equatorModule = buildEquatorModuleHtml(
+    lat, lng,
+    window.GeopuestoCitiesResolved,
+    equatorFilters
+  );
+
   const modules = [
     { html: heroModule, prio: 10000, size: "full" },
+    { html: equatorModule, prio: 2000, size: "full" },
     { html: wikiModule, prio: 900, size: "full" },
     { html: quakeModule, prio: 500 + (bigQuake ? 8500 : 0), size: bigQuake ? "full" : "half" },
     { html: volcanoModule, prio: 470 + (closeVolcano ? 8200 : 0), size: closeVolcano ? "full" : "half" },
