@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Geopuesto · Personal Equator Ring · Preview</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <style>
+    :root {
+      --bg: #0a1218;
+      --surface: #14222d;
+      --border: #1f3344;
+      --text: #d8e0e8;
+      --dim: #8aa0b3;
+      --orange: #F26522;
+      --teal: #00BFA5;
+      --amber: #f2a949;
+      --mono: 'IBM Plex Mono', 'JetBrains Mono', 'Consolas', monospace;
+      --sans: 'IBM Plex Sans', system-ui, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--sans); }
+    body { padding: 16px; }
+    header { margin-bottom: 12px; }
+    h1 { margin: 0 0 4px; font-size: 18px; font-weight: 500; }
+    .tagline { color: var(--dim); font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; }
+    .presets { display: flex; gap: 6px; margin: 12px 0; flex-wrap: wrap; }
+    .preset { padding: 6px 12px; background: var(--surface); border: 1px solid var(--border); color: var(--dim); border-radius: 4px; cursor: pointer; font-family: var(--mono); font-size: 11px; }
+    .preset:hover { color: var(--amber); border-color: var(--amber); }
+    .preset.active { color: var(--bg); background: var(--amber); border-color: var(--amber); font-weight: 600; }
+    .maps { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .map-frame { border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+    .map-label { padding: 8px 12px; background: var(--surface); border-bottom: 1px solid var(--border); font-family: var(--mono); font-size: 10px; color: var(--dim); letter-spacing: 0.06em; text-transform: uppercase; display: flex; justify-content: space-between; align-items: center; }
+    .map-label .coord { color: var(--amber); }
+    .map { height: 50vh; min-height: 380px; background: #000; }
+    .stats { margin-top: 12px; font-family: var(--mono); font-size: 11px; color: var(--dim); }
+    .stats b { color: var(--amber); }
+    @media (max-width: 800px) {
+      .maps { grid-template-columns: 1fr; }
+      .map { height: 40vh; min-height: 280px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="tagline">Geopuesto v2 · Phase 3a · Ring rendering preview</div>
+    <h1>Your Personal Equator — drawn on real Leaflet maps</h1>
+  </header>
+
+  <div class="presets" id="presets"></div>
+
+  <div class="maps">
+    <div class="map-frame">
+      <div class="map-label"><span>Origin</span><span class="coord" id="originCoord">—</span></div>
+      <div id="mapOrigin" class="map"></div>
+    </div>
+    <div class="map-frame">
+      <div class="map-label"><span>Antipode</span><span class="coord" id="antipodeCoord">—</span></div>
+      <div id="mapAntipode" class="map"></div>
+    </div>
+  </div>
+
+  <div class="stats" id="stats"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="geometry.js"></script>
+  <script>
+    'use strict';
+
+    // ---- Map setup (mirrors production index.html line 1395-1398) ----
+    const TILE_URL = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
+    const TILE_OPTS = { maxZoom: 20, subdomains: "abcd" };
+    const MAP_OPTS = { worldCopyJump: true, attributionControl: false };
+    const mapOrigin = L.map("mapOrigin", MAP_OPTS).setView([20, 0], 2);
+    const mapAntipode = L.map("mapAntipode", MAP_OPTS).setView([-20, 180], 2);
+    L.tileLayer(TILE_URL, TILE_OPTS).addTo(mapOrigin);
+    L.tileLayer(TILE_URL, TILE_OPTS).addTo(mapAntipode);
+
+    // ---- Ring renderer (verbatim from production renderPersonalEquator) ----
+    const originEquatorLayer = L.layerGroup().addTo(mapOrigin);
+    const antipodeEquatorLayer = L.layerGroup().addTo(mapAntipode);
+    let originMarker = null, antipodeMarker = null;
+
+    function renderPersonalEquator(lat, lng) {
+      originEquatorLayer.clearLayers();
+      antipodeEquatorLayer.clearLayers();
+      if (!window.Geometry) return;
+      const P = Geometry.latLonToXYZ(lat, lng);
+      const polyline = Geometry.sampleGreatCircle(P, 360);
+      const segments = Geometry.antimeridianSplit(polyline);
+      // Two-pass render: dark halo first (for contrast against bright tile features),
+      // amber line on top. Without the halo, the line gets lost in variable tile luminance.
+      const halo = { color: "#000", weight: 6, opacity: 0.55, interactive: false, smoothFactor: 1.0 };
+      const line = { color: "#f2a949", weight: 3, opacity: 1.0, interactive: false, smoothFactor: 1.0 };
+      for (const seg of segments) {
+        L.polyline(seg, halo).addTo(originEquatorLayer);
+        L.polyline(seg, line).addTo(originEquatorLayer);
+        L.polyline(seg, halo).addTo(antipodeEquatorLayer);
+        L.polyline(seg, line).addTo(antipodeEquatorLayer);
+      }
+    }
+
+    function makePulse(color) {
+      return L.divIcon({
+        className: "pulse-marker",
+        html: '<div style="width:14px;height:14px;border-radius:50%;background:' + color + ';box-shadow:0 0 0 4px rgba(255,255,255,0.15);border:2px solid #fff;"></div>',
+        iconSize: [18, 18], iconAnchor: [9, 9],
+      });
+    }
+
+    function setOrigin(lat, lng, label) {
+      if (originMarker) mapOrigin.removeLayer(originMarker);
+      if (antipodeMarker) mapAntipode.removeLayer(antipodeMarker);
+      originMarker = L.marker([lat, lng], { icon: makePulse("#F26522") }).addTo(mapOrigin);
+      const antiLat = -lat;
+      const antiLng = lng > 0 ? lng - 180 : lng + 180;
+      antipodeMarker = L.marker([antiLat, antiLng], { icon: makePulse("#00BFA5") }).addTo(mapAntipode);
+      renderPersonalEquator(lat, lng);
+      // Zoom level 2 keeps the whole great-circle visible (a ring wraps the planet)
+      mapOrigin.flyTo([lat, lng], 2, { duration: 0.6 });
+      mapAntipode.flyTo([antiLat, antiLng], 2, { duration: 0.6 });
+
+      document.getElementById('originCoord').textContent = lat.toFixed(2) + '°, ' + lng.toFixed(2) + '°';
+      document.getElementById('antipodeCoord').textContent = antiLat.toFixed(2) + '°, ' + antiLng.toFixed(2) + '°';
+      // Count ring segments (each is rendered as 2 layers: halo + amber)
+      const segCount = originEquatorLayer.getLayers().length / 2;
+      const stats = document.getElementById('stats');
+      stats.textContent = '';
+      const html = label + ' → antipode at (' + antiLat.toFixed(2) + ', ' + antiLng.toFixed(2) + '). Ring drawn as ';
+      stats.appendChild(document.createTextNode(html));
+      const segB = document.createElement('b');
+      segB.textContent = segCount + ' polyline segment' + (segCount === 1 ? '' : 's');
+      stats.appendChild(segB);
+      stats.appendChild(document.createTextNode(' on each map (antimeridianSplit: ' + (segCount > 1 ? 'fired' : 'not needed') + '). 360 samples, point-spacing 1°.'));
+    }
+
+    // ---- Presets ----
+    const PRESETS = [
+      { name: 'Salem, MA',  lat:  42.52, lon:  -70.90 },
+      { name: 'Tokyo',      lat:  35.68, lon:  139.69 },
+      { name: 'Paris',      lat:  48.85, lon:    2.35 },
+      { name: 'Rio',        lat: -22.91, lon:  -43.17 },
+      { name: 'Cape Town',  lat: -33.92, lon:   18.42 },
+      { name: 'Auckland',   lat: -36.85, lon:  174.76 },
+      { name: 'Antimeridian (Fiji area)', lat: -17.71, lon: 178.07 },
+    ];
+
+    const presetsEl = document.getElementById('presets');
+    PRESETS.forEach((p, i) => {
+      const btn = document.createElement('button');
+      btn.className = 'preset';
+      btn.textContent = p.name;
+      btn.addEventListener('click', () => {
+        for (const b of presetsEl.querySelectorAll('.preset')) b.classList.remove('active');
+        btn.classList.add('active');
+        setOrigin(p.lat, p.lon, p.name);
+      });
+      if (i === 0) btn.classList.add('active');
+      presetsEl.appendChild(btn);
+    });
+
+    // Map click → set as new origin
+    mapOrigin.on('click', (e) => {
+      for (const b of presetsEl.querySelectorAll('.preset')) b.classList.remove('active');
+      setOrigin(e.latlng.lat, e.latlng.lng, 'Custom point');
+    });
+
+    // Default to Salem
+    setOrigin(PRESETS[0].lat, PRESETS[0].lon, PRESETS[0].name);
+  </script>
+</body>
+</html>

@@ -1212,6 +1212,8 @@
 </footer>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="geometry.js"></script>
+<script src="cities.js"></script>
 <script>
 // ============================================================
 //  CONFIG — paste your API keys here to unlock extra modules.
@@ -1407,6 +1409,41 @@ function makeMarker(color) {
     html: `<div class="ring" style="background:${color};opacity:0.5;"></div><div class="dot" style="background:${color};"></div>`,
     iconSize: [30, 30], iconAnchor: [15, 15],
   });
+}
+
+// ============================================================
+//  Phase 3a — "Your Personal Equator" ring
+//  Renders the great circle perpendicular to the antipodal axis
+//  on both maps. Every point on this ring is ~10,007.5 km from
+//  the origin AND from the antipode — the set of all places
+//  equally distant from both poles of your antipodal axis.
+//
+//  Math lives in geometry.js (Geometry.sampleGreatCircle,
+//  Geometry.antimeridianSplit). Ring layers are managed as their
+//  own LayerGroup so they can be cleared/redrawn cleanly on every
+//  origin change.
+// ============================================================
+const originEquatorLayer = L.layerGroup().addTo(mapOrigin);
+const antipodeEquatorLayer = L.layerGroup().addTo(mapAntipode);
+
+function renderPersonalEquator(lat, lng) {
+  originEquatorLayer.clearLayers();
+  antipodeEquatorLayer.clearLayers();
+  if (!window.Geometry) return;  // geometry.js not loaded — skip silently
+  const P = Geometry.latLonToXYZ(lat, lng);
+  const polyline = Geometry.sampleGreatCircle(P, 360);
+  const segments = Geometry.antimeridianSplit(polyline);
+  // Two-pass render: dark halo first for contrast against variable tile luminance
+  // (continents vs ocean vs city labels), then amber line on top. Without the
+  // halo, the line gets lost over white country labels and bright coastlines.
+  const halo = { color: "#000", weight: 6, opacity: 0.55, interactive: false, smoothFactor: 1.0 };
+  const line = { color: "#f2a949", weight: 3, opacity: 1.0, interactive: false, smoothFactor: 1.0 };
+  for (const seg of segments) {
+    L.polyline(seg, halo).addTo(originEquatorLayer);
+    L.polyline(seg, line).addTo(originEquatorLayer);
+    L.polyline(seg, halo).addTo(antipodeEquatorLayer);
+    L.polyline(seg, line).addTo(antipodeEquatorLayer);
+  }
 }
 
 mapOrigin.on("click", (e) => {
@@ -2088,6 +2125,9 @@ async function goTo(lat, lng) {
   if (antipodeMarker) mapAntipode.removeLayer(antipodeMarker);
   originMarker = L.marker([lat, lng], { icon: makeMarker("#F26522") }).addTo(mapOrigin);
   antipodeMarker = L.marker([anti.lat, anti.lng], { icon: makeMarker("#00BFA5") }).addTo(mapAntipode);
+  // Phase 3a: render the personal equator ring on both maps. Pure-local math,
+  // no API wait — appears at the same instant as the markers.
+  renderPersonalEquator(lat, lng);
   // Initial quick flyTo at zoom 5 for immediate visual feedback — smart-zoom kicks in once reverse-geocode resolves
   mapOrigin.flyTo([lat, lng], 5, { duration: 0.5 });
   mapAntipode.flyTo([anti.lat, anti.lng], 5, { duration: 0.5 });
