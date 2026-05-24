@@ -279,7 +279,8 @@
    * @param P            XYZ unit vector of the origin point.
    * @param cities       Array of {lat, lon, population, ...city props}.
    * @param opts.toleranceKm  Default 100.
-   * @param opts.minPop       Default 15000 (matches GeoNames cities15000).
+   * @param opts.minPop       Default 15000 (sensible mid-point; dataset goes
+   *                          down to 1000 via GeoNames cities1000).
    */
   function citiesOnGreatCircle(P, cities, opts) {
     opts = opts || {};

@@ -157,7 +157,7 @@ GitHub Pages at `maxwellhowegis.com/geopuesto/`:
 2. **General Equidistant Ring (v2 ship)** — same ring math generalized to any two user-picked points
 3. **Geomates (v2 IP)** — the Midpoint Pair (`M_near` = surface midpoint, `M_far` = its antipode) surfaced as a novel paired-discovery feature
 
-Stack stays pure JS — no FastAPI backend, no React rewrite, no service tier. The whole effort is an extension of `index.html` plus new sibling files (`geometry.js`, `data/cities15000.json`).
+Stack stays pure JS — no FastAPI backend, no React rewrite, no service tier. The whole effort is an extension of `index.html` plus new sibling files (`geometry.js`, `cities.js`, `data/cities1000.json` — the comprehensive GeoNames dataset, ~169k cities, ~14 MB raw / ~4.7 MB gzipped).
 
 ## Smaller roadmap items (not in v2 scope)
 
