@@ -1,0 +1,548 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Geopuesto v2 · Phase 1+2 · Math Validation</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <style>
+    :root {
+      --bg: #0a0e14;
+      --fg: #e8e4d8;
+      --muted: #7c8aa8;
+      --pass: #00bfa5;
+      --fail: #ff5a4a;
+      --accent: #f26522;
+      --border: #2a3550;
+      --mono: 'IBM Plex Mono', 'JetBrains Mono', 'Consolas', monospace;
+      --sans: 'IBM Plex Sans', system-ui, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--sans); }
+    body { padding: 24px 16px 60px; max-width: 960px; margin: 0 auto; }
+    header { border-bottom: 1px solid var(--border); padding-bottom: 16px; margin-bottom: 24px; }
+    h1 { margin: 0 0 8px; font-size: 22px; font-weight: 500; letter-spacing: -0.01em; }
+    .tagline { color: var(--muted); font-family: var(--mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; }
+    .summary { margin: 18px 0 28px; display: flex; gap: 16px; font-family: var(--mono); font-size: 14px; }
+    .summary .chip { padding: 10px 16px; border: 1px solid var(--border); border-radius: 6px; }
+    .summary .chip.pass { color: var(--pass); border-color: var(--pass); }
+    .summary .chip.fail { color: var(--fail); border-color: var(--fail); }
+    .summary .chip.total { color: var(--muted); }
+    section { margin-bottom: 28px; }
+    section > h2 { font-size: 13px; font-weight: 600; color: var(--accent); font-family: var(--mono); letter-spacing: 0.1em; text-transform: uppercase; margin: 0 0 12px; border-bottom: 1px dashed var(--border); padding-bottom: 8px; }
+    .test { display: grid; grid-template-columns: 18px 1fr auto; gap: 12px; align-items: baseline; padding: 7px 0; border-bottom: 1px solid rgba(42, 53, 80, 0.4); font-family: var(--mono); font-size: 13px; }
+    .test .icon { font-weight: 700; text-align: center; }
+    .test.pass .icon { color: var(--pass); }
+    .test.fail .icon { color: var(--fail); }
+    .test .label { color: var(--fg); }
+    .test .detail { color: var(--muted); font-size: 11px; text-align: right; }
+    .test.fail .detail { color: var(--fail); }
+    .readout { background: rgba(0, 191, 165, 0.06); border-left: 3px solid var(--pass); padding: 10px 14px; margin-bottom: 12px; font-family: var(--mono); font-size: 13px; }
+    .readout .label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; }
+    .readout .value { color: var(--fg); }
+    .contrib { background: rgba(242, 101, 34, 0.08); border-left: 3px solid var(--accent); padding: 14px 16px; margin: 14px 0 22px; border-radius: 4px; font-family: var(--mono); font-size: 12px; line-height: 1.55; }
+    .contrib h3 { margin: 0 0 8px; font-size: 12px; color: var(--accent); text-transform: uppercase; letter-spacing: 0.1em; }
+    .contrib code { background: rgba(255, 255, 255, 0.06); padding: 1px 5px; border-radius: 3px; }
+    #salem-map { height: 360px; margin-top: 8px; border: 1px solid var(--border); border-radius: 4px; }
+    .map-caption { color: var(--muted); font-family: var(--mono); font-size: 11px; margin-top: 6px; }
+    .sprintc-buttons { margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; }
+    .sprintc-buttons button { background: transparent; color: var(--fg); border: 1px solid var(--accent); padding: 8px 14px; font-family: var(--mono); font-size: 12px; cursor: pointer; border-radius: 4px; transition: background 0.15s; }
+    .sprintc-buttons button:hover { background: rgba(242, 101, 34, 0.15); }
+    .share-url { margin-top: 8px; padding: 8px 12px; background: rgba(0, 191, 165, 0.06); border: 1px solid var(--border); border-radius: 4px; font-family: var(--mono); font-size: 11px; word-break: break-all; color: var(--fg); }
+    .share-url .copied { color: var(--pass); margin-left: 8px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; }
+    footer { color: var(--muted); font-family: var(--mono); font-size: 11px; margin-top: 32px; padding-top: 16px; border-top: 1px solid var(--border); }
+    footer a { color: var(--accent); text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="tagline">Geopuesto v2 · Sprint A + B · Math Validation</div>
+    <h1>Two-Point Mode & Polyhedra Suite Self-Tests</h1>
+  </header>
+
+  <div class="summary">
+    <div class="chip pass" id="chip-pass">— passed</div>
+    <div class="chip fail" id="chip-fail">— failed</div>
+    <div class="chip total" id="chip-total">— total</div>
+  </div>
+
+  <div id="results"></div>
+
+  <section>
+    <h2>Boston → Tokyo · Live Readout</h2>
+    <div id="bos-tok-readout"></div>
+    <div class="contrib">
+      <h3>Contribution point — bearing asymmetry UX format</h3>
+      <p style="margin: 0 0 8px;">
+        Below this page's <code>&lt;script&gt;</code> there's a stub
+        <code>formatBearingPair(pair)</code> function that decides how the
+        Boston→Tokyo bearing readout reads to a user. The math returns
+        <code>{ initial, final, asymmetryDeg }</code>; the UX is your call.
+      </p>
+      <p style="margin: 0 0 6px;">Some valid options:</p>
+      <ul style="margin: 0 0 8px 18px; padding: 0;">
+        <li><code>"Start 333° NW → arrive 239° SW (compass rotates 94° left)"</code></li>
+        <li><code>"Initial 333°, final 239°, asymmetry 94°"</code></li>
+        <li><code>"Head NW, arrive heading SW"</code> — semantic, hide numbers</li>
+        <li><code>"333° → 239°"</code> — minimalist</li>
+      </ul>
+      <p style="margin: 0;">
+        Edit the stub at the bottom of this file and reload. Reflects in the
+        readout above. This format becomes the canonical bearing display when
+        Two-Point Mode wires into <code>index.html</code>.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Visual · Salem + Cuboctahedron (12 tangent points of a cube)</h2>
+    <div id="salem-map"></div>
+    <div class="map-caption">
+      Anchor: Salem MA (42.52°N, 70.90°W). Per V3_VISION.md §"Salem cube example",
+      expect 12 tangent points distributed at 60° / 90° / 120° / 180° from the anchor.
+    </div>
+  </section>
+
+  <section>
+    <h2>Sprint C · Share link &amp; export</h2>
+    <div class="map-caption" style="margin-bottom: 10px;">
+      Share copies a URL that restores this exact configuration (Salem,
+      cuboctahedron, spin 0). Reload the page after copying to confirm
+      hash-restore. GeoJSON / KML downloads contain 12 Points + N LineString
+      segments.
+    </div>
+    <div class="sprintc-buttons">
+      <button id="btn-share">Copy share link</button>
+      <button id="btn-export-geojson">Download GeoJSON</button>
+      <button id="btn-export-kml">Download KML</button>
+    </div>
+    <div id="share-url-display" class="share-url" style="display:none;"></div>
+    <div id="hash-parse-display" class="readout" style="display:none;"></div>
+  </section>
+
+  <footer>
+    Implementation under test:
+    <code>twoPoint.js</code>, <code>bearings.js</code>, <code>rotation.js</code>,
+    <code>shapeEngine.js</code>, <code>vertexCache.js</code>.
+    Spec refs: <a href="docs/V3_VISION.md">V3_VISION.md</a>,
+    <a href="docs/geopuesto_master_spec.md">master_spec §13, §20, §22, §23</a>,
+    <a href="docs/V2_PLAN.md">V2_PLAN.md</a>.
+  </footer>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="geometry.js"></script>
+  <script src="twoPoint.js"></script>
+  <script src="bearings.js"></script>
+  <script src="rotation.js"></script>
+  <script src="shapeEngine.js"></script>
+  <script src="vertexCache.js"></script>
+  <script src="shareLink.js"></script>
+  <script src="exportGeo.js"></script>
+  <script>
+    (function () {
+      'use strict';
+      const G = window.Geometry;
+      const TP = window.TwoPoint;
+      const B = window.Bearings;
+      const R = window.Rotation;
+      const SE = window.ShapeEngine;
+      const VC = window.VertexCache;
+      const SL = window.ShareLink;
+      const EG = window.ExportGeo;
+
+      // --- DOM helpers ----------------------------------------------------------
+      function el(tag, attrs, children) {
+        const node = document.createElement(tag);
+        if (attrs) {
+          if (attrs.class) node.className = attrs.class;
+          if (attrs.text != null) node.textContent = attrs.text;
+          if (attrs.id) node.id = attrs.id;
+          if (attrs.style) node.setAttribute('style', attrs.style);
+        }
+        if (children) for (const c of children) if (c) node.appendChild(c);
+        return node;
+      }
+
+      // --- Test runner ----------------------------------------------------------
+      let passCount = 0, failCount = 0;
+      const sections = {};
+      const resultsRoot = document.getElementById('results');
+
+      function ensureSection(name) {
+        if (sections[name]) return sections[name];
+        const sec = el('section', null, [el('h2', { text: name })]);
+        resultsRoot.appendChild(sec);
+        sections[name] = sec;
+        return sec;
+      }
+      function record(sec, label, ok, detail) {
+        const row = el('div', { class: 'test ' + (ok ? 'pass' : 'fail') }, [
+          el('span', { class: 'icon', text: ok ? '✓' : '✗' }),
+          el('span', { class: 'label', text: label }),
+          el('span', { class: 'detail', text: detail || '' }),
+        ]);
+        ensureSection(sec).appendChild(row);
+        if (ok) passCount++; else failCount++;
+      }
+      function approx(a, b, eps) { return Math.abs(a - b) <= (eps == null ? 1e-6 : eps); }
+      function summarize() {
+        document.getElementById('chip-pass').textContent  = passCount  + ' passed';
+        document.getElementById('chip-fail').textContent  = failCount  + ' failed';
+        document.getElementById('chip-total').textContent = (passCount + failCount) + ' total';
+      }
+
+      // --- Fixtures -------------------------------------------------------------
+      const BOSTON = { lat: 42.3601, lon: -71.0589 };
+      const TOKYO  = { lat: 35.6895, lon: 139.6917 };
+      const SALEM  = { lat: 42.5195, lon: -70.8967 };
+      const LONDON = { lat: 51.5074, lon: -0.1278 };
+      const SYDNEY = { lat: -33.8688, lon: 151.2093 };
+
+      // ========================================================================
+      // TwoPoint
+      // ========================================================================
+      (function testTwoPoint() {
+        const sec = 'TwoPoint · derive / cross-track / along-track / closerTo';
+        const d = TP.derive(BOSTON, TOKYO);
+        record(sec, 'derive(Boston, Tokyo).distanceKm ≈ 10800', approx(d.distanceKm, 10800, 200), d.distanceKm.toFixed(1) + ' km');
+        record(sec, 'derive returns M with valid lat/lon', d.M && d.M.lat >= -90 && d.M.lat <= 90 && d.M.lon >= -180 && d.M.lon <= 180, d.M ? d.M.lat.toFixed(2) + ', ' + d.M.lon.toFixed(2) : 'null');
+        record(sec, 'M and -M are antipodal (lat sum ≈ 0)', d.M && d.mAntipode && approx(d.M.lat + d.mAntipode.lat, 0, 1e-6), 'sum ' + (d.M.lat + d.mAntipode.lat).toExponential(2));
+        record(sec, 'n and -n are antipodal', d.n && d.nAntipode && approx(d.n.lat + d.nAntipode.lat, 0, 1e-6), '');
+        // n must be 90° from both A and B (within tolerance)
+        const nVec = G.latLonToXYZ(d.n.lat, d.n.lon);
+        const aVec = G.latLonToXYZ(BOSTON.lat, BOSTON.lon);
+        const bVec = G.latLonToXYZ(TOKYO.lat,  TOKYO.lon);
+        record(sec, 'n ⟂ A (90° arc, dot ≈ 0)', approx(G.dot(nVec, aVec), 0, 1e-10), 'dot=' + G.dot(nVec, aVec).toExponential(2));
+        record(sec, 'n ⟂ B (90° arc, dot ≈ 0)', approx(G.dot(nVec, bVec), 0, 1e-10), 'dot=' + G.dot(nVec, bVec).toExponential(2));
+        // M is equidistant from A and B
+        const mVec = G.latLonToXYZ(d.M.lat, d.M.lon);
+        record(sec, 'M equidistant from A and B', approx(G.dot(mVec, aVec), G.dot(mVec, bVec), 1e-10), 'Δdot=' + (G.dot(mVec, aVec) - G.dot(mVec, bVec)).toExponential(2));
+        // Degenerate cases
+        const dIdent = TP.derive(BOSTON, BOSTON);
+        record(sec, 'derive(A, A) ⇒ degenerate=identical', dIdent.degenerate === 'identical' && dIdent.distanceKm < 1e-6, dIdent.degenerate);
+        const bostAnti = G.xyzToLatLon(G.negate(G.latLonToXYZ(BOSTON.lat, BOSTON.lon)));
+        const dAnti = TP.derive(BOSTON, bostAnti);
+        record(sec, 'derive(A, -A) ⇒ degenerate=antipodal', dAnti.degenerate === 'antipodal' && approx(dAnti.distanceKm, 20015, 5), dAnti.degenerate + ', ' + dAnti.distanceKm.toFixed(1));
+        // Cross-track / along-track
+        const xt = TP.crossTrackDistanceKm(LONDON, BOSTON, TOKYO);
+        record(sec, 'crossTrack(London, Bos, Tok) finite', isFinite(xt), xt.toFixed(1) + ' km');
+        const at = TP.alongTrackDistanceKm(LONDON, BOSTON, TOKYO);
+        record(sec, 'alongTrack(London, Bos, Tok) > 0 (London is forward from Boston)', at > 0, at.toFixed(1) + ' km');
+        // closerTo
+        record(sec, 'closerTo(Sydney, Boston, Tokyo) = B (Tokyo)', TP.closerTo(SYDNEY, BOSTON, TOKYO) === 'B', '');
+        record(sec, 'closerTo(M, Boston, Tokyo) = equidistant', TP.closerTo(d.M, BOSTON, TOKYO) === 'equidistant', '');
+      })();
+
+      // ========================================================================
+      // Bearings
+      // ========================================================================
+      (function testBearings() {
+        const sec = 'Bearings · initial / final / asymmetry';
+        const east  = B.initial({ lat: 0, lon: 0 }, { lat: 0, lon: 1 });
+        record(sec, 'Equator due east bearing = 90°', approx(east, 90, 1e-6), east.toFixed(4) + '°');
+        const north = B.initial({ lat: 0, lon: 0 }, { lat: 1, lon: 0 });
+        record(sec, 'Equator due north bearing = 0°', approx(north, 0, 1e-6), north.toFixed(4) + '°');
+        const meridian = B.pair({ lat: 0, lon: 0 }, { lat: 60, lon: 0 });
+        record(sec, 'Along meridian: asymmetry = 0', approx(meridian.asymmetryDeg, 0, 1e-6), meridian.asymmetryDeg.toFixed(6) + '°');
+        const equator = B.pair({ lat: 0, lon: 0 }, { lat: 0, lon: 90 });
+        record(sec, 'Along equator: asymmetry = 0', approx(equator.asymmetryDeg, 0, 1e-6), equator.asymmetryDeg.toFixed(6) + '°');
+        const bostonTokyo = B.pair(BOSTON, TOKYO);
+        record(sec, 'Boston→Tokyo: initial in NW quadrant (270–360°)', bostonTokyo.initial > 270 && bostonTokyo.initial < 360, bostonTokyo.initial.toFixed(1) + '°');
+        record(sec, 'Boston→Tokyo: asymmetry > 50° (great circle bends sharply)', bostonTokyo.asymmetryDeg > 50, bostonTokyo.asymmetryDeg.toFixed(1) + '°');
+        record(sec, 'Boston→Tokyo: asymmetry ≤ 180° (within compass)', bostonTokyo.asymmetryDeg <= 180, bostonTokyo.asymmetryDeg.toFixed(1) + '°');
+      })();
+
+      // ========================================================================
+      // Rotation
+      // ========================================================================
+      (function testRotation() {
+        const sec = 'Rotation · matrices / SLERP';
+        // Identity case
+        const v0 = [1, 0, 0];
+        const target = [1, 0, 0];
+        const Mid = R.alignMatrix(v0, target);
+        record(sec, 'alignMatrix(v, v) = identity', approx(Mid[0], 1) && approx(Mid[4], 1) && approx(Mid[8], 1) && approx(Mid[1], 0), '');
+        // Quarter turn
+        const M90 = R.axisAngleMatrix([0, 0, 1], Math.PI / 2);
+        const rotated = R.apply(M90, [1, 0, 0]);
+        record(sec, 'axisAngleMatrix(z, 90°)·[1,0,0] = [0,1,0]', approx(rotated[0], 0, 1e-10) && approx(rotated[1], 1, 1e-10) && approx(rotated[2], 0, 1e-10), '[' + rotated.map(function (x) { return x.toFixed(3); }).join(', ') + ']');
+        // alignMatrix mapping
+        const aligned = R.apply(R.alignMatrix([1, 0, 0], [0, 0, 1]), [1, 0, 0]);
+        record(sec, 'alignMatrix([1,0,0],[0,0,1]) maps source to target', approx(aligned[2], 1, 1e-10), '[' + aligned.map(function (x) { return x.toFixed(3); }).join(', ') + ']');
+        // Antipodal alignment
+        const flip = R.apply(R.alignMatrix([1, 0, 0], [-1, 0, 0]), [1, 0, 0]);
+        record(sec, 'alignMatrix([1,0,0],[-1,0,0]) flips to antipode', approx(flip[0], -1, 1e-10), '[' + flip.map(function (x) { return x.toFixed(3); }).join(', ') + ']');
+        // SLERP endpoints
+        const A = [1, 0, 0], C = [0, 1, 0];
+        const slerpStart = R.slerp(A, C, 0);
+        const slerpEnd   = R.slerp(A, C, 1);
+        const slerpMid   = R.slerp(A, C, 0.5);
+        record(sec, 'slerp(A,B,0) = A', approx(slerpStart[0], 1) && approx(slerpStart[1], 0), '');
+        record(sec, 'slerp(A,B,1) = B', approx(slerpEnd[0], 0) && approx(slerpEnd[1], 1), '');
+        const midNorm = Math.sqrt(slerpMid[0] * slerpMid[0] + slerpMid[1] * slerpMid[1]);
+        record(sec, 'slerp midpoint unit-length', approx(midNorm, 1, 1e-10), 'norm=' + midNorm.toFixed(8));
+        record(sec, 'slerp midpoint is at 45° (equal x and y)', approx(slerpMid[0], slerpMid[1], 1e-10), 'x=' + slerpMid[0].toFixed(4) + ', y=' + slerpMid[1].toFixed(4));
+      })();
+
+      // ========================================================================
+      // VertexCache (synchronous; safe to test before catalog loads)
+      // ========================================================================
+      (function testCache() {
+        const sec = 'VertexCache · keyFor / get / set / clear';
+        VC.clear();
+        const p = { lat: 42.519534, lon: -70.896720 };
+        record(sec, 'keyFor rounds to 3 decimals', VC.keyFor(p) === '42.520,-70.897', VC.keyFor(p));
+        VC.set('test', p, { hello: 'world' });
+        const got = VC.get('test', p);
+        record(sec, 'set then get round-trips', got && got.hello === 'world', JSON.stringify(got));
+        VC.set('test', p, 'short-lived', 10);  // 10 ms TTL
+        const beforeExpire = VC.get('test', p);
+        record(sec, 'set TTL value retrievable immediately', beforeExpire === 'short-lived', String(beforeExpire));
+        setTimeout(function () {
+          const afterExpire = VC.get('test', p);
+          record(sec, 'set TTL value expires after ttlMs', afterExpire === undefined, String(afterExpire));
+          VC.clear();
+          summarize();
+        }, 60);
+      })();
+
+      // ========================================================================
+      // ShareLink
+      // ========================================================================
+      (function testShareLink() {
+        const sec = 'ShareLink · serialize / parse / round-trip';
+        record(sec, 'serialize(empty) = ""', SL.serialize({}) === '', '');
+        const cfg = { mode: 'polyhedra', A: SALEM, shape: 'cuboctahedron', spinDeg: 42, toleranceKm: 100, minPop: 15000 };
+        const hash = SL.serialize(cfg);
+        record(sec, 'serialize emits leading "#"', hash.charAt(0) === '#', hash);
+        const parsed = SL.parse(hash);
+        record(sec, 'round-trip preserves mode', parsed.mode === 'polyhedra', parsed.mode);
+        record(sec, 'round-trip preserves shape', parsed.shape === 'cuboctahedron', parsed.shape);
+        record(sec, 'round-trip preserves spin', parsed.spinDeg === 42, String(parsed.spinDeg));
+        record(sec, 'round-trip preserves tol', parsed.toleranceKm === 100, String(parsed.toleranceKm));
+        record(sec, 'round-trip preserves pop', parsed.minPop === 15000, String(parsed.minPop));
+        record(sec, 'A within 3-decimal precision', parsed.A && approx(parsed.A.lat, SALEM.lat, 0.001) && approx(parsed.A.lon, SALEM.lon, 0.001), '');
+        const bad = SL.parse('#mode=bogus&shape=cube&a=200,500');
+        record(sec, 'invalid mode dropped, shape kept', bad.mode === null && bad.shape === 'cube', 'mode=' + bad.mode + ', shape=' + bad.shape);
+        record(sec, 'out-of-range lat (200°) dropped', bad.A === null, String(bad.A));
+        const negSpin = SL.parse('#spin=-30');
+        record(sec, 'negative spin normalized to [0,360)', negSpin.spinDeg === 330, String(negSpin.spinDeg));
+        const url = SL.makeUrl('https://example.com/geopuesto/', cfg);
+        record(sec, 'makeUrl combines base + hash', url.indexOf('https://example.com/geopuesto/#') === 0, url.substring(0, 60) + '…');
+        const replaced = SL.makeUrl('https://example.com/?x=1#old', cfg);
+        record(sec, 'makeUrl strips existing hash from base', replaced.indexOf('#old') === -1, replaced.substring(0, 60) + '…');
+      })();
+
+      // ========================================================================
+      // ExportGeo
+      // ========================================================================
+      (function testExportGeo() {
+        const sec = 'ExportGeo · build / toKML';
+        const fc = EG.build({
+          name: 'Test',
+          points: [{ lat: 42.52, lon: -70.90, name: 'Salem' }, { lat: 0, lon: 0, name: 'Origin' }],
+          polylines: [{ coords: [[0, 0], [10, 10]], name: 'Diag' }],
+        });
+        record(sec, 'build returns FeatureCollection', fc.type === 'FeatureCollection', fc.type);
+        record(sec, '2 points + 1 line = 3 features', fc.features.length === 3, fc.features.length + ' features');
+        const salemPt = fc.features[0];
+        record(sec, 'GeoJSON uses [lon, lat] (not [lat, lon])', salemPt.geometry.coordinates[0] === -70.9 && salemPt.geometry.coordinates[1] === 42.52, JSON.stringify(salemPt.geometry.coordinates));
+        record(sec, 'Feature name propagates to properties', salemPt.properties.name === 'Salem', salemPt.properties.name);
+        const filtered = EG.build({ points: [{ lat: 200, lon: 0 }, { lat: 0, lon: 0 }] });
+        record(sec, 'invalid lat (200°) filtered', filtered.features.length === 1, filtered.features.length + ' kept');
+        const kml = EG.toKML({ name: 'Sample', points: [{ lat: 42.52, lon: -70.90, name: 'Salem' }] });
+        record(sec, 'toKML wraps in <kml>', kml.indexOf('<kml') !== -1 && kml.indexOf('</kml>') !== -1, '');
+        record(sec, 'toKML emits Placemark/name', kml.indexOf('<name>Salem</name>') !== -1, '');
+        record(sec, 'toKML uses lon,lat,alt order', kml.indexOf('-70.9,42.52,0') !== -1, '');
+        record(sec, 'toKML XML-escapes special chars', EG.toKML({ points: [{ lat: 0, lon: 0, name: 'A&B<C>' }] }).indexOf('A&amp;B&lt;C&gt;') !== -1, '');
+      })();
+
+      // ========================================================================
+      // ShapeEngine — async, runs after catalog fetches
+      // ========================================================================
+      SE.ready.then(function () {
+        const sec = 'ShapeEngine · catalog / configure / edges';
+        const shapes = SE.listShapes();
+        record(sec, 'Catalog loads 6 shapes', shapes.length === 6, shapes.map(function (s) { return s.id; }).join(', '));
+        const cubeEdges = SE.getEdges('cube');
+        record(sec, 'Cube auto-detects 12 edges', cubeEdges.length === 12, 'got ' + cubeEdges.length);
+        const octaEdges = SE.getEdges('octahedron');
+        record(sec, 'Octahedron auto-detects 12 edges', octaEdges.length === 12, 'got ' + octaEdges.length);
+        const icoEdges = SE.getEdges('icosahedron');
+        record(sec, 'Icosahedron auto-detects 30 edges', icoEdges.length === 30, 'got ' + icoEdges.length);
+        const cuboctaEdges = SE.getEdges('cuboctahedron');
+        record(sec, 'Cuboctahedron auto-detects 24 edges', cuboctaEdges.length === 24, 'got ' + cuboctaEdges.length);
+
+        const cfg = SE.configure('cuboctahedron', SALEM, 0);
+        record(sec, 'configure returns 12 vertices', cfg.vertices.length === 12, '');
+        record(sec, 'configure: vertex[0] lands at anchor (Salem)', approx(cfg.vertices[0].lat, SALEM.lat, 1e-6) && approx(cfg.vertices[0].lon, SALEM.lon, 1e-6), cfg.vertices[0].lat.toFixed(4) + ', ' + cfg.vertices[0].lon.toFixed(4));
+        // Cuboctahedron antipodal-pair check: vertex 0 = (a,a,0), vertex 3 = (-a,-a,0) are antipodal
+        const v0 = cfg.vertices[0], v3 = cfg.vertices[3];
+        record(sec, 'configure: vertex[3] = antipode of vertex[0]', approx(v0.lat + v3.lat, 0, 1e-6), 'sum ' + (v0.lat + v3.lat).toFixed(6));
+        // Distance signatures: 4 vertices @ 60°, 2 @ 90°, 4 @ 120°, 1 @ 180°
+        const anchorVec = G.latLonToXYZ(SALEM.lat, SALEM.lon);
+        const arcs = cfg.vertices.slice(1).map(function (ll) {
+          return Math.acos(G.clamp(G.dot(anchorVec, G.latLonToXYZ(ll.lat, ll.lon)), -1, 1)) * 180 / Math.PI;
+        });
+        const at60 = arcs.filter(function (a) { return approx(a, 60, 0.1); }).length;
+        const at90 = arcs.filter(function (a) { return approx(a, 90, 0.1); }).length;
+        const at120 = arcs.filter(function (a) { return approx(a, 120, 0.1); }).length;
+        const at180 = arcs.filter(function (a) { return approx(a, 180, 0.1); }).length;
+        record(sec, 'Cuboctahedron neighborhood signature: 4×60°', at60 === 4, 'got ' + at60);
+        record(sec, 'Cuboctahedron neighborhood signature: 2×90°', at90 === 2, 'got ' + at90);
+        record(sec, 'Cuboctahedron neighborhood signature: 4×120°', at120 === 4, 'got ' + at120);
+        record(sec, 'Cuboctahedron neighborhood signature: 1×180° (antipode)', at180 === 1, 'got ' + at180);
+        record(sec, 'configure: edgePolylines non-empty', cfg.edgePolylines.length > 0, cfg.edgePolylines.length + ' segments');
+
+        renderSalemMap(cfg);
+        wireSprintC(cfg);
+        renderBosTokReadout();
+        summarize();
+      }).catch(function (err) {
+        record('ShapeEngine · catalog load', 'catalog fetch failed', false, String(err));
+        renderBosTokReadout();
+        summarize();
+      });
+
+      // ========================================================================
+      // Visual: Salem-cuboctahedron Leaflet map
+      // ========================================================================
+      function renderSalemMap(cfg) {
+        const map = L.map('salem-map', { worldCopyJump: true }).setView([20, -30], 1);
+        L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+          attribution: 'Esri Dark Gray Canvas', maxZoom: 16, subdomains: ['', '']
+        }).addTo(map);
+        // Edge polylines
+        cfg.edgePolylines.forEach(function (poly) {
+          L.polyline(poly, { color: '#00bfa5', weight: 1.5, opacity: 0.6 }).addTo(map);
+        });
+        // Vertices (pins)
+        cfg.vertices.forEach(function (ll, i) {
+          const isAnchor = (i === 0);
+          L.circleMarker([ll.lat, ll.lon], {
+            radius: isAnchor ? 7 : 5,
+            color: isAnchor ? '#f26522' : '#e8e4d8',
+            weight: 2,
+            fillColor: isAnchor ? '#f26522' : '#0a0e14',
+            fillOpacity: 1,
+          }).bindTooltip('Vertex ' + i + (isAnchor ? ' (anchor, Salem)' : '') + '<br>' + ll.lat.toFixed(2) + ', ' + ll.lon.toFixed(2), { direction: 'top' }).addTo(map);
+        });
+      }
+
+      // ========================================================================
+      // Boston→Tokyo readout — uses formatBearingPair (USER-EDITABLE BELOW)
+      // ========================================================================
+      function renderBosTokReadout() {
+        const root = document.getElementById('bos-tok-readout');
+        const d = TP.derive(BOSTON, TOKYO);
+        const p = B.pair(BOSTON, TOKYO);
+
+        function row(label, value) {
+          return el('div', { class: 'readout' }, [
+            el('div', { class: 'label', text: label }),
+            el('div', { class: 'value', text: value }),
+          ]);
+        }
+        root.appendChild(row('Arc distance', d.distanceKm.toFixed(0) + ' km'));
+        root.appendChild(row('Bearings (formatted by your formatBearingPair)', formatBearingPair(p)));
+        root.appendChild(row('Midpoint M', d.M.lat.toFixed(3) + '°, ' + d.M.lon.toFixed(3) + '°  (' + describeRegion(d.M) + ')'));
+        root.appendChild(row('Antipodal midpoint −M', d.mAntipode.lat.toFixed(3) + '°, ' + d.mAntipode.lon.toFixed(3) + '°  (' + describeRegion(d.mAntipode) + ')'));
+        root.appendChild(row('Great-circle pole n', d.n.lat.toFixed(3) + '°, ' + d.n.lon.toFixed(3) + '°  (' + describeRegion(d.n) + ')'));
+      }
+
+      function describeRegion(ll) {
+        // Very rough quadrant labelling, just for readability of the readout.
+        const ns = ll.lat >= 0 ? 'N' : 'S';
+        const ew = ll.lon >= 0 ? 'E' : 'W';
+        return Math.abs(ll.lat).toFixed(0) + '°' + ns + ' / ' + Math.abs(ll.lon).toFixed(0) + '°' + ew;
+      }
+
+      // ========================================================================
+      // Sprint C wire-up: Share link + Export buttons + hash-restore display
+      // ========================================================================
+      function buildExportBundle(cfg) {
+        return {
+          name: 'Geopuesto · Salem · Cuboctahedron',
+          points: cfg.vertices.map(function (v, i) {
+            return {
+              lat: v.lat,
+              lon: v.lon,
+              name: i === 0 ? 'Salem (anchor)' : 'Vertex ' + i,
+              props: { index: i, anchor: i === 0 },
+            };
+          }),
+          polylines: cfg.edgePolylines.map(function (poly, idx) {
+            return { coords: poly, name: 'Edge segment ' + idx };
+          }),
+        };
+      }
+
+      function wireSprintC(cfg) {
+        const salemConfig = {
+          mode: 'polyhedra',
+          A: SALEM,
+          shape: 'cuboctahedron',
+          spinDeg: 0,
+        };
+
+        document.getElementById('btn-share').addEventListener('click', function () {
+          const url = SL.makeUrl(window.location.href, salemConfig);
+          const display = document.getElementById('share-url-display');
+          display.style.display = 'block';
+          display.textContent = url;
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(url).then(function () {
+              const tag = el('span', { class: 'copied', text: 'copied to clipboard' });
+              display.appendChild(tag);
+              setTimeout(function () { if (tag.parentNode) tag.parentNode.removeChild(tag); }, 1800);
+            }).catch(function () { /* clipboard denied — URL is still visible above */ });
+          }
+        });
+
+        document.getElementById('btn-export-geojson').addEventListener('click', function () {
+          EG.download(buildExportBundle(cfg), 'geopuesto-salem-cuboctahedron.geojson');
+        });
+
+        document.getElementById('btn-export-kml').addEventListener('click', function () {
+          EG.downloadKML(buildExportBundle(cfg), 'geopuesto-salem-cuboctahedron.kml');
+        });
+
+        // Display any config restored from the URL hash on load.
+        const restored = SL.fromCurrentLocation();
+        const hasContent = restored.mode || restored.shape || restored.A || restored.B
+                       || restored.spinDeg != null || restored.toleranceKm != null;
+        if (hasContent) {
+          const display = document.getElementById('hash-parse-display');
+          display.style.display = 'block';
+          display.appendChild(el('div', { class: 'label', text: 'Restored from URL hash' }));
+          display.appendChild(el('div', { class: 'value', text: JSON.stringify(restored, null, 2) }));
+        }
+      }
+
+      // =========================================================================
+      // USER CONTRIBUTION POINT — bearing asymmetry UX format (~5–10 lines)
+      // =========================================================================
+      //
+      // The math returns { initial, final, asymmetryDeg }. The string this
+      // function returns is what shows up in the Boston→Tokyo readout panel
+      // above. Whatever format you settle on here will become the canonical
+      // bearing display when Two-Point Mode wires into index.html.
+      //
+      // See the orange contribution callout near the top of this page for the
+      // candidate formats and the trade-offs.
+      //
+      // TODO (Max): replace the placeholder with your chosen format.
+      function formatBearingPair(pair) {
+        return 'TODO: edit formatBearingPair in v2-tests.html — debug dump: '
+             + 'initial=' + pair.initial.toFixed(1) + '° '
+             + 'final=' + pair.final.toFixed(1) + '° '
+             + 'asymmetry=' + pair.asymmetryDeg.toFixed(1) + '°';
+      }
+
+    })();
+  </script>
+</body>
+</html>

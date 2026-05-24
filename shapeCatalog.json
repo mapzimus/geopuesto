@@ -1,0 +1,121 @@
+{
+  "version": 1,
+  "edgeStrategy": "auto-min-distance",
+  "deferred": {
+    "truncatedIcosahedron": "60 vertices via (0,±1,±3φ) row family — Sprint B.2",
+    "rhombicTriacontahedron": "icosahedron + dodecahedron vertices unioned (32) — Sprint B.2",
+    "keplerPoinsot": "shares Platonic vertex sets, different edges — Sprint B.3 needs explicit edges"
+  },
+  "shapes": {
+    "tetrahedron": {
+      "technicalLabel": "Tetrahedron",
+      "userLabel": "Spin a pyramid inside it",
+      "description": "Four faces, four vertices, the simplest regular polyhedron. Self-dual.",
+      "vertexCount": 4,
+      "vertices": [
+        [ 0.5773502691896258,  0.5773502691896258,  0.5773502691896258],
+        [ 0.5773502691896258, -0.5773502691896258, -0.5773502691896258],
+        [-0.5773502691896258,  0.5773502691896258, -0.5773502691896258],
+        [-0.5773502691896258, -0.5773502691896258,  0.5773502691896258]
+      ]
+    },
+    "cube": {
+      "technicalLabel": "Cube",
+      "userLabel": "Spin a cube around it",
+      "description": "Six square faces, eight vertices. Tangent points of a circumscribed cube form a cuboctahedron at the 12 edge midpoints.",
+      "vertexCount": 8,
+      "vertices": [
+        [-0.5773502691896258, -0.5773502691896258, -0.5773502691896258],
+        [ 0.5773502691896258, -0.5773502691896258, -0.5773502691896258],
+        [-0.5773502691896258,  0.5773502691896258, -0.5773502691896258],
+        [ 0.5773502691896258,  0.5773502691896258, -0.5773502691896258],
+        [-0.5773502691896258, -0.5773502691896258,  0.5773502691896258],
+        [ 0.5773502691896258, -0.5773502691896258,  0.5773502691896258],
+        [-0.5773502691896258,  0.5773502691896258,  0.5773502691896258],
+        [ 0.5773502691896258,  0.5773502691896258,  0.5773502691896258]
+      ]
+    },
+    "octahedron": {
+      "technicalLabel": "Octahedron",
+      "userLabel": "Spin an octahedron inside it",
+      "description": "Eight triangular faces, six vertices. Dual of the cube.",
+      "vertexCount": 6,
+      "vertices": [
+        [ 1,  0,  0],
+        [-1,  0,  0],
+        [ 0,  1,  0],
+        [ 0, -1,  0],
+        [ 0,  0,  1],
+        [ 0,  0, -1]
+      ]
+    },
+    "icosahedron": {
+      "technicalLabel": "Icosahedron",
+      "userLabel": "Spin a star inside it",
+      "description": "Twenty triangular faces, twelve vertices arranged in three orthogonal golden rectangles. Dual of the dodecahedron.",
+      "vertexCount": 12,
+      "vertices": [
+        [ 0.0,                  0.5257311121191336,  0.8506508083520399],
+        [ 0.0,                  0.5257311121191336, -0.8506508083520399],
+        [ 0.0,                 -0.5257311121191336,  0.8506508083520399],
+        [ 0.0,                 -0.5257311121191336, -0.8506508083520399],
+        [ 0.5257311121191336,   0.8506508083520399,  0.0               ],
+        [ 0.5257311121191336,  -0.8506508083520399,  0.0               ],
+        [-0.5257311121191336,   0.8506508083520399,  0.0               ],
+        [-0.5257311121191336,  -0.8506508083520399,  0.0               ],
+        [ 0.8506508083520399,   0.0,                 0.5257311121191336],
+        [ 0.8506508083520399,   0.0,                -0.5257311121191336],
+        [-0.8506508083520399,   0.0,                 0.5257311121191336],
+        [-0.8506508083520399,   0.0,                -0.5257311121191336]
+      ]
+    },
+    "dodecahedron": {
+      "technicalLabel": "Dodecahedron",
+      "userLabel": "Spin a 12-faced gem inside it",
+      "description": "Twelve pentagonal faces, twenty vertices. Eight vertices sit at cube corners; the other twelve come from three orthogonal golden rectangles scaled by 1/phi and phi. Dual of the icosahedron.",
+      "vertexCount": 20,
+      "vertices": [
+        [ 0.5773502691896258,  0.5773502691896258,  0.5773502691896258],
+        [ 0.5773502691896258,  0.5773502691896258, -0.5773502691896258],
+        [ 0.5773502691896258, -0.5773502691896258,  0.5773502691896258],
+        [ 0.5773502691896258, -0.5773502691896258, -0.5773502691896258],
+        [-0.5773502691896258,  0.5773502691896258,  0.5773502691896258],
+        [-0.5773502691896258,  0.5773502691896258, -0.5773502691896258],
+        [-0.5773502691896258, -0.5773502691896258,  0.5773502691896258],
+        [-0.5773502691896258, -0.5773502691896258, -0.5773502691896258],
+        [ 0.0,                 0.3568220897730899,  0.9341723589627158],
+        [ 0.0,                 0.3568220897730899, -0.9341723589627158],
+        [ 0.0,                -0.3568220897730899,  0.9341723589627158],
+        [ 0.0,                -0.3568220897730899, -0.9341723589627158],
+        [ 0.3568220897730899,  0.9341723589627158,  0.0               ],
+        [ 0.3568220897730899, -0.9341723589627158,  0.0               ],
+        [-0.3568220897730899,  0.9341723589627158,  0.0               ],
+        [-0.3568220897730899, -0.9341723589627158,  0.0               ],
+        [ 0.9341723589627158,  0.0,                 0.3568220897730899],
+        [ 0.9341723589627158,  0.0,                -0.3568220897730899],
+        [-0.9341723589627158,  0.0,                 0.3568220897730899],
+        [-0.9341723589627158,  0.0,                -0.3568220897730899]
+      ]
+    },
+    "cuboctahedron": {
+      "technicalLabel": "Cuboctahedron",
+      "userLabel": "Spin a vector equilibrium",
+      "description": "Twelve vertices at the edge midpoints of a cube (or equivalently of an octahedron). Eight triangles + six squares. Called the 'vector equilibrium' by Buckminster Fuller because all 12 vertices are equidistant from the center AND from each other along the edges.",
+      "vertexCount": 12,
+      "vertices": [
+        [ 0.7071067811865476,  0.7071067811865476,  0.0               ],
+        [ 0.7071067811865476, -0.7071067811865476,  0.0               ],
+        [-0.7071067811865476,  0.7071067811865476,  0.0               ],
+        [-0.7071067811865476, -0.7071067811865476,  0.0               ],
+        [ 0.7071067811865476,  0.0,                 0.7071067811865476],
+        [ 0.7071067811865476,  0.0,                -0.7071067811865476],
+        [-0.7071067811865476,  0.0,                 0.7071067811865476],
+        [-0.7071067811865476,  0.0,                -0.7071067811865476],
+        [ 0.0,                 0.7071067811865476,  0.7071067811865476],
+        [ 0.0,                 0.7071067811865476, -0.7071067811865476],
+        [ 0.0,                -0.7071067811865476,  0.7071067811865476],
+        [ 0.0,                -0.7071067811865476, -0.7071067811865476]
+      ]
+    }
+  }
+}

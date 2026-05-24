@@ -15,7 +15,7 @@ Single-file web app that shows what's on the exact opposite side of Earth from a
 Geolocation, Google APIs, and AISStream all need a real HTTP origin (not `file://`). Spin up a server:
 
 ```powershell
-cd C:\Users\Calen\Documents\Geopuesto
+cd C:\Users\mhowe\Documents\dev\maxwellhowegis\geopuesto
 python -m http.server 8000
 ```
 
