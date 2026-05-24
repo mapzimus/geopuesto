@@ -1985,57 +1985,35 @@ function renderPersonalEquator(lat, lng) {
 // ============================================================
 const originRingCitiesLayer = L.layerGroup().addTo(mapOrigin);
 const antipodeRingCitiesLayer = L.layerGroup().addTo(mapAntipode);
-const MAX_RING_PINS = 300;  // legacy upper-bound (unused after bearing-stratified)
 
-// Phase 3b.7: bearing-stratified sampling for map pins.
+// Phase 3b.10: simplified picker. The picker is NOT a filter — the user's
+// tolerance + pop dropdowns set the scope. Picker just ships matches as pins.
 //
-// The original simple cap (slice(0, 300)) took the 300 closest cities globally,
-// which silently dropped entire regions: at ±250 km/1k+ pop for Salem, only
-// 1 of 16 South American cities ever rendered because the densest part of the
-// ring (Asia/Africa) saturated the cap.
+// History (why all this rewrite work):
+//   3b.1 added a flat cap of 300. Hid sparse regions (no SA cities).
+//   3b.7 added bearing-stratified (24 buckets × 16). Hid notable far cities.
+//   3b.9 added per-bucket famous override. Worked for famous, still missed
+//        the "hundreds of small NE towns" a user expects at 1k+ pop filter.
+//   3b.10 drops the artificial picker rules entirely. Hard cap as safety only.
 //
-// New approach: divide the ring into 24 angular buckets (15° each), take the
-// closest 16 cities from each. Dense buckets get capped; sparse buckets get
-// every city they have. Same total marker budget, but ALL parts of the ring
-// get representation — South Atlantic, Antarctica, mid-Pacific gaps included.
-const PIN_BEARING_BUCKETS = 24;
-const PIN_PER_BUCKET = 24;  // 3b.8: bumped from 16 — dense regions (MA coast, etc.) need headroom
-
-// Phase 3b.9 (v2): per-bucket famous-city override. The first attempt used a
-// global "top 300 by pop" override — but at wide tolerances (250km), global
-// megacities (Mumbai 12M, Delhi 10M, ...) ate the cap and regional notables
-// like Manchester NH (110k) still didn't appear. Fix: each bearing bucket
-// gets its OWN top-N most-populous override, so regional famous cities are
-// guaranteed visible even when neighbor towns are closer to the ring.
-const PIN_AUTO_INCLUDE_POP = 25000;  // pop threshold for "notable city"
+// Cap-overflow strategy: keep ALL famous (≥25k pop), fill remainder with
+// closest cities. Guarantees notable + nearby; sacrifices the long tail.
+const PIN_AUTO_INCLUDE_POP = 25000;
+const PIN_HARD_CAP = 2000;  // per map; modern Leaflet handles 2k circleMarkers smoothly
 
 function pickPinsForOverview(matches) {
   if (!matches || matches.length === 0) return matches || [];
-  const bucketSize = 360 / PIN_BEARING_BUCKETS;
-  const grouped = Array.from({ length: PIN_BEARING_BUCKETS }, () => []);
+  if (matches.length <= PIN_HARD_CAP) return matches;
+  // Cap exceeded — keep all famous, fill the rest with closest cities.
+  const picked = new Set();
   for (const c of matches) {
-    const b = Math.floor(((c.bearingAlongCircleDeg || 0) % 360) / bucketSize) % PIN_BEARING_BUCKETS;
-    grouped[b].push(c);
+    if ((c.population || 0) >= PIN_AUTO_INCLUDE_POP) picked.add(c);
   }
-  const pickedSet = new Set();
-  for (const g of grouped) {
-    // Pass 1 (closeness): the N closest-to-ring cities in this bucket — covers
-    // dense regional clusters and the "literally on the ring" small towns.
-    const closest = g.slice(0, PIN_PER_BUCKET);
-    for (const c of closest) pickedSet.add(c);
-    // Pass 2 (notable): every city ≥ PIN_AUTO_INCLUDE_POP in this bucket
-    // gets pinned. No cap — capping forces large NH cities like Manchester
-    // (110k) and Nashua (87k) to compete against Boston (650k), which they
-    // always lose. Threshold + bearing partition together bound the total
-    // marker count well enough (worst case ~800 markers at ±250km/1k+).
-    for (const c of g) {
-      if ((c.population || 0) >= PIN_AUTO_INCLUDE_POP) pickedSet.add(c);
-    }
+  for (const c of matches) {  // matches is already sorted by closeness
+    if (picked.size >= PIN_HARD_CAP) break;
+    picked.add(c);
   }
-  // Return in closeness order so "first" still means "closest to ring"
-  const picked = Array.from(pickedSet);
-  picked.sort((a, b) => a.distanceFromCircleKm - b.distanceFromCircleKm);
-  return picked;
+  return Array.from(picked).sort((a, b) => a.distanceFromCircleKm - b.distanceFromCircleKm);
 }
 
 // Phase 3b.2: index of pin pairs keyed by `${lat},${lng}` so we can highlight
