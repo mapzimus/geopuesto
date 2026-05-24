@@ -659,6 +659,26 @@
   }
   .equator-flagship-header .lede strong { color: var(--orange); font-weight: 600; }
 
+  /* Phase 3b.4: embedded ring-overview Leaflet map inside the module.
+     Lets the user SEE the orthodrome + all pins without scrolling back up
+     to the main maps. Fitted to the ring's bounds on every render. */
+  .equator-overview-map-wrap {
+    padding: 14px 18px 0;
+    background: var(--surface);
+  }
+  .equator-overview-map {
+    height: 360px;
+    width: 100%;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    background: #000;
+  }
+  @media (max-width: 768px) {
+    .equator-overview-map-wrap { padding: 10px 10px 0; }
+    .equator-overview-map { height: 260px; }
+  }
+
   /* Phase 3b.3: closest-city headline callout (the discovery moment) */
   .equator-headline {
     display: grid;
@@ -1883,8 +1903,10 @@ function renderRingCities(lat, lng) {
     const key = pinKey(c.lat, c.lon);
     ringPinIndex.set(key, { o: oPin, a: aPin, baseStyle: style });
 
-    // Pin hover → highlight self + matching card. mouseout reverts.
-    function onPinHover() { highlightRingPinByKey(key, /*scrollCard=*/ true); }
+    // Pin hover → highlight self + matching card (NO auto-scroll — scroll is
+    // disorienting when the user is just moving the mouse over the map).
+    // Phase 3b.4: scrollCard=false so hovering pins doesn't yank the page.
+    function onPinHover() { highlightRingPinByKey(key, /*scrollCard=*/ false); }
     function onPinLeave() { clearRingPinHighlight(); }
     oPin.on("mouseover", onPinHover); oPin.on("mouseout", onPinLeave);
     aPin.on("mouseover", onPinHover); aPin.on("mouseout", onPinLeave);
@@ -1940,6 +1962,107 @@ function zoomBothMapsToRing() {
 }
 
 // ============================================================
+//  Phase 3b.4 — Embedded ring-overview Leaflet map
+//
+//  Third map (besides mapOrigin / mapAntipode) that lives inside the
+//  orthodrome module body. Auto-fits to the ring's bounds so the user
+//  can see the WHOLE orthodrome + every pinned city without scrolling
+//  back up to the main maps and zooming out.
+//
+//  Module HTML gets rebuilt on every renderInfo() call and every
+//  refreshEquatorModule() — so the #equator-overview-map div is a fresh
+//  node each time. We .remove() the prior Leaflet instance before
+//  creating a new one. Cheap enough (~20ms) given how rarely it fires.
+// ============================================================
+let equatorOverviewMap = null;
+const equatorOverviewLayers = [];
+
+function initEquatorOverviewMap() {
+  const div = document.getElementById("equator-overview-map");
+  if (!div) return;
+  // Tear down any prior instance pointing at the now-detached div
+  if (equatorOverviewMap) {
+    try { equatorOverviewMap.remove(); } catch (e) { /* ignore */ }
+    equatorOverviewMap = null;
+    equatorOverviewLayers.length = 0;
+  }
+  equatorOverviewMap = L.map(div, {
+    worldCopyJump: true,
+    attributionControl: false,
+    zoomControl: true,
+    scrollWheelZoom: false,  // avoid hijacking page scroll
+  }).setView([0, 0], 2);
+  L.tileLayer(BASE_URL, TILE_OPTS_NOATTR).addTo(equatorOverviewMap);
+  if (currentOriginForEquator) {
+    drawEquatorOverviewContents(currentOriginForEquator.lat, currentOriginForEquator.lng);
+  }
+}
+
+function drawEquatorOverviewContents(lat, lng) {
+  if (!equatorOverviewMap || !window.Geometry) return;
+  // Clear any prior non-tile layers
+  for (const layer of equatorOverviewLayers) {
+    try { equatorOverviewMap.removeLayer(layer); } catch (e) {}
+  }
+  equatorOverviewLayers.length = 0;
+
+  // Ring polyline (halo + amber line, same convention as main maps)
+  const P = Geometry.latLonToXYZ(lat, lng);
+  const polyline = Geometry.sampleGreatCircle(P, 360);
+  const segments = Geometry.antimeridianSplit(polyline);
+  const halo = { color: "#000", weight: 5, opacity: 0.55, interactive: false, smoothFactor: 1.0 };
+  const line = { color: "#f2a949", weight: 2.5, opacity: 1.0, interactive: false, smoothFactor: 1.0 };
+  const ringLayers = [];
+  for (const seg of segments) {
+    ringLayers.push(L.polyline(seg, halo).addTo(equatorOverviewMap));
+    const ln = L.polyline(seg, line).addTo(equatorOverviewMap);
+    ringLayers.push(ln);
+    equatorOverviewLayers.push(ringLayers[ringLayers.length - 2], ln);
+  }
+
+  // Origin (orange) and antipode (teal) markers — instant spatial anchors
+  const antiLat = -lat;
+  const antiLng = lng > 0 ? lng - 180 : lng + 180;
+  const oMark = L.circleMarker([lat, lng], {
+    radius: 6, color: "#fff", weight: 2, fillColor: "#F26522", fillOpacity: 1, interactive: false
+  }).addTo(equatorOverviewMap);
+  const aMark = L.circleMarker([antiLat, antiLng], {
+    radius: 6, color: "#fff", weight: 2, fillColor: "#00BFA5", fillOpacity: 1, interactive: false
+  }).addTo(equatorOverviewMap);
+  equatorOverviewLayers.push(oMark, aMark);
+
+  // City pins on the ring (smaller than main maps, popups disabled — click
+  // the cards in the panel below for full info)
+  const cities = window.GeopuestoCitiesResolved;
+  if (cities) {
+    const matches = Geometry.citiesOnGreatCircle(P, cities, {
+      toleranceKm: equatorFilters.toleranceKm,
+      minPop: equatorFilters.minPop,
+    });
+    const toRender = matches.slice(0, MAX_RING_PINS);
+    for (const c of toRender) {
+      const pin = L.circleMarker([c.lat, c.lon], {
+        radius: 3,
+        color: "#000",
+        weight: 1,
+        fillColor: "#f2a949",
+        fillOpacity: 0.9,
+      }).bindTooltip(c.name + " (" + c.country + ")", { direction: "top", offset: [0, -3], opacity: 0.85 });
+      pin.addTo(equatorOverviewMap);
+      equatorOverviewLayers.push(pin);
+    }
+  }
+
+  // Fit bounds to the ring so the whole orthodrome is visible at once.
+  // For antipodal rings (always wrap the planet) this is ~world view.
+  const fg = L.featureGroup(ringLayers);
+  const bounds = fg.getBounds();
+  if (bounds.isValid()) {
+    equatorOverviewMap.fitBounds(bounds, { padding: [16, 16], maxZoom: 3, animate: false });
+  }
+}
+
+// ============================================================
 //  Phase 3b — "Your Personal Equator" module
 //  Renders the city-list panel that pairs with the ring above.
 //  Filter/sort state lives at module scope and persists across
@@ -1960,8 +2083,8 @@ function buildEquatorModuleHtml(lat, lng, cities, filters) {
     return `
     <div class="module full" id="equator-module">
       <div class="equator-flagship-header">
-        <span class="eyebrow"><span class="badge-new">NEW · v2</span> Personal Equator</span>
-        <h2 class="title">Your Personal Equator</h2>
+        <span class="eyebrow"><span class="badge-new">NEW · v2</span> Orthodrome · Personal Equator</span>
+        <h2 class="title">Your Orthodrome</h2>
         <p class="lede">Loading city data from GeoNames…</p>
       </div>
       <div class="module-body">
@@ -1986,13 +2109,14 @@ function buildEquatorModuleHtml(lat, lng, cities, filters) {
     sorted.sort((a, b) => a.bearingAlongCircleDeg - b.bearingAlongCircleDeg);
   }
 
-  // Lede: lead with the discovery moment, not a count.
+  // Lede: lead with the discovery moment, not a count. "Orthodrome" is the
+  // navigator's term for a great-circle route — straighter, cooler, accurate.
   const lede = headlineCity
-    ? `Your closest equator-mate is <strong>${escapeHtml(headlineCity.name)}, ${escapeHtml(headlineCity.country)}</strong> — just <strong>${headlineCity.distanceFromCircleKm.toFixed(1)} km</strong> from the ring that wraps the planet equidistant from you and your antipode.`
+    ? `Your closest orthodrome-mate is <strong>${escapeHtml(headlineCity.name)}, ${escapeHtml(headlineCity.country)}</strong> — just <strong>${headlineCity.distanceFromCircleKm.toFixed(1)} km</strong> from the orthodrome that loops the planet equidistant from you and your antipode.`
     : `No cities match the current filters. Widen the tolerance or lower the population threshold.`;
   const countLine = sorted.length === 0
     ? ''
-    : `${sorted.length.toLocaleString()} cit${sorted.length === 1 ? "y" : "ies"} found within ${filters.toleranceKm} km of your equator · each ~10,007 km from you and from your antipode`;
+    : `${sorted.length.toLocaleString()} cit${sorted.length === 1 ? "y" : "ies"} found within ${filters.toleranceKm} km of your orthodrome · each ~10,007 km from you and from your antipode`;
 
   const controlsHtml = `
     <div class="equator-controls">
@@ -2071,10 +2195,10 @@ function buildEquatorModuleHtml(lat, lng, cities, filters) {
   const headlineHtml = headlineCity ? `
     <div class="equator-headline">
       <div class="equator-headline-text">
-        <div class="equator-headline-label">Closest city on your equator</div>
+        <div class="equator-headline-label">Closest city on your orthodrome</div>
         <h3 class="equator-headline-name">${escapeHtml(headlineCity.name)}<span class="equator-headline-cc">${escapeHtml(headlineCity.country)}</span></h3>
         <div class="equator-headline-meta">
-          <b>${headlineCity.distanceFromCircleKm.toFixed(1)} km</b> from the ring · pop <b>${headlineCity.population.toLocaleString()}</b> · <b>${headlineCity.distanceFromOriginKm.toLocaleString(undefined, {maximumFractionDigits: 0})} km</b> from you
+          <b>${headlineCity.distanceFromCircleKm.toFixed(1)} km</b> off the orthodrome · pop <b>${headlineCity.population.toLocaleString()}</b> · <b>${headlineCity.distanceFromOriginKm.toLocaleString(undefined, {maximumFractionDigits: 0})} km</b> from you
         </div>
       </div>
       <button type="button" class="equator-headline-action" data-set-origin="1" data-lat="${headlineCity.lat}" data-lng="${headlineCity.lon}" title="Drop everything and tunnel here">
@@ -2085,12 +2209,13 @@ function buildEquatorModuleHtml(lat, lng, cities, filters) {
   return `
     <div class="module full" id="equator-module">
       <div class="equator-flagship-header">
-        <span class="eyebrow"><span class="badge-new">NEW · v2</span> Personal Equator</span>
-        <h2 class="title">The cities that are equidistant from you and your antipode</h2>
+        <span class="eyebrow"><span class="badge-new">NEW · v2</span> Orthodrome · Personal Equator</span>
+        <h2 class="title">Your orthodrome — every city equidistant from you and your antipode</h2>
         <p class="lede">${lede}</p>
         ${countLine ? `<p class="lede" style="color:var(--dim);font-size:0.8rem;font-family:'IBM Plex Mono',monospace;">${countLine}</p>` : ''}
       </div>
       <div class="module-body">
+        <div class="equator-overview-map-wrap"><div id="equator-overview-map" class="equator-overview-map"></div></div>
         ${headlineHtml}
         ${controlsHtml}
         ${listHtml}
@@ -2116,6 +2241,9 @@ function refreshEquatorModule() {
   // Phase 3b.1: also re-render the pin layer with the new filter values.
   // The pins use the same equatorFilters state, so they need to refresh too.
   renderRingCities(currentOriginForEquator.lat, currentOriginForEquator.lng);
+  // Phase 3b.4: the overview map div was replaced; rebuild the Leaflet
+  // instance on the new node. ~20ms cost on filter change.
+  initEquatorOverviewMap();
 }
 
 // Re-render when cities finish loading (covers the case where user picked an
@@ -3707,6 +3835,12 @@ function renderInfo(lat, lng, data, nearby, wikiSummary, photos, sun, weather, c
     // Module HTML templates hardcode `class="module full"`. Rewrite to whichever size the entry requested.
     .map(m => m.html.replace('class="module full', `class="module ${m.size || "full"}`))
     .join("");
+  // Phase 3b.4: the orthodrome module HTML includes a placeholder div for the
+  // embedded ring-overview map. innerHTML just replaced the old node, so the
+  // Leaflet instance pointing at the old div is dead — rebuild on the new
+  // node. Idempotent: this fires on both partial-data and full-data passes
+  // of renderInfo, and that's fine.
+  initEquatorOverviewMap();
 
   // Webcam alt-thumbnail switcher — swap the main player/image when clicked
   document.querySelectorAll(".webcam-alt").forEach(btn => {
