@@ -1999,17 +1999,38 @@ const antipodeRingCitiesLayer = L.layerGroup().addTo(mapAntipode);
 // Cap-overflow strategy: keep ALL famous (≥25k pop), fill remainder with
 // closest cities. Guarantees notable + nearby; sacrifices the long tail.
 const PIN_AUTO_INCLUDE_POP = 25000;
-const PIN_HARD_CAP = 2000;  // per map; modern Leaflet handles 2k circleMarkers smoothly
+// Phase 3b.11: raised 2000 → 4000 after the "no VT cities at 250km/1k+" report.
+// At 4000, all 4,545 matches at the Kinshasa/Salem ±250km/1k+ benchmark fit
+// (cap doesn't fire). Mobile may lag at the widest filter combos, but few
+// users dial that far and we'd rather show too much than too little.
+const PIN_HARD_CAP = 4000;
 
 function pickPinsForOverview(matches) {
   if (!matches || matches.length === 0) return matches || [];
   if (matches.length <= PIN_HARD_CAP) return matches;
-  // Cap exceeded — keep all famous, fill the rest with closest cities.
+  // Cap exceeded — three-pass split-budget strategy (Phase 3b.11):
+  //   Pass 1: First 75% of cap goes to the closest cities, no other criteria.
+  //           Guarantees small-town coverage near the ring (Saint Johnsbury VT
+  //           at 124 km, all NE coastal towns, etc).
+  //   Pass 2: Remaining 25% fills first with famous cities (>=25k pop) NOT
+  //           already in pass 1. Catches iconic far-from-ring cities like
+  //           NYC/Albany/Montreal at the edge of wide-tolerance filters.
+  //   Pass 3: If budget STILL has room (narrow filter with few famous
+  //           candidates), fill with next-closest non-famous. Stops the
+  //           cap from being partially-used; every promised slot delivers.
+  //
+  // History: an earlier "famous-first then closest" version caused widening
+  // tolerance to REMOVE coverage for sparse regions (more famous candidates
+  // ate the budget). The three-pass version is monotonic: widening never
+  // removes a previously-shown city.
+  const CLOSEST_BUDGET = Math.floor(PIN_HARD_CAP * 0.75);
   const picked = new Set();
+  for (let i = 0; i < Math.min(matches.length, CLOSEST_BUDGET); i++) picked.add(matches[i]);
   for (const c of matches) {
+    if (picked.size >= PIN_HARD_CAP) break;
     if ((c.population || 0) >= PIN_AUTO_INCLUDE_POP) picked.add(c);
   }
-  for (const c of matches) {  // matches is already sorted by closeness
+  for (const c of matches) {
     if (picked.size >= PIN_HARD_CAP) break;
     picked.add(c);
   }
@@ -2366,6 +2387,7 @@ function buildEquatorModuleHtml(lat, lng, cities, filters) {
           <option value="50"${filters.toleranceKm === 50 ? " selected" : ""}>±50 km</option>
           <option value="100"${filters.toleranceKm === 100 ? " selected" : ""}>±100 km · default</option>
           <option value="250"${filters.toleranceKm === 250 ? " selected" : ""}>±250 km · wide</option>
+          <option value="500"${filters.toleranceKm === 500 ? " selected" : ""}>±500 km · sweep</option>
         </select>
       </label>
       <label class="equator-ctrl">
