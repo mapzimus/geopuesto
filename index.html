@@ -2001,6 +2001,14 @@ const MAX_RING_PINS = 300;  // legacy upper-bound (unused after bearing-stratifi
 const PIN_BEARING_BUCKETS = 24;
 const PIN_PER_BUCKET = 24;  // 3b.8: bumped from 16 — dense regions (MA coast, etc.) need headroom
 
+// Phase 3b.9 (v2): per-bucket famous-city override. The first attempt used a
+// global "top 300 by pop" override — but at wide tolerances (250km), global
+// megacities (Mumbai 12M, Delhi 10M, ...) ate the cap and regional notables
+// like Manchester NH (110k) still didn't appear. Fix: each bearing bucket
+// gets its OWN top-N most-populous override, so regional famous cities are
+// guaranteed visible even when neighbor towns are closer to the ring.
+const PIN_AUTO_INCLUDE_POP = 25000;  // pop threshold for "notable city"
+
 function pickPinsForOverview(matches) {
   if (!matches || matches.length === 0) return matches || [];
   const bucketSize = 360 / PIN_BEARING_BUCKETS;
@@ -2009,9 +2017,23 @@ function pickPinsForOverview(matches) {
     const b = Math.floor(((c.bearingAlongCircleDeg || 0) % 360) / bucketSize) % PIN_BEARING_BUCKETS;
     grouped[b].push(c);
   }
-  const picked = [];
-  for (const g of grouped) picked.push(...g.slice(0, PIN_PER_BUCKET));
+  const pickedSet = new Set();
+  for (const g of grouped) {
+    // Pass 1 (closeness): the N closest-to-ring cities in this bucket — covers
+    // dense regional clusters and the "literally on the ring" small towns.
+    const closest = g.slice(0, PIN_PER_BUCKET);
+    for (const c of closest) pickedSet.add(c);
+    // Pass 2 (notable): every city ≥ PIN_AUTO_INCLUDE_POP in this bucket
+    // gets pinned. No cap — capping forces large NH cities like Manchester
+    // (110k) and Nashua (87k) to compete against Boston (650k), which they
+    // always lose. Threshold + bearing partition together bound the total
+    // marker count well enough (worst case ~800 markers at ±250km/1k+).
+    for (const c of g) {
+      if ((c.population || 0) >= PIN_AUTO_INCLUDE_POP) pickedSet.add(c);
+    }
+  }
   // Return in closeness order so "first" still means "closest to ring"
+  const picked = Array.from(pickedSet);
   picked.sort((a, b) => a.distanceFromCircleKm - b.distanceFromCircleKm);
   return picked;
 }
