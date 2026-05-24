@@ -64,6 +64,7 @@
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="geometry.js"></script>
+  <script src="cities.js"></script>
   <script>
     'use strict';
 
@@ -79,7 +80,13 @@
     // ---- Ring renderer (verbatim from production renderPersonalEquator) ----
     const originEquatorLayer = L.layerGroup().addTo(mapOrigin);
     const antipodeEquatorLayer = L.layerGroup().addTo(mapAntipode);
+    const originRingCitiesLayer = L.layerGroup().addTo(mapOrigin);
+    const antipodeRingCitiesLayer = L.layerGroup().addTo(mapAntipode);
     let originMarker = null, antipodeMarker = null;
+
+    // Filters (tweak to see different tolerance/pop combos at runtime)
+    const filters = { toleranceKm: 100, minPop: 100000 };
+    const MAX_RING_PINS = 300;
 
     function renderPersonalEquator(lat, lng) {
       originEquatorLayer.clearLayers();
@@ -88,8 +95,6 @@
       const P = Geometry.latLonToXYZ(lat, lng);
       const polyline = Geometry.sampleGreatCircle(P, 360);
       const segments = Geometry.antimeridianSplit(polyline);
-      // Two-pass render: dark halo first (for contrast against bright tile features),
-      // amber line on top. Without the halo, the line gets lost in variable tile luminance.
       const halo = { color: "#000", weight: 6, opacity: 0.55, interactive: false, smoothFactor: 1.0 };
       const line = { color: "#f2a949", weight: 3, opacity: 1.0, interactive: false, smoothFactor: 1.0 };
       for (const seg of segments) {
@@ -98,6 +103,28 @@
         L.polyline(seg, halo).addTo(antipodeEquatorLayer);
         L.polyline(seg, line).addTo(antipodeEquatorLayer);
       }
+    }
+
+    // Phase 3b.1 — render city pins on both maps along the ring
+    async function renderRingCities(lat, lng) {
+      originRingCitiesLayer.clearLayers();
+      antipodeRingCitiesLayer.clearLayers();
+      const cities = await window.GeopuestoCities;
+      if (!cities || cities.length === 0) return 0;
+      const P = Geometry.latLonToXYZ(lat, lng);
+      const matches = Geometry.citiesOnGreatCircle(P, cities, filters);
+      const toRender = matches.slice(0, MAX_RING_PINS);
+      for (const c of toRender) {
+        const t = c.distanceFromCircleKm / Math.max(filters.toleranceKm, 1);
+        const style = {
+          radius: 4, color: "#000", weight: 1.5, opacity: 0.8,
+          fillColor: "#f2a949", fillOpacity: 1.0 - 0.5 * t,
+        };
+        const popup = `<strong>${c.name}</strong> (${c.country})<br>pop ${c.population.toLocaleString()}<br>${c.distanceFromCircleKm.toFixed(1)} km from ring`;
+        L.circleMarker([c.lat, c.lon], style).bindPopup(popup).addTo(originRingCitiesLayer);
+        L.circleMarker([c.lat, c.lon], style).bindPopup(popup).addTo(antipodeRingCitiesLayer);
+      }
+      return toRender.length;
     }
 
     function makePulse(color) {
@@ -116,6 +143,14 @@
       const antiLng = lng > 0 ? lng - 180 : lng + 180;
       antipodeMarker = L.marker([antiLat, antiLng], { icon: makePulse("#00BFA5") }).addTo(mapAntipode);
       renderPersonalEquator(lat, lng);
+      renderRingCities(lat, lng).then(function (n) {
+        const stats = document.getElementById('stats');
+        if (stats) {
+          const extra = document.createElement('span');
+          extra.textContent = '  ·  ' + n + ' city pin' + (n === 1 ? '' : 's') + ' rendered (cap ' + MAX_RING_PINS + ', min pop ' + filters.minPop.toLocaleString() + ', tol ' + filters.toleranceKm + ' km)';
+          stats.appendChild(extra);
+        }
+      });
       // Zoom level 2 keeps the whole great-circle visible (a ring wraps the planet)
       mapOrigin.flyTo([lat, lng], 2, { duration: 0.6 });
       mapAntipode.flyTo([antiLat, antiLng], 2, { duration: 0.6 });

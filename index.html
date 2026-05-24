@@ -709,6 +709,54 @@
     font-size: 0.8rem;
     font-style: italic;
   }
+
+  /* Phase 3b.1: ring-pin popups on the maps */
+  .ring-pin-popup {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--text);
+    line-height: 1.55;
+    min-width: 220px;
+  }
+  .ring-pin-popup strong {
+    font-family: 'IBM Plex Sans', sans-serif;
+    color: var(--orange);
+    font-size: 0.95rem;
+    font-weight: 600;
+  }
+  .ring-pin-popup .cc {
+    color: var(--dim);
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .ring-pin-popup .popup-set-origin {
+    display: inline-block;
+    margin-top: 8px;
+    padding: 6px 12px;
+    background: var(--orange);
+    color: #0a1218;
+    border: none;
+    border-radius: 3px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: filter 120ms ease;
+  }
+  .ring-pin-popup .popup-set-origin:hover { filter: brightness(1.15); }
+  .ring-pin-popup .popup-set-origin:focus { outline: 2px solid #fff; outline-offset: 1px; }
+  /* Override Leaflet's default popup chrome for the Mission Control aesthetic */
+  .leaflet-popup-content-wrapper {
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  }
+  .leaflet-popup-tip { background: var(--surface); border: 1px solid var(--border); }
+  .leaflet-popup-close-button { color: var(--dim) !important; }
+  .leaflet-popup-close-button:hover { color: var(--orange) !important; }
   @media (max-width: 768px) {
     .equator-controls { padding: 10px; gap: 8px; }
     .equator-ctrl select { min-width: 90px; font-size: 0.75rem; }
@@ -1554,6 +1602,70 @@ function renderPersonalEquator(lat, lng) {
 }
 
 // ============================================================
+//  Phase 3b.1 — City pins on the ring (both maps)
+//
+//  Renders each city that matched the current filters as a small
+//  circle marker on both the origin and antipode maps. Cities are
+//  literally on the ring, so they appear at their real lat/lon.
+//  Click a pin → popup with city info + "set as origin" button.
+//  Capped at MAX_RING_PINS per map for perf (wide filters can match
+//  thousands of cities; rendering 10k+ SVG markers would freeze).
+// ============================================================
+const originRingCitiesLayer = L.layerGroup().addTo(mapOrigin);
+const antipodeRingCitiesLayer = L.layerGroup().addTo(mapAntipode);
+const MAX_RING_PINS = 300;  // per map; total markers = 2x this
+
+function renderRingCities(lat, lng) {
+  originRingCitiesLayer.clearLayers();
+  antipodeRingCitiesLayer.clearLayers();
+  if (!window.Geometry) return 0;
+  const cities = window.GeopuestoCitiesResolved;
+  if (!cities || cities.length === 0) return 0;
+
+  const P = Geometry.latLonToXYZ(lat, lng);
+  const matches = Geometry.citiesOnGreatCircle(P, cities, {
+    toleranceKm: equatorFilters.toleranceKm,
+    minPop: equatorFilters.minPop,
+  });
+
+  // Closest cities first (citiesOnGreatCircle already sorts by closeness),
+  // so capping picks the cities right ON the ring rather than a random sample.
+  const toRender = matches.slice(0, MAX_RING_PINS);
+
+  // Style: small amber dot with dark halo for contrast against the tile bg.
+  // Opacity tapers slightly with distance from ring (closer = more solid)
+  // so the visual emphasis matches the "this is on the ring" signal.
+  function pinStyle(c) {
+    const t = c.distanceFromCircleKm / Math.max(equatorFilters.toleranceKm, 1);
+    const fillOpacity = 1.0 - 0.5 * t;  // 1.0 right on ring, 0.5 at outer edge
+    return {
+      radius: 4,
+      color: "#000",
+      weight: 1.5,
+      opacity: 0.8,
+      fillColor: "#f2a949",
+      fillOpacity: fillOpacity,
+    };
+  }
+
+  for (const c of toRender) {
+    const popupHtml =
+      '<div class="ring-pin-popup">' +
+        '<strong>' + escapeHtml(c.name) + '</strong> ' +
+        '<span class="cc">' + escapeHtml(c.country) + '</span><br>' +
+        'population: ' + c.population.toLocaleString() + '<br>' +
+        c.distanceFromCircleKm.toFixed(1) + ' km from ring · bearing ' + c.bearingAlongCircleDeg.toFixed(0) + '°<br>' +
+        c.distanceFromOriginKm.toFixed(0) + ' km from you · ' + c.distanceFromAntipodeKm.toFixed(0) + ' km from antipode<br>' +
+        '<button type="button" class="popup-set-origin" data-set-origin="1" data-lat="' + c.lat + '" data-lng="' + c.lon + '">Set as new origin →</button>' +
+      '</div>';
+    const style = pinStyle(c);
+    L.circleMarker([c.lat, c.lon], style).bindPopup(popupHtml).addTo(originRingCitiesLayer);
+    L.circleMarker([c.lat, c.lon], style).bindPopup(popupHtml).addTo(antipodeRingCitiesLayer);
+  }
+  return toRender.length;
+}
+
+// ============================================================
 //  Phase 3b — "Your Personal Equator" module
 //  Renders the city-list panel that pairs with the ring above.
 //  Filter/sort state lives at module scope and persists across
@@ -1606,9 +1718,11 @@ function buildEquatorModuleHtml(lat, lng, cities, filters) {
       <label class="equator-ctrl">
         <span class="equator-ctrl-label">Tolerance</span>
         <select data-equator-ctrl="toleranceKm" aria-label="Tolerance from ring in km">
+          <option value="10"${filters.toleranceKm === 10 ? " selected" : ""}>±10 km · tight</option>
+          <option value="25"${filters.toleranceKm === 25 ? " selected" : ""}>±25 km</option>
           <option value="50"${filters.toleranceKm === 50 ? " selected" : ""}>±50 km</option>
-          <option value="100"${filters.toleranceKm === 100 ? " selected" : ""}>±100 km</option>
-          <option value="250"${filters.toleranceKm === 250 ? " selected" : ""}>±250 km</option>
+          <option value="100"${filters.toleranceKm === 100 ? " selected" : ""}>±100 km · default</option>
+          <option value="250"${filters.toleranceKm === 250 ? " selected" : ""}>±250 km · wide</option>
         </select>
       </label>
       <label class="equator-ctrl">
@@ -1666,10 +1780,15 @@ function refreshEquatorModule() {
   const fresh = parsed.body.firstElementChild;
   const existing = document.getElementById("equator-module");
   if (existing && fresh) existing.replaceWith(fresh);
+  // Phase 3b.1: also re-render the pin layer with the new filter values.
+  // The pins use the same equatorFilters state, so they need to refresh too.
+  renderRingCities(currentOriginForEquator.lat, currentOriginForEquator.lng);
 }
 
 // Re-render when cities finish loading (covers the case where user picked an
-// origin BEFORE the eager fetch resolved)
+// origin BEFORE the eager fetch resolved). refreshEquatorModule() already
+// calls renderRingCities() internally, so both the panel AND the map pins
+// catch up at the same instant.
 window.addEventListener("geopuesto:cities-ready", refreshEquatorModule);
 
 // Filter changes (delegated): any <select data-equator-ctrl="...">
@@ -1693,6 +1812,18 @@ document.addEventListener("click", (e) => {
   if (!row) return;
   const lat = parseFloat(row.getAttribute("data-lat"));
   const lng = parseFloat(row.getAttribute("data-lng"));
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+  activePresetName = null;
+  if (typeof renderPresets === "function") renderPresets();
+  goTo(lat, lng);
+});
+
+// Phase 3b.1: click "Set as new origin" inside a ring-pin popup (delegated)
+document.addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-set-origin]");
+  if (!btn) return;
+  const lat = parseFloat(btn.getAttribute("data-lat"));
+  const lng = parseFloat(btn.getAttribute("data-lng"));
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
   activePresetName = null;
   if (typeof renderPresets === "function") renderPresets();
@@ -2393,6 +2524,9 @@ async function goTo(lat, lng) {
   // Phase 3b: remember current origin so refreshEquatorModule() can rebuild
   // the city list on filter changes without needing to re-call renderInfo.
   currentOriginForEquator = { lat: lat, lng: lng };
+  // Phase 3b.1: render city pins on both maps right next to the ring. These
+  // are the same cities surfaced in the panel — one more spatial channel.
+  renderRingCities(lat, lng);
   // Initial quick flyTo at zoom 5 for immediate visual feedback — smart-zoom kicks in once reverse-geocode resolves
   mapOrigin.flyTo([lat, lng], 5, { duration: 0.5 });
   mapAntipode.flyTo([anti.lat, anti.lng], 5, { duration: 0.5 });
