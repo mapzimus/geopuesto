@@ -291,6 +291,34 @@
     background: var(--orange-soft);
   }
   .swap-btn .arrows { font-size: 0.95rem; opacity: 0.85; }
+
+  /* Phase 3b.6: navigation history (browser-back-aware "← Back" button) */
+  .back-btn {
+    background: var(--surface-2);
+    border: 1px solid var(--border-bright);
+    color: var(--dim);
+    padding: 7px 14px;
+    border-radius: 1px;
+    cursor: pointer;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    transition: all 0.15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .back-btn:hover {
+    border-color: var(--teal);
+    color: var(--teal);
+    background: rgba(0, 191, 165, 0.08);
+  }
+  .back-btn[hidden] { display: none !important; }
+  .back-btn .arrow { font-size: 0.95rem; opacity: 0.85; }
+  @media (max-width: 720px) {
+    .back-btn { padding: 11px 16px; min-height: 44px; }
+  }
   .distance {
     font-family: 'IBM Plex Mono', monospace;
     font-size: 0.6rem;
@@ -523,6 +551,21 @@
   .hero-photo::before { top: -1px; left: -1px; border-width: 1px 0 0 1px; }
   .hero-photo::after { bottom: -1px; right: -1px; border-width: 0 1px 1px 0; }
   .hero-text { display: flex; flex-direction: column; }
+  /* Phase 3b.6: hero eyebrow line so the Antipode module pairs visually
+     with the Orthodrome module's flagship eyebrow (teal vs orange — the
+     two complementary brand colors signal "these belong together"). */
+  .hero-eyebrow {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--teal);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin: 0 0 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .hero-eyebrow-dot { font-size: 0.8rem; line-height: 1; }
   .hero-title {
     font-family: 'IBM Plex Sans', sans-serif;
     font-size: 2.4rem;
@@ -879,7 +922,7 @@
   }
   .equator-row {
     display: grid;
-    grid-template-columns: 1fr auto;
+    grid-template-columns: 1fr auto auto;  /* main | meta | quick-jump */
     gap: 8px;
     align-items: center;
     padding: 9px 14px;
@@ -887,6 +930,37 @@
     cursor: pointer;
     transition: background-color 120ms ease, border-color 120ms ease;
     min-height: 44px;   /* WCAG 2.5.5 touch target */
+  }
+
+  /* Phase 3b.6: one-click "→" tunnel-to-this-city button on every card */
+  .equator-row-jump {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--dim);
+    width: 36px;
+    height: 36px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 1.0rem;
+    font-weight: 600;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 120ms ease;
+    padding: 0;
+    flex-shrink: 0;
+  }
+  .equator-row-jump:hover {
+    background: var(--orange);
+    color: var(--bg);
+    border-color: var(--orange);
+    transform: translateX(2px);
+  }
+  .equator-row-jump:focus {
+    outline: 2px solid var(--orange);
+    outline-offset: 2px;
   }
   .equator-row:hover {
     background: var(--surface);
@@ -1546,6 +1620,7 @@
     <span class="value" id="originCoords">—</span>
   </div>
   <div class="readout-actions">
+    <button class="back-btn" id="backBtn" type="button" aria-label="Go back to previous origin" hidden><span class="arrow" aria-hidden="true">←</span> Back</button>
     <button class="swap-btn" id="swapBtn" type="button" aria-label="Swap origin and target"><span class="arrows" aria-hidden="true">⇄</span> Swap</button>
   </div>
   <div class="readout target" aria-live="polite">
@@ -2165,7 +2240,7 @@ function buildEquatorModuleHtml(lat, lng, cities, filters) {
         // Card click = expand inline; "Set as new origin →" button = navigate.
         // Phase 3b.3 separates browsing from commitment.
         return `
-        <div class="equator-row" data-equator-city="1" data-pin-key="${pkey}" data-lat="${c.lat}" data-lng="${c.lon}" tabindex="0" role="button" aria-expanded="false" title="Click to expand · Hover to highlight on the map">
+        <div class="equator-row" data-equator-city="1" data-pin-key="${pkey}" data-lat="${c.lat}" data-lng="${c.lon}" tabindex="0" role="button" aria-expanded="false" title="Click card to expand · Click → to tunnel · Hover to highlight on the map">
           <div class="equator-row-main">
             <span class="equator-row-name">${escapeHtml(c.name)}</span>
             <span class="equator-row-country">${escapeHtml(c.country)}</span>
@@ -2174,6 +2249,7 @@ function buildEquatorModuleHtml(lat, lng, cities, filters) {
             <span class="equator-row-pop">${c.population.toLocaleString()}</span>
             <span class="equator-row-dist">d_ring ${c.distanceFromCircleKm.toFixed(0)} km</span>
           </div>
+          <button type="button" class="equator-row-jump" data-set-origin="1" data-lat="${c.lat}" data-lng="${c.lon}" aria-label="Tunnel to ${escapeHtml(c.name)}" title="Tunnel to ${escapeHtml(c.name)} — one click">→</button>
           <div class="equator-row-detail">
             <div class="equator-row-detail-grid">
               <div><span class="label">Population</span><span class="value">${c.population.toLocaleString()}</span></div>
@@ -3032,11 +3108,86 @@ function utcToSolarLocal(utcStr, lng) {
   return `${hh}:${mm}`;
 }
 
-async function goTo(lat, lng) {
+// ============================================================
+//  Phase 3b.6 — Navigation history (browser-back-aware "← Back")
+//
+//  Single mechanism (browser history) drives all back-nav UX:
+//    - UI button (#backBtn)
+//    - Browser back button
+//    - Mouse back button (XButton1)
+//    - Keyboard Alt+Left
+//    - Mobile swipe-back gesture
+//
+//  We push a state entry on every USER-driven goTo. When the user
+//  goes back (any of those entry points), popstate fires and we
+//  re-run goTo with opts.fromHistory=true so the recursion stops.
+// ============================================================
+let geoHistoryDepth = 0;
+
+function updateBackButtonVisibility() {
+  const btn = document.getElementById("backBtn");
+  if (!btn) return;
+  if (geoHistoryDepth > 0) {
+    btn.hidden = false;
+  } else {
+    btn.hidden = true;
+  }
+}
+
+window.addEventListener("popstate", function (e) {
+  if (e.state && typeof e.state.lat === "number" && typeof e.state.lng === "number") {
+    activePresetName = e.state.presetName || null;
+    if (typeof renderPresets === "function") renderPresets();
+    geoHistoryDepth = Math.max(0, geoHistoryDepth - 1);
+    updateBackButtonVisibility();
+    goTo(e.state.lat, e.state.lng, { fromHistory: true });
+  } else {
+    // Popped back to a state with no origin (e.g. before any nav happened)
+    geoHistoryDepth = Math.max(0, geoHistoryDepth - 1);
+    updateBackButtonVisibility();
+  }
+});
+
+// Back-button click → delegates to browser history.back() so the same
+// popstate path handles everything (no separate code path to maintain).
+document.addEventListener("DOMContentLoaded", function () {
+  const btn = document.getElementById("backBtn");
+  if (btn) {
+    btn.addEventListener("click", function () {
+      if (geoHistoryDepth > 0) history.back();
+    });
+  }
+});
+
+// Parse #origin=lat,lng on initial page load (after localStorage restore
+// runs, so URL takes precedence if both are present). Lets shared URLs work.
+function parseOriginHash() {
+  const m = (location.hash || "").match(/^#origin=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/);
+  if (!m) return null;
+  const lat = parseFloat(m[1]);
+  const lng = parseFloat(m[2]);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  return { lat: lat, lng: lng };
+}
+
+async function goTo(lat, lng, opts) {
+  opts = opts || {};
   lat = Math.max(-90, Math.min(90, lat));
   lng = ((lng + 540) % 360) - 180;
   const anti = calcAntipode(lat, lng);
   currentAnti = anti;
+
+  // Phase 3b.6: push to browser history so back-button (UI + native browser
+  // back + Alt+Left + mobile gesture) all just work. Skip when restoring
+  // FROM history (otherwise back-button creates an infinite loop).
+  if (!opts.fromHistory && typeof history !== "undefined" && history.pushState) {
+    try {
+      const hash = "#origin=" + lat.toFixed(4) + "," + lng.toFixed(4);
+      history.pushState({ lat: lat, lng: lng, presetName: activePresetName }, "", hash);
+      geoHistoryDepth++;
+      updateBackButtonVisibility();
+    } catch (e) { /* SecurityError on some file:// origins — ignore */ }
+  }
 
   if (originMarker) mapOrigin.removeLayer(originMarker);
   if (antipodeMarker) mapAntipode.removeLayer(antipodeMarker);
@@ -3776,6 +3927,7 @@ function renderInfo(lat, lng, data, nearby, wikiSummary, photos, sun, weather, c
       <div class="hero-body">
         ${heroImg}
         <div class="hero-text">
+          <div class="hero-eyebrow"><span class="hero-eyebrow-dot">●</span> Antipode · what's on the other side of Earth</div>
           <h1 class="hero-title">${escapeHtml(heroTitle)}</h1>
           <div class="hero-subtitle">${heroSubtitle}</div>
           <div class="hero-facts">
@@ -4060,8 +4212,10 @@ document.getElementById("shuffleBtn").addEventListener("click", () => {
   goTo(p.lat, p.lng);
 });
 
-// Restore last visited location on page load (skip empty state for repeat visitors)
-const _last = loadLastLocation();
+// Restore on page load. Priority: URL hash (#origin=lat,lng — shareable link)
+// over localStorage (returning visitor) over empty state (first-time visitor).
+const _urlOrigin = parseOriginHash();
+const _last = _urlOrigin || loadLastLocation();
 if (_last) {
   activePresetName = _last.presetName || null;
   renderPresets();
