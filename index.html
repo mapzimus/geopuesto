@@ -872,6 +872,27 @@
   .equator-ctrl select:hover { border-color: var(--orange); }
   .equator-ctrl select:focus { outline: 2px solid var(--orange); outline-offset: 1px; }
 
+  /* Phase 3b.8: free-text search input — first control in the strip */
+  .equator-ctrl-search { flex: 1 1 240px; min-width: 200px; }
+  .equator-ctrl input[type="search"] {
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 4px 10px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.85rem;
+    min-height: 32px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .equator-ctrl input[type="search"]:hover { border-color: var(--orange); }
+  .equator-ctrl input[type="search"]:focus { outline: 2px solid var(--orange); outline-offset: 1px; }
+  .equator-ctrl input[type="search"]::-webkit-search-cancel-button {
+    filter: invert(0.7);
+    cursor: pointer;
+  }
+
   .equator-action-btn {
     margin-left: auto;
     align-self: flex-end;
@@ -1978,7 +1999,7 @@ const MAX_RING_PINS = 300;  // legacy upper-bound (unused after bearing-stratifi
 // every city they have. Same total marker budget, but ALL parts of the ring
 // get representation — South Atlantic, Antarctica, mid-Pacific gaps included.
 const PIN_BEARING_BUCKETS = 24;
-const PIN_PER_BUCKET = 16;
+const PIN_PER_BUCKET = 24;  // 3b.8: bumped from 16 — dense regions (MA coast, etc.) need headroom
 
 function pickPinsForOverview(matches) {
   if (!matches || matches.length === 0) return matches || [];
@@ -2017,10 +2038,9 @@ function renderRingCities(lat, lng) {
   if (!cities || cities.length === 0) return 0;
 
   const P = Geometry.latLonToXYZ(lat, lng);
-  const matches = Geometry.citiesOnGreatCircle(P, cities, {
-    toleranceKm: equatorFilters.toleranceKm,
-    minPop: equatorFilters.minPop,
-  });
+  // Phase 3b.8: applyEquatorFilters also applies the name search so map pins
+  // and panel cards stay synchronized.
+  const matches = applyEquatorFilters(P, cities, equatorFilters);
 
   // Phase 3b.7: bearing-stratified pick — covers all parts of the ring,
   // not just the densest (Asian) region. See pickPinsForOverview comment.
@@ -2190,10 +2210,9 @@ function drawEquatorOverviewContents(lat, lng) {
   // the cards in the panel below for full info)
   const cities = window.GeopuestoCitiesResolved;
   if (cities) {
-    const matches = Geometry.citiesOnGreatCircle(P, cities, {
-      toleranceKm: equatorFilters.toleranceKm,
-      minPop: equatorFilters.minPop,
-    });
+    // Phase 3b.8: same filter pipeline (including name search) as the list
+    // and main maps. Typing in the search box narrows pins here too.
+    const matches = applyEquatorFilters(P, cities, equatorFilters);
     // Phase 3b.7: bearing-stratified — every part of the ring gets pin
     // coverage, not just dense urban regions.
     const toRender = pickPinsForOverview(matches);
@@ -2227,10 +2246,27 @@ function drawEquatorOverviewContents(lat, lng) {
 //  via DOMParser + replaceWith (no full renderInfo re-run).
 // ============================================================
 const equatorFilters = {
-  toleranceKm: 100,   // 50 / 100 / 250
+  toleranceKm: 100,   // 5 / 10 / 25 / 50 / 100 / 250
   minPop: 15000,      // 1000 / 15000 / 100000 / 1000000
-  sortBy: "closeness" // closeness | population | bearing
+  sortBy: "closeness",// closeness | population | bearing
+  nameFilter: ""      // free-text search across city name (case-insensitive substring)
 };
+
+// Phase 3b.8: shared filter pipeline. EVERY caller that needs matches at the
+// current filter state (list, main-map pins, overview-map pins) goes through
+// this. Keeps the name search consistent across all 3 surfaces.
+function applyEquatorFilters(P, cities, filters) {
+  const matches = Geometry.citiesOnGreatCircle(P, cities, {
+    toleranceKm: filters.toleranceKm,
+    minPop: filters.minPop,
+  });
+  const q = (filters.nameFilter || "").trim().toLowerCase();
+  if (!q) return matches;
+  return matches.filter(c =>
+    c.name.toLowerCase().includes(q) ||
+    (c.country || "").toLowerCase().includes(q)
+  );
+}
 let currentOriginForEquator = null;  // {lat, lng}, set by goTo
 
 // Phase 3b.7: country code → continent mapping for the breakdown stat.
@@ -2282,10 +2318,8 @@ function buildEquatorModuleHtml(lat, lng, cities, filters) {
   const P = Geometry.latLonToXYZ(lat, lng);
   // Always fetch matches sorted by closeness first so we can pick the headline
   // city (literally the closest) before re-sorting for the user's display pref.
-  const matchesByCloseness = Geometry.citiesOnGreatCircle(P, cities, {
-    toleranceKm: filters.toleranceKm,
-    minPop: filters.minPop,
-  });
+  // Phase 3b.8: applyEquatorFilters also applies the name search.
+  const matchesByCloseness = applyEquatorFilters(P, cities, filters);
   const headlineCity = matchesByCloseness[0] || null;
 
   const sorted = matchesByCloseness.slice();
@@ -2319,6 +2353,10 @@ function buildEquatorModuleHtml(lat, lng, cities, filters) {
 
   const controlsHtml = `
     <div class="equator-controls">
+      <label class="equator-ctrl equator-ctrl-search">
+        <span class="equator-ctrl-label">Find a city</span>
+        <input type="search" data-equator-search="1" value="${escapeHtml(filters.nameFilter || '')}" placeholder="e.g. Salem, Tokyo, BR…" aria-label="Filter cities by name or country code" autocomplete="off" spellcheck="false">
+      </label>
       <label class="equator-ctrl">
         <span class="equator-ctrl-label">Tolerance</span>
         <select data-equator-ctrl="toleranceKm" aria-label="Tolerance from ring in km">
@@ -2466,6 +2504,30 @@ document.addEventListener("change", (e) => {
     if (Number.isFinite(n)) equatorFilters[key] = n;
   }
   refreshEquatorModule();
+});
+
+// Phase 3b.8: free-text name search. Debounced so we don't re-render the
+// whole module + 3 Leaflet maps on every keystroke. refreshEquatorModule
+// rebuilds the module HTML so the input gets a new DOM node — we restore
+// focus and caret position so the user's typing flow isn't interrupted.
+let nameFilterDebounce = null;
+document.addEventListener("input", (e) => {
+  const input = e.target.closest("[data-equator-search]");
+  if (!input) return;
+  const newValue = input.value;
+  const caretPos = input.selectionStart;
+  clearTimeout(nameFilterDebounce);
+  nameFilterDebounce = setTimeout(function () {
+    if (equatorFilters.nameFilter === newValue) return;  // no-op if unchanged
+    equatorFilters.nameFilter = newValue;
+    refreshEquatorModule();
+    // Re-focus the freshly-rendered input and restore caret
+    const fresh = document.querySelector("[data-equator-search]");
+    if (fresh) {
+      fresh.focus();
+      try { fresh.setSelectionRange(caretPos, caretPos); } catch (err) { /* ignore */ }
+    }
+  }, 90);
 });
 
 // Phase 3b.3: click on a city row → TOGGLE EXPAND (NOT navigate).
