@@ -611,6 +611,119 @@
   .module-body.padded { padding: 14px; }
 
   /* ============ Phase 3b: Personal Equator module ============ */
+
+  /* Phase 3b.3: flagship header treatment - same DOM, bigger presence */
+  .equator-flagship-header {
+    background: linear-gradient(135deg, rgba(242, 101, 34, 0.10), rgba(0, 191, 165, 0.06));
+    border-bottom: 1px solid var(--border);
+    border-left: 3px solid var(--orange);
+    padding: 16px 18px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .equator-flagship-header .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--dim);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+  .equator-flagship-header .badge-new {
+    display: inline-block;
+    background: var(--orange);
+    color: var(--bg);
+    padding: 2px 7px;
+    border-radius: 3px;
+    font-weight: 700;
+    font-size: 0.6rem;
+    letter-spacing: 0.12em;
+  }
+  .equator-flagship-header .title {
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 1.4rem;
+    font-weight: 500;
+    color: var(--text-bright);
+    line-height: 1.15;
+    margin: 0;
+  }
+  .equator-flagship-header .lede {
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 0.95rem;
+    color: var(--text);
+    line-height: 1.4;
+    margin: 0;
+  }
+  .equator-flagship-header .lede strong { color: var(--orange); font-weight: 600; }
+
+  /* Phase 3b.3: closest-city headline callout (the discovery moment) */
+  .equator-headline {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 16px;
+    padding: 18px 18px 16px;
+    background: rgba(242, 101, 34, 0.04);
+    border-bottom: 1px solid var(--border);
+  }
+  .equator-headline-text { min-width: 0; }
+  .equator-headline-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: var(--dim);
+    margin-bottom: 4px;
+  }
+  .equator-headline-name {
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 1.6rem;
+    font-weight: 500;
+    color: var(--orange);
+    line-height: 1.1;
+    margin: 0 0 6px;
+  }
+  .equator-headline-cc {
+    display: inline-block;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--dim);
+    letter-spacing: 0.12em;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+  .equator-headline-meta {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.8rem;
+    color: var(--text);
+    line-height: 1.5;
+  }
+  .equator-headline-meta b { color: var(--text-bright); font-weight: 600; }
+  .equator-headline-action {
+    background: var(--orange);
+    color: var(--bg);
+    border: none;
+    border-radius: 4px;
+    padding: 10px 16px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    min-height: 44px;
+    white-space: nowrap;
+    transition: filter 120ms ease;
+  }
+  .equator-headline-action:hover { filter: brightness(1.12); }
+  .equator-headline-action:focus { outline: 2px solid #fff; outline-offset: 2px; }
+  @media (max-width: 600px) {
+    .equator-headline { grid-template-columns: 1fr; }
+    .equator-headline-action { width: 100%; }
+    .equator-headline-name { font-size: 1.3rem; }
+  }
+
   .equator-controls {
     display: flex;
     gap: 12px;
@@ -672,6 +785,72 @@
     padding-left: 12px;
   }
   .equator-row.is-pin-linked .equator-row-name { color: var(--orange); }
+
+  /* Phase 3b.3: expand-on-click for browsing without committing.
+     Click = expand inline; "Set as new origin" button = actual navigation. */
+  .equator-row-detail {
+    display: none;
+    grid-column: 1 / -1;
+    margin-top: 8px;
+    padding: 10px 0 4px;
+    border-top: 1px dashed var(--border);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--dim);
+    line-height: 1.7;
+  }
+  .equator-row.is-expanded {
+    background: var(--surface);
+    border-left: 3px solid var(--orange);
+    padding-left: 11px;  /* 14 - 3 to keep alignment */
+  }
+  .equator-row.is-expanded .equator-row-detail { display: block; }
+  .equator-row-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 4px 16px;
+    margin-bottom: 10px;
+  }
+  .equator-row-detail-grid .label {
+    color: var(--dim);
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    display: block;
+  }
+  .equator-row-detail-grid .value { color: var(--text-bright); font-size: 0.9rem; }
+  .equator-row-detail-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 6px;
+  }
+  .equator-row-action {
+    background: var(--orange);
+    color: var(--bg);
+    border: none;
+    border-radius: 3px;
+    padding: 8px 14px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    min-height: 36px;
+    letter-spacing: 0.04em;
+    transition: filter 120ms ease;
+  }
+  .equator-row-action:hover { filter: brightness(1.12); }
+  .equator-row-action:focus { outline: 2px solid #fff; outline-offset: 1px; }
+  .equator-row-action.secondary {
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .equator-row-action.secondary:hover {
+    border-color: var(--orange);
+    color: var(--orange);
+    filter: none;
+  }
 
   .equator-list {
     max-height: 380px;
@@ -1780,33 +1959,40 @@ function buildEquatorModuleHtml(lat, lng, cities, filters) {
   if (!window.Geometry || !cities || cities.length === 0) {
     return `
     <div class="module full" id="equator-module">
-      <div class="module-header orange">
-        <span>Your Personal Equator</span>
-        <span class="meta">Loading city data…</span>
+      <div class="equator-flagship-header">
+        <span class="eyebrow"><span class="badge-new">NEW · v2</span> Personal Equator</span>
+        <h2 class="title">Your Personal Equator</h2>
+        <p class="lede">Loading city data from GeoNames…</p>
       </div>
       <div class="module-body">
-        <div class="equator-empty">Cities still loading from GeoNames. Pick another origin in a moment to refresh.</div>
+        <div class="equator-empty">Pick another origin in a moment to refresh.</div>
       </div>
     </div>`;
   }
 
   const P = Geometry.latLonToXYZ(lat, lng);
-  const matches = Geometry.citiesOnGreatCircle(P, cities, {
+  // Always fetch matches sorted by closeness first so we can pick the headline
+  // city (literally the closest) before re-sorting for the user's display pref.
+  const matchesByCloseness = Geometry.citiesOnGreatCircle(P, cities, {
     toleranceKm: filters.toleranceKm,
     minPop: filters.minPop,
   });
+  const headlineCity = matchesByCloseness[0] || null;
 
-  // Re-sort if user picked something other than closeness (the default)
-  const sorted = matches.slice();
+  const sorted = matchesByCloseness.slice();
   if (filters.sortBy === "population") {
     sorted.sort((a, b) => b.population - a.population);
   } else if (filters.sortBy === "bearing") {
     sorted.sort((a, b) => a.bearingAlongCircleDeg - b.bearingAlongCircleDeg);
   }
 
-  const subtitle = sorted.length === 0
-    ? `No cities match these filters · all ~10,007 km from you and your antipode`
-    : `${sorted.length.toLocaleString()} cit${sorted.length === 1 ? "y" : "ies"} on your equator · each ~10,007 km from you and from your antipode`;
+  // Lede: lead with the discovery moment, not a count.
+  const lede = headlineCity
+    ? `Your closest equator-mate is <strong>${escapeHtml(headlineCity.name)}, ${escapeHtml(headlineCity.country)}</strong> — just <strong>${headlineCity.distanceFromCircleKm.toFixed(1)} km</strong> from the ring that wraps the planet equidistant from you and your antipode.`
+    : `No cities match the current filters. Widen the tolerance or lower the population threshold.`;
+  const countLine = sorted.length === 0
+    ? ''
+    : `${sorted.length.toLocaleString()} cit${sorted.length === 1 ? "y" : "ies"} found within ${filters.toleranceKm} km of your equator · each ~10,007 km from you and from your antipode`;
 
   const controlsHtml = `
     <div class="equator-controls">
@@ -1851,8 +2037,11 @@ function buildEquatorModuleHtml(lat, lng, cities, filters) {
         // data-pin-key MUST match pinKey(c.lat, c.lon) format so the
         // card↔pin hover-link can find the marker. Phase 3b.2.
         const pkey = c.lat.toFixed(5) + "," + c.lon.toFixed(5);
+        const bearingCompass = bearingToCompass(c.bearingAlongCircleDeg);
+        // Card click = expand inline; "Set as new origin →" button = navigate.
+        // Phase 3b.3 separates browsing from commitment.
         return `
-        <div class="equator-row" data-equator-city="1" data-pin-key="${pkey}" data-lat="${c.lat}" data-lng="${c.lon}" tabindex="0" role="button" title="Click to make this your new origin · Hover to highlight on the map">
+        <div class="equator-row" data-equator-city="1" data-pin-key="${pkey}" data-lat="${c.lat}" data-lng="${c.lon}" tabindex="0" role="button" aria-expanded="false" title="Click to expand · Hover to highlight on the map">
           <div class="equator-row-main">
             <span class="equator-row-name">${escapeHtml(c.name)}</span>
             <span class="equator-row-country">${escapeHtml(c.country)}</span>
@@ -1861,20 +2050,58 @@ function buildEquatorModuleHtml(lat, lng, cities, filters) {
             <span class="equator-row-pop">${c.population.toLocaleString()}</span>
             <span class="equator-row-dist">d_ring ${c.distanceFromCircleKm.toFixed(0)} km</span>
           </div>
+          <div class="equator-row-detail">
+            <div class="equator-row-detail-grid">
+              <div><span class="label">Population</span><span class="value">${c.population.toLocaleString()}</span></div>
+              <div><span class="label">Distance from ring</span><span class="value">${c.distanceFromCircleKm.toFixed(2)} km</span></div>
+              <div><span class="label">Distance from you</span><span class="value">${c.distanceFromOriginKm.toLocaleString(undefined, {maximumFractionDigits: 0})} km</span></div>
+              <div><span class="label">Distance from antipode</span><span class="value">${c.distanceFromAntipodeKm.toLocaleString(undefined, {maximumFractionDigits: 0})} km</span></div>
+              <div><span class="label">Bearing on ring</span><span class="value">${c.bearingAlongCircleDeg.toFixed(0)}° ${bearingCompass}</span></div>
+              <div><span class="label">Coordinates</span><span class="value">${c.lat.toFixed(3)}, ${c.lon.toFixed(3)}</span></div>
+            </div>
+            <div class="equator-row-detail-actions">
+              <button type="button" class="equator-row-action" data-set-origin="1" data-lat="${c.lat}" data-lng="${c.lon}">Set as new origin →</button>
+              <button type="button" class="equator-row-action secondary" data-highlight-pin="${pkey}">Highlight on map</button>
+            </div>
+          </div>
         </div>`;
       }).join("")}</div>`;
 
+  // Closest-city headline callout — the discovery moment, prominent at top.
+  const headlineHtml = headlineCity ? `
+    <div class="equator-headline">
+      <div class="equator-headline-text">
+        <div class="equator-headline-label">Closest city on your equator</div>
+        <h3 class="equator-headline-name">${escapeHtml(headlineCity.name)}<span class="equator-headline-cc">${escapeHtml(headlineCity.country)}</span></h3>
+        <div class="equator-headline-meta">
+          <b>${headlineCity.distanceFromCircleKm.toFixed(1)} km</b> from the ring · pop <b>${headlineCity.population.toLocaleString()}</b> · <b>${headlineCity.distanceFromOriginKm.toLocaleString(undefined, {maximumFractionDigits: 0})} km</b> from you
+        </div>
+      </div>
+      <button type="button" class="equator-headline-action" data-set-origin="1" data-lat="${headlineCity.lat}" data-lng="${headlineCity.lon}" title="Drop everything and tunnel here">
+        Tunnel to ${escapeHtml(headlineCity.name)} →
+      </button>
+    </div>` : '';
+
   return `
     <div class="module full" id="equator-module">
-      <div class="module-header orange">
-        <span>Your Personal Equator</span>
-        <span class="meta">${subtitle}</span>
+      <div class="equator-flagship-header">
+        <span class="eyebrow"><span class="badge-new">NEW · v2</span> Personal Equator</span>
+        <h2 class="title">The cities that are equidistant from you and your antipode</h2>
+        <p class="lede">${lede}</p>
+        ${countLine ? `<p class="lede" style="color:var(--dim);font-size:0.8rem;font-family:'IBM Plex Mono',monospace;">${countLine}</p>` : ''}
       </div>
       <div class="module-body">
+        ${headlineHtml}
         ${controlsHtml}
         ${listHtml}
       </div>
     </div>`;
+}
+
+// Phase 3b.3 helper: convert bearing degrees to compass label (8-point rose)
+function bearingToCompass(deg) {
+  const labels = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+  return labels[Math.round(((deg % 360) + 360) % 360 / 45) % 8];
 }
 
 function refreshEquatorModule() {
@@ -1912,16 +2139,53 @@ document.addEventListener("change", (e) => {
   refreshEquatorModule();
 });
 
-// Click on a city row → set as new origin (delegated)
+// Phase 3b.3: click on a city row → TOGGLE EXPAND (NOT navigate).
+// Navigation only happens via the explicit "Set as new origin →" button
+// inside the expanded detail, or via the "Tunnel to X →" headline button.
+// Separating browse from commit was the main UX fix in 3b.3.
 document.addEventListener("click", (e) => {
+  // First check: if the click landed on an action button OR something inside
+  // an action button, let those handlers fire and skip the row toggle. The
+  // action handlers (data-set-origin, data-highlight-pin) live below.
+  if (e.target.closest("[data-set-origin], [data-highlight-pin], button")) return;
   const row = e.target.closest("[data-equator-city]");
   if (!row) return;
-  const lat = parseFloat(row.getAttribute("data-lat"));
-  const lng = parseFloat(row.getAttribute("data-lng"));
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
-  activePresetName = null;
-  if (typeof renderPresets === "function") renderPresets();
-  goTo(lat, lng);
+  const wasExpanded = row.classList.contains("is-expanded");
+  // Collapse any other expanded row so only one is open at a time.
+  const list = row.closest(".equator-list");
+  if (list) {
+    list.querySelectorAll(".equator-row.is-expanded").forEach((r) => {
+      r.classList.remove("is-expanded");
+      r.setAttribute("aria-expanded", "false");
+    });
+  }
+  if (!wasExpanded) {
+    row.classList.add("is-expanded");
+    row.setAttribute("aria-expanded", "true");
+  }
+});
+
+// Phase 3b.3: "Highlight on map" button → flash the matching pin pair and
+// scroll the card into view. Useful when the card is open and the user wants
+// to confirm where on the planet this city actually is.
+document.addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-highlight-pin]");
+  if (!btn) return;
+  const key = btn.getAttribute("data-highlight-pin");
+  if (!key) return;
+  // The pin highlight is normally cleared on mouseout, so it'd flicker away
+  // instantly here. Hold it for a couple seconds by suppressing the next
+  // pointer-out by name (simple: highlight, then re-highlight on a timer).
+  highlightRingPinByKey(key, /*scrollCard=*/ false);
+  setTimeout(function () {
+    // Brief second pulse so the user catches the location even if they moved
+    // their mouse off the panel
+    if (highlightedPinKey === key) clearRingPinHighlight();
+    highlightRingPinByKey(key, false);
+    setTimeout(function () {
+      if (highlightedPinKey === key) clearRingPinHighlight();
+    }, 1400);
+  }, 700);
 });
 
 // Phase 3b.1: click "Set as new origin" inside a ring-pin popup (delegated)
