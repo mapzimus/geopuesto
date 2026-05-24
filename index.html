@@ -646,6 +646,33 @@
   .equator-ctrl select:hover { border-color: var(--orange); }
   .equator-ctrl select:focus { outline: 2px solid var(--orange); outline-offset: 1px; }
 
+  .equator-action-btn {
+    margin-left: auto;
+    align-self: flex-end;
+    background: transparent;
+    color: var(--orange);
+    border: 1px solid var(--orange);
+    border-radius: 3px;
+    padding: 6px 12px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    min-height: 32px;
+    letter-spacing: 0.04em;
+    transition: background-color 120ms ease, color 120ms ease;
+  }
+  .equator-action-btn:hover { background: var(--orange); color: var(--bg); }
+  .equator-action-btn:focus { outline: 2px solid var(--orange); outline-offset: 2px; }
+
+  /* Card hover ↔ pin highlight link (Phase 3b.2) */
+  .equator-row.is-pin-linked {
+    background: var(--surface);
+    border-left: 2px solid var(--orange);
+    padding-left: 12px;
+  }
+  .equator-row.is-pin-linked .equator-row-name { color: var(--orange); }
+
   .equator-list {
     max-height: 380px;
     overflow-y: auto;
@@ -1615,9 +1642,23 @@ const originRingCitiesLayer = L.layerGroup().addTo(mapOrigin);
 const antipodeRingCitiesLayer = L.layerGroup().addTo(mapAntipode);
 const MAX_RING_PINS = 300;  // per map; total markers = 2x this
 
+// Phase 3b.2: index of pin pairs keyed by `${lat},${lng}` so we can highlight
+// the matching map pin when the user hovers a city card in the panel (and
+// vice versa). Stable key format = the same format used on the card's
+// data-pin-key attribute, so lookups always hit.
+const ringPinIndex = new Map();
+let highlightedPinKey = null;
+
+function pinKey(lat, lon) {
+  // Fixed format avoids float-string mismatch between card and marker
+  return lat.toFixed(5) + "," + lon.toFixed(5);
+}
+
 function renderRingCities(lat, lng) {
   originRingCitiesLayer.clearLayers();
   antipodeRingCitiesLayer.clearLayers();
+  ringPinIndex.clear();
+  highlightedPinKey = null;
   if (!window.Geometry) return 0;
   const cities = window.GeopuestoCitiesResolved;
   if (!cities || cities.length === 0) return 0;
@@ -1628,16 +1669,14 @@ function renderRingCities(lat, lng) {
     minPop: equatorFilters.minPop,
   });
 
-  // Closest cities first (citiesOnGreatCircle already sorts by closeness),
-  // so capping picks the cities right ON the ring rather than a random sample.
+  // Closest cities first; cap picks the cities right ON the ring (not random).
   const toRender = matches.slice(0, MAX_RING_PINS);
 
-  // Style: small amber dot with dark halo for contrast against the tile bg.
-  // Opacity tapers slightly with distance from ring (closer = more solid)
-  // so the visual emphasis matches the "this is on the ring" signal.
+  // Style: small amber dot with dark halo. Opacity tapers with distance from
+  // ring (closer = more solid).
   function pinStyle(c) {
     const t = c.distanceFromCircleKm / Math.max(equatorFilters.toleranceKm, 1);
-    const fillOpacity = 1.0 - 0.5 * t;  // 1.0 right on ring, 0.5 at outer edge
+    const fillOpacity = 1.0 - 0.5 * t;
     return {
       radius: 4,
       color: "#000",
@@ -1659,10 +1698,66 @@ function renderRingCities(lat, lng) {
         '<button type="button" class="popup-set-origin" data-set-origin="1" data-lat="' + c.lat + '" data-lng="' + c.lon + '">Set as new origin →</button>' +
       '</div>';
     const style = pinStyle(c);
-    L.circleMarker([c.lat, c.lon], style).bindPopup(popupHtml).addTo(originRingCitiesLayer);
-    L.circleMarker([c.lat, c.lon], style).bindPopup(popupHtml).addTo(antipodeRingCitiesLayer);
+    const oPin = L.circleMarker([c.lat, c.lon], style).bindPopup(popupHtml).addTo(originRingCitiesLayer);
+    const aPin = L.circleMarker([c.lat, c.lon], style).bindPopup(popupHtml).addTo(antipodeRingCitiesLayer);
+
+    const key = pinKey(c.lat, c.lon);
+    ringPinIndex.set(key, { o: oPin, a: aPin, baseStyle: style });
+
+    // Pin hover → highlight self + matching card. mouseout reverts.
+    function onPinHover() { highlightRingPinByKey(key, /*scrollCard=*/ true); }
+    function onPinLeave() { clearRingPinHighlight(); }
+    oPin.on("mouseover", onPinHover); oPin.on("mouseout", onPinLeave);
+    aPin.on("mouseover", onPinHover); aPin.on("mouseout", onPinLeave);
   }
   return toRender.length;
+}
+
+// Phase 3b.2 helpers
+function highlightRingPinByKey(key, scrollCard) {
+  if (highlightedPinKey === key) return;
+  clearRingPinHighlight();
+  const entry = ringPinIndex.get(key);
+  if (!entry) return;
+  // Boost: bigger, white-rim, full-opaque amber so the pin "pops" against
+  // background pins. Matches the .is-pin-linked card style visually.
+  const hot = { radius: 8, color: "#fff", weight: 2, opacity: 1.0, fillColor: "#f2a949", fillOpacity: 1.0 };
+  entry.o.setStyle(hot); entry.o.bringToFront();
+  entry.a.setStyle(hot); entry.a.bringToFront();
+  highlightedPinKey = key;
+  // Highlight the matching card too, optionally scrolling it into view
+  const card = document.querySelector('[data-equator-city][data-pin-key="' + key + '"]');
+  if (card) {
+    card.classList.add("is-pin-linked");
+    if (scrollCard) card.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+}
+
+function clearRingPinHighlight() {
+  if (highlightedPinKey == null) return;
+  const entry = ringPinIndex.get(highlightedPinKey);
+  if (entry) {
+    entry.o.setStyle(entry.baseStyle);
+    entry.a.setStyle(entry.baseStyle);
+  }
+  const stale = document.querySelector(".equator-row.is-pin-linked");
+  if (stale) stale.classList.remove("is-pin-linked");
+  highlightedPinKey = null;
+}
+
+// "Show full ring" button — fitBounds both maps to the ring polyline extent.
+// For antipodal rings (always wrap the planet) this is essentially world view;
+// for v2 narrow rings (Boston↔NYC) it'd be much tighter. Same code, both cases.
+function zoomBothMapsToRing() {
+  const oLayers = originEquatorLayer.getLayers();
+  const aLayers = antipodeEquatorLayer.getLayers();
+  if (oLayers.length === 0 || aLayers.length === 0) return;
+  const oBounds = L.featureGroup(oLayers).getBounds();
+  const aBounds = L.featureGroup(aLayers).getBounds();
+  if (!oBounds.isValid() || !aBounds.isValid()) return;
+  const opts = { padding: [40, 40], maxZoom: 5, animate: true, duration: 0.7 };
+  mapOrigin.fitBounds(oBounds, opts);
+  mapAntipode.fitBounds(aBounds, opts);
 }
 
 // ============================================================
@@ -1718,6 +1813,7 @@ function buildEquatorModuleHtml(lat, lng, cities, filters) {
       <label class="equator-ctrl">
         <span class="equator-ctrl-label">Tolerance</span>
         <select data-equator-ctrl="toleranceKm" aria-label="Tolerance from ring in km">
+          <option value="5"${filters.toleranceKm === 5 ? " selected" : ""}>±5 km · pin-point</option>
           <option value="10"${filters.toleranceKm === 10 ? " selected" : ""}>±10 km · tight</option>
           <option value="25"${filters.toleranceKm === 25 ? " selected" : ""}>±25 km</option>
           <option value="50"${filters.toleranceKm === 50 ? " selected" : ""}>±50 km</option>
@@ -1742,12 +1838,21 @@ function buildEquatorModuleHtml(lat, lng, cities, filters) {
           <option value="bearing"${filters.sortBy === "bearing" ? " selected" : ""}>Bearing on ring</option>
         </select>
       </label>
+      <button type="button" class="equator-action-btn" data-equator-action="zoom-to-ring"
+              aria-label="Zoom both maps to show the full equator ring"
+              title="Zoom both maps out to show the whole ring + all pinned cities">
+        Show full ring ⤢
+      </button>
     </div>`;
 
   const listHtml = sorted.length === 0
     ? `<div class="equator-empty">No cities match. Try widening tolerance to ±250 km or lowering min pop.</div>`
-    : `<div class="equator-list">${sorted.map(c => `
-        <div class="equator-row" data-equator-city="1" data-lat="${c.lat}" data-lng="${c.lon}" tabindex="0" role="button" title="Click to make this your new origin">
+    : `<div class="equator-list">${sorted.map(c => {
+        // data-pin-key MUST match pinKey(c.lat, c.lon) format so the
+        // card↔pin hover-link can find the marker. Phase 3b.2.
+        const pkey = c.lat.toFixed(5) + "," + c.lon.toFixed(5);
+        return `
+        <div class="equator-row" data-equator-city="1" data-pin-key="${pkey}" data-lat="${c.lat}" data-lng="${c.lon}" tabindex="0" role="button" title="Click to make this your new origin · Hover to highlight on the map">
           <div class="equator-row-main">
             <span class="equator-row-name">${escapeHtml(c.name)}</span>
             <span class="equator-row-country">${escapeHtml(c.country)}</span>
@@ -1756,7 +1861,8 @@ function buildEquatorModuleHtml(lat, lng, cities, filters) {
             <span class="equator-row-pop">${c.population.toLocaleString()}</span>
             <span class="equator-row-dist">d_ring ${c.distanceFromCircleKm.toFixed(0)} km</span>
           </div>
-        </div>`).join("")}</div>`;
+        </div>`;
+      }).join("")}</div>`;
 
   return `
     <div class="module full" id="equator-module">
@@ -1828,6 +1934,32 @@ document.addEventListener("click", (e) => {
   activePresetName = null;
   if (typeof renderPresets === "function") renderPresets();
   goTo(lat, lng);
+});
+
+// Phase 3b.2: "Show full ring" button → fitBounds both maps (delegated)
+document.addEventListener("click", (e) => {
+  const action = e.target.closest("[data-equator-action]");
+  if (!action) return;
+  const what = action.getAttribute("data-equator-action");
+  if (what === "zoom-to-ring") zoomBothMapsToRing();
+});
+
+// Phase 3b.2: card hover → highlight matching pin pair on both maps.
+// Uses pointerover/pointerout (mouseover bubbles, but pointerover is the
+// modern alias that handles touch too). Doesn't scroll the card on hover
+// because the user is already looking at the card they're hovering.
+document.addEventListener("pointerover", (e) => {
+  const row = e.target.closest("[data-equator-city]");
+  if (!row) return;
+  const key = row.getAttribute("data-pin-key");
+  if (key) highlightRingPinByKey(key, /*scrollCard=*/ false);
+});
+document.addEventListener("pointerout", (e) => {
+  const row = e.target.closest("[data-equator-city]");
+  if (!row) return;
+  // Only clear if leaving for something OTHER than the same card's children
+  if (row.contains(e.relatedTarget)) return;
+  clearRingPinHighlight();
 });
 
 // Keyboard activation (Enter / Space) for accessibility
