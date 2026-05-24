@@ -702,6 +702,56 @@
   }
   .equator-flagship-header .lede strong { color: var(--orange); font-weight: 600; }
 
+  /* Phase 3b.7: continent breakdown chips */
+  .continent-breakdown {
+    margin-top: 10px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 6px;
+    align-items: baseline;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.78rem;
+    color: var(--dim);
+  }
+  .continent-breakdown .cb-region {
+    cursor: pointer;
+    padding: 3px 8px;
+    border-radius: 3px;
+    border: 1px solid transparent;
+    transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+    user-select: none;
+  }
+  .continent-breakdown .cb-region b {
+    color: var(--text-bright);
+    font-weight: 600;
+    margin-left: 2px;
+  }
+  .continent-breakdown .cb-region:hover {
+    background: var(--surface);
+    border-color: var(--orange);
+    color: var(--orange);
+  }
+  .continent-breakdown .cb-region:hover b { color: var(--orange); }
+  /* Zero-region: visually de-emphasized, but interactive — clicking explains why */
+  .continent-breakdown .cb-region.zero {
+    opacity: 0.5;
+    text-decoration: line-through;
+    text-decoration-color: var(--border);
+  }
+  .continent-breakdown .cb-region.zero b { color: var(--dim); }
+  .continent-breakdown .cb-region.zero:hover {
+    opacity: 1;
+    text-decoration: none;
+    border-color: var(--amber, #f2a949);
+    color: var(--amber, #f2a949);
+  }
+  /* Low-count (<5): subtly highlight as "sparse but present" */
+  .continent-breakdown .cb-region.low b { color: var(--amber, #f2a949); }
+  .continent-breakdown .cb-sep {
+    color: var(--border);
+    user-select: none;
+  }
+
   /* Phase 3b.4: embedded ring-overview Leaflet map inside the module.
      Lets the user SEE the orthodrome + all pins without scrolling back up
      to the main maps. Fitted to the ring's bounds on every render. */
@@ -1914,7 +1964,36 @@ function renderPersonalEquator(lat, lng) {
 // ============================================================
 const originRingCitiesLayer = L.layerGroup().addTo(mapOrigin);
 const antipodeRingCitiesLayer = L.layerGroup().addTo(mapAntipode);
-const MAX_RING_PINS = 300;  // per map; total markers = 2x this
+const MAX_RING_PINS = 300;  // legacy upper-bound (unused after bearing-stratified)
+
+// Phase 3b.7: bearing-stratified sampling for map pins.
+//
+// The original simple cap (slice(0, 300)) took the 300 closest cities globally,
+// which silently dropped entire regions: at ±250 km/1k+ pop for Salem, only
+// 1 of 16 South American cities ever rendered because the densest part of the
+// ring (Asia/Africa) saturated the cap.
+//
+// New approach: divide the ring into 24 angular buckets (15° each), take the
+// closest 16 cities from each. Dense buckets get capped; sparse buckets get
+// every city they have. Same total marker budget, but ALL parts of the ring
+// get representation — South Atlantic, Antarctica, mid-Pacific gaps included.
+const PIN_BEARING_BUCKETS = 24;
+const PIN_PER_BUCKET = 16;
+
+function pickPinsForOverview(matches) {
+  if (!matches || matches.length === 0) return matches || [];
+  const bucketSize = 360 / PIN_BEARING_BUCKETS;
+  const grouped = Array.from({ length: PIN_BEARING_BUCKETS }, () => []);
+  for (const c of matches) {
+    const b = Math.floor(((c.bearingAlongCircleDeg || 0) % 360) / bucketSize) % PIN_BEARING_BUCKETS;
+    grouped[b].push(c);
+  }
+  const picked = [];
+  for (const g of grouped) picked.push(...g.slice(0, PIN_PER_BUCKET));
+  // Return in closeness order so "first" still means "closest to ring"
+  picked.sort((a, b) => a.distanceFromCircleKm - b.distanceFromCircleKm);
+  return picked;
+}
 
 // Phase 3b.2: index of pin pairs keyed by `${lat},${lng}` so we can highlight
 // the matching map pin when the user hovers a city card in the panel (and
@@ -1943,8 +2022,9 @@ function renderRingCities(lat, lng) {
     minPop: equatorFilters.minPop,
   });
 
-  // Closest cities first; cap picks the cities right ON the ring (not random).
-  const toRender = matches.slice(0, MAX_RING_PINS);
+  // Phase 3b.7: bearing-stratified pick — covers all parts of the ring,
+  // not just the densest (Asian) region. See pickPinsForOverview comment.
+  const toRender = pickPinsForOverview(matches);
 
   // Style: small amber dot with dark halo. Opacity tapers with distance from
   // ring (closer = more solid).
@@ -2114,7 +2194,9 @@ function drawEquatorOverviewContents(lat, lng) {
       toleranceKm: equatorFilters.toleranceKm,
       minPop: equatorFilters.minPop,
     });
-    const toRender = matches.slice(0, MAX_RING_PINS);
+    // Phase 3b.7: bearing-stratified — every part of the ring gets pin
+    // coverage, not just dense urban regions.
+    const toRender = pickPinsForOverview(matches);
     for (const c of toRender) {
       const pin = L.circleMarker([c.lat, c.lon], {
         radius: 3,
@@ -2150,6 +2232,35 @@ const equatorFilters = {
   sortBy: "closeness" // closeness | population | bearing
 };
 let currentOriginForEquator = null;  // {lat, lng}, set by goTo
+
+// Phase 3b.7: country code → continent mapping for the breakdown stat.
+// Six broad regions, ISO 3166-1 alpha-2 codes. Russia placed in EU per
+// GeoNames convention; American Samoa "AS" correctly resolves to Oceania
+// (no collision with continent key "AS" for Asia — different lookup maps).
+const COUNTRY_TO_CONTINENT = (function () {
+  const m = {};
+  function add(continent, codes) {
+    for (const c of codes.split(" ")) m[c] = continent;
+  }
+  add("AF", "DZ AO BJ BW BF BI CV CM CF TD KM CD CG CI DJ EG GQ ER SZ ET GA GM GH GN GW KE LS LR LY MG MW ML MR MU YT MA MZ NA NE NG RE RW SH ST SN SC SL SO ZA SS SD TZ TG TN UG EH ZM ZW");
+  add("AS", "AF AM AZ BH BD BT BN KH CN CX CC CY GE HK IN ID IR IQ IL JP JO KZ KP KR KG KW LA LB MO MY MV MN MM NP OM PK PS PH QA SA SG LK SY TW TJ TH TL TR TM AE UZ VN YE");
+  add("EU", "AL AD AT BY BE BA BG HR CZ DK EE FO FI FR DE GI GR GG HU IS IE IM IT JE LV LI LT LU MK MT MD MC ME NL NO PL PT RO RU SM RS SK SI ES SJ SE CH UA GB VA AX");
+  add("NA", "AI AG AW BS BB BZ BM BQ VG CA KY CR CU CW DM DO SV GL GD GP GT HT HN JM MQ MX MS NI PA PR BL KN LC MF PM VC SX TT TC US VI");
+  add("OC", "AS AU CK FJ PF GU KI MH FM NR NC NZ NU NF MP PW PG PN WS SB TK TO TV VU WF");
+  add("SA", "AR BO BR CL CO EC FK GF GY PE PY SR UY VE");
+  return m;
+})();
+const CONTINENT_LABELS = { AS: "Asia", AF: "Africa", EU: "Europe", NA: "N. America", SA: "S. America", OC: "Oceania" };
+const CONTINENT_ORDER = ["AS", "EU", "AF", "NA", "SA", "OC"];
+
+function summarizeByContinent(matches) {
+  const counts = { AS: 0, AF: 0, EU: 0, NA: 0, SA: 0, OC: 0 };
+  for (const c of matches) {
+    const k = COUNTRY_TO_CONTINENT[c.country];
+    if (k && counts[k] != null) counts[k]++;
+  }
+  return counts;
+}
 
 function buildEquatorModuleHtml(lat, lng, cities, filters) {
   // Loading state: cities promise hasn't resolved yet (rare — only on first
@@ -2192,6 +2303,19 @@ function buildEquatorModuleHtml(lat, lng, cities, filters) {
   const countLine = sorted.length === 0
     ? ''
     : `${sorted.length.toLocaleString()} cit${sorted.length === 1 ? "y" : "ies"} found within ${filters.toleranceKm} km of your orthodrome · each ~10,007 km from you and from your antipode`;
+
+  // Phase 3b.7: continent breakdown — surfaces "0 in S. America" so the user
+  // knows when widening filters might help, without having to scroll a huge
+  // list to find out. Each region is a button that scrolls the matching
+  // first-of-region city into view.
+  const byContinent = summarizeByContinent(sorted);
+  const breakdownLine = sorted.length === 0 ? '' : CONTINENT_ORDER
+    .map(k => {
+      const n = byContinent[k];
+      const cls = n === 0 ? "zero" : (n < 5 ? "low" : "");
+      return `<span class="cb-region ${cls}" data-continent="${k}" title="${n === 0 ? 'No cities — try widening tolerance or lowering min pop' : 'Click to find first city in this region'}">${CONTINENT_LABELS[k]} <b>${n}</b></span>`;
+    })
+    .join(`<span class="cb-sep">·</span>`);
 
   const controlsHtml = `
     <div class="equator-controls">
@@ -2289,6 +2413,7 @@ function buildEquatorModuleHtml(lat, lng, cities, filters) {
         <h2 class="title">Your orthodrome — every city equidistant from you and your antipode</h2>
         <p class="lede">${lede}</p>
         ${countLine ? `<p class="lede" style="color:var(--dim);font-size:0.8rem;font-family:'IBM Plex Mono',monospace;">${countLine}</p>` : ''}
+        ${breakdownLine ? `<div class="continent-breakdown" role="region" aria-label="Cities by continent">${breakdownLine}</div>` : ''}
       </div>
       <div class="module-body">
         <div class="equator-overview-map-wrap"><div id="equator-overview-map" class="equator-overview-map"></div></div>
@@ -2366,6 +2491,40 @@ document.addEventListener("click", (e) => {
   if (!wasExpanded) {
     row.classList.add("is-expanded");
     row.setAttribute("aria-expanded", "true");
+  }
+});
+
+// Phase 3b.7: click a continent chip → find the first card whose country
+// belongs to that continent and scroll/highlight it. If there are zero, the
+// title tooltip already explains. The chip click just helps you JUMP to the
+// region you care about in a list of hundreds of cities.
+document.addEventListener("click", (e) => {
+  const chip = e.target.closest("[data-continent]");
+  if (!chip) return;
+  const continent = chip.getAttribute("data-continent");
+  if (!continent) return;
+  // Walk the list, find the first card whose country maps to this continent
+  const cards = document.querySelectorAll("[data-equator-city]");
+  for (const card of cards) {
+    // The card has data-lat/data-lng; we need the country, which we don't
+    // store explicitly. Read it from the rendered country span.
+    const ccSpan = card.querySelector(".equator-row-country");
+    if (!ccSpan) continue;
+    const cc = ccSpan.textContent.trim();
+    if (COUNTRY_TO_CONTINENT[cc] !== continent) continue;
+    // Found one — scroll into view and briefly highlight
+    card.scrollIntoView({ behavior: "smooth", block: "center" });
+    card.classList.add("is-pin-linked");
+    setTimeout(() => card.classList.remove("is-pin-linked"), 1800);
+    // Also pulse the matching map pin so the user can spot it on the overview
+    const pk = card.getAttribute("data-pin-key");
+    if (pk) {
+      highlightRingPinByKey(pk, /*scrollCard=*/ false);
+      setTimeout(() => {
+        if (highlightedPinKey === pk) clearRingPinHighlight();
+      }, 2200);
+    }
+    return;
   }
 });
 
