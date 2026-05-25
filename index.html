@@ -2231,9 +2231,20 @@ function drawEquatorOverviewContents(lat, lng) {
   equatorOverviewLayers.length = 0;
 
   // Ring polyline (halo + amber line, same convention as main maps)
+  // Same pipeline as renderPersonalEquator: 720-sample great circle (so the
+  // curve stays smooth at high latitudes), antimeridianSplit at ±180°, then
+  // clipPolylineToLat at 85° to avoid Mercator-edge stripes when the GC
+  // crosses into the projection's polar caps (visible bug for near-equatorial
+  // origins like Ecuador where the GC max-lat approaches 90°).
   const P = Geometry.latLonToXYZ(lat, lng);
-  const polyline = Geometry.sampleGreatCircle(P, 360);
-  const segments = Geometry.antimeridianSplit(polyline);
+  const polyline = Geometry.sampleGreatCircle(P, 720);
+  const splitSegs = Geometry.antimeridianSplit(polyline);
+  const segments = [];
+  for (const seg of splitSegs) {
+    for (const clipped of Geometry.clipPolylineToLat(seg, 85)) {
+      segments.push(clipped);
+    }
+  }
   const halo = { color: "#000", weight: 5, opacity: 0.55, interactive: false, smoothFactor: 1.0 };
   const line = { color: "#f2a949", weight: 2.5, opacity: 1.0, interactive: false, smoothFactor: 1.0 };
   const ringLayers = [];
