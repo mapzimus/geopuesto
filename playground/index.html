@@ -25,20 +25,29 @@
     h1 { margin: 0 0 8px; font-size: 22px; font-weight: 500; letter-spacing: -0.01em; }
     .tagline { color: var(--muted); font-family: var(--mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; }
     section { margin-bottom: 28px; }
-    section > h2 { font-size: 13px; font-weight: 600; color: var(--accent); font-family: var(--mono); letter-spacing: 0.1em; text-transform: uppercase; margin: 0 0 12px; border-bottom: 1px dashed var(--border); padding-bottom: 8px; }
+    /* T2-2: section H2s are an INDEX/LANDMARK, not the loudest thing on the
+       page. Demoted from accent-orange + uppercase mono to a soft-bright
+       sans-serif title with a thin accent underline. Frees orange for
+       primary CTAs (Load + render, Run Monte Carlo). */
+    section > h2 { font-size: 17px; font-weight: 500; color: var(--fg); font-family: var(--sans); letter-spacing: -0.005em; text-transform: none; margin: 0 0 14px; padding: 0 0 8px; border-bottom: 1px solid var(--border); position: relative; }
+    section > h2::after { content: ""; position: absolute; left: 0; bottom: -1px; width: 24px; height: 1px; background: var(--accent); }
     .readout { background: rgba(0, 191, 165, 0.06); border-left: 3px solid var(--pass); padding: 10px 14px; margin-bottom: 8px; font-family: var(--mono); font-size: 13px; }
     .readout .label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; }
     .readout .value { color: var(--fg); }
     .readout.warn { background: rgba(255, 90, 74, 0.08); border-left-color: var(--fail); }
     .readout.warn .value { color: var(--fail); }
-    #salem-map, #curves-map, #analysis-map { height: 360px; margin-top: 8px; border: 1px solid var(--border); border-radius: 4px; }
+    #tp-map, #salem-map, #curves-map, #analysis-map { height: 360px; margin-top: 8px; border: 1px solid var(--border); border-radius: 4px; }
     .map-caption { color: var(--muted); font-family: var(--mono); font-size: 11px; margin-top: 6px; }
     .control-row { display: flex; gap: 12px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; font-family: var(--mono); font-size: 12px; }
     .control-row label { display: flex; flex-direction: column; gap: 4px; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; }
     .control-row input[type="text"], .control-row select { padding: 6px 10px; background: rgba(255,255,255,0.06); border: 1px solid var(--border); color: var(--fg); font-family: var(--mono); font-size: 13px; border-radius: 4px; min-width: 200px; text-transform: none; letter-spacing: normal; }
     .control-row input[type="text"]:focus, .control-row select:focus { outline: none; border-color: var(--accent); }
-    .control-row button { padding: 7px 14px; background: var(--accent); color: var(--bg); border: none; cursor: pointer; font-family: var(--mono); font-size: 12px; font-weight: 600; border-radius: 4px; align-self: flex-end; }
-    .control-row button:hover { opacity: 0.9; }
+    /* T2-2: primary CTA buttons get amped. Bigger pad, drop shadow on hover. */
+    .control-row button { padding: 9px 18px; background: var(--accent); color: var(--bg); border: none; cursor: pointer; font-family: var(--mono); font-size: 12px; font-weight: 700; border-radius: 4px; align-self: flex-end; letter-spacing: 0.02em; box-shadow: 0 1px 0 rgba(0,0,0,0.2); transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease; }
+    .control-row button:hover { background: #ff7c3a; box-shadow: 0 2px 8px rgba(242,101,34,0.4); transform: translateY(-1px); }
+    .control-row button:active { transform: translateY(0); box-shadow: 0 1px 0 rgba(0,0,0,0.2); }
+    .control-row button:disabled { background: rgba(124, 138, 168, 0.25); color: var(--muted); box-shadow: none; cursor: not-allowed; transform: none; }
+    .control-row button:disabled:hover { background: rgba(124, 138, 168, 0.25); box-shadow: none; transform: none; }
     .quick-picks { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; font-family: var(--mono); font-size: 11px; }
     .quick-picks-label { color: var(--muted); }
     .quick-picks button { padding: 4px 10px; background: transparent; border: 1px solid var(--border); color: var(--fg); cursor: pointer; font-family: var(--mono); font-size: 11px; border-radius: 4px; }
@@ -49,6 +58,19 @@
     .sprintc-buttons button:hover { background: rgba(242, 101, 34, 0.15); }
     .share-url { margin-top: 8px; padding: 8px 12px; background: rgba(0, 191, 165, 0.06); border: 1px solid var(--border); border-radius: 4px; font-family: var(--mono); font-size: 11px; word-break: break-all; color: var(--fg); }
     .share-url .copied { color: var(--pass); margin-left: 8px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; }
+
+    /* T2-4: shared toast container for copy/share/export feedback.
+       Replaces the prior tiny inline "copied" tag (which the audit flagged
+       as too subtle — easy to miss the 1.8s flash). Fixed-position at
+       bottom-center so it doesn't compete with the live readouts. */
+    .toast-container { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 9000; display: flex; flex-direction: column; gap: 8px; align-items: center; pointer-events: none; }
+    .toast { background: var(--bg); color: var(--fg); border: 1px solid var(--border); border-left: 3px solid var(--pass); padding: 10px 16px; font-family: var(--mono); font-size: 12px; border-radius: 4px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); pointer-events: auto; opacity: 0; transform: translateY(8px); transition: opacity 0.2s ease, transform 0.2s ease; max-width: 480px; }
+    .toast.toast-show { opacity: 1; transform: translateY(0); }
+    .toast.toast-error { border-left-color: var(--fail); }
+    .toast.toast-info { border-left-color: var(--accent); }
+    .toast strong { color: var(--pass); font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; font-size: 10px; margin-right: 8px; }
+    .toast.toast-error strong { color: var(--fail); }
+    .toast.toast-info strong { color: var(--accent); }
     footer { color: var(--muted); font-family: var(--mono); font-size: 11px; margin-top: 32px; padding-top: 16px; border-top: 1px solid var(--border); }
     footer a { color: var(--accent); text-decoration: none; }
     footer a:hover { text-decoration: underline; }
@@ -71,12 +93,20 @@
     <h2>Two places on Earth</h2>
     <!-- TODO (Max): plain-language section heading. Previous: "Two-Point Mode · A → B" -->
     <div class="map-caption" style="margin-bottom: 12px;">
-      Pick two points A and B. See the great-circle path between them, the locus of
-      points equidistant from both, and the four "named" points that fall out of
-      this geometry: midpoint M, antipodal midpoint −M (the &ldquo;Geomate&rdquo;
-      pair), and the two poles n / −n of the A&ndash;B great circle.
+      Pick two points A and B. The map below shows the great-circle path between
+      them, the locus of points equidistant from both, and the four "named" points
+      that fall out: midpoint M, its antipode −M (the &ldquo;Geomate&rdquo;), and
+      the two poles n / −n of the A&ndash;B great circle. Change A and B with the
+      inputs or the city quick-picks underneath.
     </div>
-    <div class="control-row">
+    <!-- T2-3: map-first layout. Boston → Tokyo great-circle arc is the very
+         first visual the page renders, before inputs or readouts. The wow
+         before any interaction. -->
+    <div id="tp-map"></div>
+    <div class="map-caption" id="tp-map-caption">
+      Orange = A. Teal = B. Solid orange arc = the A&rarr;B great circle (the shortest path on a sphere). Dashed teal arc = the perpendicular-bisector great circle (every point on this curve is equidistant from A and B). Blue pins = M and &minus;M (the Geomates). Yellow pins = n and &minus;n (the poles of the A&ndash;B great circle).
+    </div>
+    <div class="control-row" style="margin-top: 14px;">
       <label>A (origin):
         <input type="text" id="tp-a-input" value="42.3601,-71.0589" placeholder="lat, lon">
       </label>
@@ -92,7 +122,7 @@
       <button data-tp-b="-1.286,36.817">Nairobi</button>
       <button data-tp-b="-22.9068,-43.1729">Rio</button>
     </div>
-    <div id="bos-tok-readout"></div>
+    <div id="bos-tok-readout" style="margin-top: 14px;"></div>
     <div class="control-row" style="margin-top: 14px;">
       <label>Test point P (cross/along-track from A&ndash;B great circle):
         <input type="text" id="tp-p-input" value="51.5074,-0.1278" placeholder="lat, lon">
@@ -110,23 +140,37 @@
       </label>
       <label>Shape:
         <select id="poly-shape-select">
-          <option value="tetrahedron">Pyramid (tetrahedron) &middot; 4 verts</option>
-          <option value="cube">Cube &middot; 8 verts</option>
-          <option value="octahedron">Octahedron &middot; 6 verts</option>
-          <option value="icosahedron">Star (icosahedron) &middot; 12 verts</option>
-          <option value="dodecahedron">Dodecahedron &middot; 20 verts</option>
-          <option value="cuboctahedron" selected>Vector Equilibrium (cuboctahedron) &middot; 12 verts</option>
-          <option value="truncatedIcosahedron">Soccer ball (truncated icosahedron) &middot; 60 verts</option>
-          <option value="rhombicTriacontahedron">32-vertex grid (rhombic triacontahedron / Becker-Hagens) &middot; 32 verts</option>
-          <option value="fibonacciSphere">Golden-angle lattice (Fibonacci sphere) &middot; N verts</option>
-          <option value="geodesicIcosahedron">Geodesic dome (icosahedral subdivision) &middot; 10k&sup2;+2 verts</option>
-          <option value="nPrism">Prism (n-gonal) &middot; 2n verts</option>
-          <option value="nAntiprism">Antiprism (n-gonal, twisted) &middot; 2n verts</option>
-          <option value="stellaOctangula">Stella Octangula (two interpenetrating tetrahedra) &middot; 8 verts</option>
-          <option value="fiveTetrahedraCompound">5 interpenetrating tetrahedra (chiral compound) &middot; 20 verts</option>
-          <option value="fiveCubesCompound">5 interpenetrating cubes (achiral compound) &middot; 20 verts</option>
-          <option value="smallStellatedDodecahedron">Small stellated dodecahedron (Kepler-Poinsot) &middot; 12 verts</option>
-          <option value="greatStellatedDodecahedron">Great stellated dodecahedron (Kepler-Poinsot) &middot; 20 verts</option>
+          <!-- T2-5: plain-first ordering with category groups. Per V3_VISION
+               §"UI/UX philosophy" the user should see plain language before
+               the math name. Optgroup labels surface the taxonomy without
+               taking real estate on the option text itself. -->
+          <optgroup label="The five Platonics (regular convex)">
+            <option value="tetrahedron">Pyramid &middot; 4 verts &middot; tetrahedron</option>
+            <option value="cube">Cube &middot; 8 verts</option>
+            <option value="octahedron">Diamond &middot; 6 verts &middot; octahedron</option>
+            <option value="icosahedron">Star &middot; 12 verts &middot; icosahedron</option>
+            <option value="dodecahedron">12-faced gem &middot; 20 verts &middot; dodecahedron</option>
+          </optgroup>
+          <optgroup label="Archimedean / Catalan / soccer-ball family">
+            <option value="cuboctahedron" selected>Vector equilibrium &middot; 12 verts &middot; cuboctahedron</option>
+            <option value="truncatedIcosahedron">Soccer ball &middot; 60 verts &middot; truncated icosahedron / C₆₀</option>
+            <option value="rhombicTriacontahedron">32-vertex grid &middot; 32 verts &middot; rhombic triacontahedron / Becker-Hagens</option>
+          </optgroup>
+          <optgroup label="Parametric (drag the slider after picking)">
+            <option value="fibonacciSphere">Golden-angle lattice &middot; N verts &middot; Fibonacci sphere</option>
+            <option value="geodesicIcosahedron">Geodesic dome &middot; 10k²+2 verts &middot; icosahedral subdivision</option>
+            <option value="nPrism">Prism &middot; 2n verts &middot; n-gonal</option>
+            <option value="nAntiprism">Twisted prism &middot; 2n verts &middot; n-gonal antiprism</option>
+          </optgroup>
+          <optgroup label="Compounds (interpenetrating polyhedra)">
+            <option value="stellaOctangula">Stella Octangula &middot; 8 verts &middot; two tetrahedra</option>
+            <option value="fiveTetrahedraCompound">Five tetrahedra &middot; 20 verts &middot; chiral compound</option>
+            <option value="fiveCubesCompound">Five cubes &middot; 20 verts &middot; achiral compound</option>
+          </optgroup>
+          <optgroup label="Kepler-Poinsot stars">
+            <option value="smallStellatedDodecahedron">Small stellated dodecahedron &middot; 12 verts</option>
+            <option value="greatStellatedDodecahedron">Great stellated dodecahedron &middot; 20 verts</option>
+          </optgroup>
         </select>
       </label>
     </div>
@@ -409,6 +453,7 @@
           row(root, 'Status', d.degenerate === 'identical'
             ? 'A and B are identical — perpendicular bisector is undefined.'
             : 'A and B are antipodal — every point is equidistant from both.', { warn: true });
+          renderTwoPointMap();  // still clear/redraw to show A and B
           return;
         }
         const p = B.pair(state.A, state.B);
@@ -420,6 +465,78 @@
         row(root, '−M — Geomate, the antipode of M (also equidistant from A and B, but on the OTHER side of Earth)', fmtCoord(d.mAntipode));
         row(root, 'n — north pole of the A–B great circle (every point on this circle is 90° from BOTH A and B)', fmtCoord(d.n));
         row(root, '−n — south pole of the same great circle (90° from A and B on the opposite side)', fmtCoord(d.nAntipode));
+        renderTwoPointMap();
+      }
+
+      // ---------------------------------------------------------------
+      // Two-Point Mode map (T2-1: the most-flagged audit finding).
+      // One Leaflet instance, lazy-init, clear-and-redraw per state change.
+      // Pattern mirrors the antipodal app's renderTwoPointOnMapsCurrent
+      // but localized to a single map. A/B/M/-M/n/-n pins + A→B orthodrome
+      // + perpendicular-bisector great circle, all with antimeridian-split.
+      // ---------------------------------------------------------------
+      let tpMap = null;
+      const tpLayers = { lines: null, pins: null };
+
+      function ensureTpMap() {
+        if (tpMap) return tpMap;
+        tpMap = L.map('tp-map', { worldCopyJump: true }).setView([20, 0], 1);
+        L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+          attribution: 'Esri Dark Gray Canvas', maxZoom: 16, subdomains: ['', ''],
+        }).addTo(tpMap);
+        tpLayers.lines = L.layerGroup().addTo(tpMap);
+        tpLayers.pins = L.layerGroup().addTo(tpMap);
+        return tpMap;
+      }
+
+      function renderTwoPointMap() {
+        ensureTpMap();
+        tpLayers.lines.clearLayers();
+        tpLayers.pins.clearLayers();
+
+        // Always draw A and B even in the degenerate case.
+        L.circleMarker([state.A.lat, state.A.lon], {
+          radius: 7, color: '#f26522', weight: 2, fillColor: '#f26522', fillOpacity: 1,
+        }).bindTooltip('A · ' + state.A.lat.toFixed(2) + ', ' + state.A.lon.toFixed(2), { direction: 'top' }).addTo(tpLayers.pins);
+        L.circleMarker([state.B.lat, state.B.lon], {
+          radius: 7, color: '#00bfa5', weight: 2, fillColor: '#00bfa5', fillOpacity: 1,
+        }).bindTooltip('B · ' + state.B.lat.toFixed(2) + ', ' + state.B.lon.toFixed(2), { direction: 'top' }).addTo(tpLayers.pins);
+
+        const d = TP.derive(state.A, state.B);
+        if (d.degenerate || !window.Geometry) return;
+
+        // Polylines: orthodrome (orange solid) + perpendicular bisector (teal dashed).
+        const G = window.Geometry;
+        const a = G.latLonToXYZ(state.A.lat, state.A.lon);
+        const b = G.latLonToXYZ(state.B.lat, state.B.lon);
+        const orthoPole = G.normalize(G.cross(a, b));
+        const bisectorPole = G.normalize(G.sub(a, b));
+        const orthoSegs = G.antimeridianSplit(G.sampleGreatCircle(orthoPole, 360));
+        const bisectorSegs = G.antimeridianSplit(G.sampleGreatCircle(bisectorPole, 360));
+        const halo = { color: '#000', weight: 6, opacity: 0.5, interactive: false, smoothFactor: 1.0 };
+        const orthoStyle = { color: '#f26522', weight: 3, opacity: 1.0, interactive: false, smoothFactor: 1.0 };
+        const bisectorStyle = { color: '#00bfa5', weight: 3, opacity: 0.9, dashArray: '8,6', interactive: false, smoothFactor: 1.0 };
+        for (const seg of orthoSegs) {
+          L.polyline(seg, halo).addTo(tpLayers.lines);
+          L.polyline(seg, orthoStyle).addTo(tpLayers.lines);
+        }
+        for (const seg of bisectorSegs) {
+          L.polyline(seg, halo).addTo(tpLayers.lines);
+          L.polyline(seg, bisectorStyle).addTo(tpLayers.lines);
+        }
+
+        // Named-point pins: M and −M in blue, n and −n in yellow.
+        const named = [
+          { p: d.M,         label: 'M',  desc: 'midpoint of A→B arc',  color: '#3b82f6' },
+          { p: d.mAntipode, label: '−M', desc: 'Geomate (antipodal midpoint)', color: '#3b82f6' },
+          { p: d.n,         label: 'n',  desc: 'north pole of A–B great circle', color: '#fbbf24' },
+          { p: d.nAntipode, label: '−n', desc: 'south pole of A–B great circle', color: '#fbbf24' },
+        ];
+        for (const pt of named) {
+          L.circleMarker([pt.p.lat, pt.p.lon], {
+            radius: 6, color: pt.color, weight: 2, fillColor: pt.color, fillOpacity: 0.85,
+          }).bindTooltip(pt.label + ' · ' + pt.desc + '<br>' + pt.p.lat.toFixed(2) + ', ' + pt.p.lon.toFixed(2), { direction: 'top' }).addTo(tpLayers.pins);
+        }
       }
 
       // ---------------------------------------------------------------
@@ -1174,6 +1291,32 @@
         };
       }
 
+      // T2-4: shared toast. Auto-removes after 2.4 s; up to 3 stacked at a time.
+      function showToast(msg, kind) {
+        let host = document.getElementById('toast-container');
+        if (!host) {
+          host = document.createElement('div');
+          host.id = 'toast-container';
+          host.className = 'toast-container';
+          document.body.appendChild(host);
+        }
+        // Cap stack at 3 by dropping oldest.
+        while (host.children.length >= 3) host.removeChild(host.firstChild);
+        const toast = document.createElement('div');
+        toast.className = 'toast' + (kind === 'error' ? ' toast-error' : kind === 'info' ? ' toast-info' : '');
+        const label = document.createElement('strong');
+        label.textContent = kind === 'error' ? 'Error' : kind === 'info' ? 'Info' : '✓';
+        toast.appendChild(label);
+        toast.appendChild(document.createTextNode(msg));
+        host.appendChild(toast);
+        // Defer the class flip so the transition runs.
+        requestAnimationFrame(function () { toast.classList.add('toast-show'); });
+        setTimeout(function () {
+          toast.classList.remove('toast-show');
+          setTimeout(function () { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 250);
+        }, 2400);
+      }
+
       function wireSprintC() {
         document.getElementById('btn-share').addEventListener('click', function () {
           const url = SL.makeUrl(window.location.href, currentShareConfig());
@@ -1182,22 +1325,28 @@
           display.textContent = url;
           if (navigator.clipboard && navigator.clipboard.writeText) {
             navigator.clipboard.writeText(url).then(function () {
-              const tag = el('span', { class: 'copied', text: 'copied to clipboard' });
-              display.appendChild(tag);
-              setTimeout(function () { if (tag.parentNode) tag.parentNode.removeChild(tag); }, 1800);
-            }).catch(function () { /* clipboard denied — URL still visible */ });
+              showToast('Share link copied to clipboard');
+            }).catch(function () {
+              showToast('Clipboard blocked — URL is shown above to copy manually', 'info');
+            });
+          } else {
+            showToast('Clipboard unavailable — URL is shown above', 'info');
           }
         });
         document.getElementById('btn-export-geojson').addEventListener('click', function () {
           if (!SE || !SE.ready) return;
           SE.ready.then(function () {
-            EG.download(currentExportBundle(), 'geopuesto-' + state.shape + '.geojson');
+            const name = 'geopuesto-' + state.shape + '.geojson';
+            EG.download(currentExportBundle(), name);
+            showToast('Downloaded ' + name);
           });
         });
         document.getElementById('btn-export-kml').addEventListener('click', function () {
           if (!SE || !SE.ready) return;
           SE.ready.then(function () {
-            EG.downloadKML(currentExportBundle(), 'geopuesto-' + state.shape + '.kml');
+            const name = 'geopuesto-' + state.shape + '.kml';
+            EG.downloadKML(currentExportBundle(), name);
+            showToast('Downloaded ' + name);
           });
         });
 
