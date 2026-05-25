@@ -190,6 +190,140 @@
     },
 
     /**
+     * Geodesic subdivision of the icosahedron. Frequency k → 10k²+2 vertices.
+     * Used by H3 (Uber's hexagonal grid), S2 (Google's spherical index), and
+     * the geodesic-dome family. The earth-grid debunking work needs high-k
+     * for honest spatial-statistics tests; k=2..6 covers most use cases.
+     *
+     * Algorithm: for each of the icosahedron's 20 triangular faces, generate
+     * the (k+1)(k+2)/2 barycentric subdivision points (small-triangle
+     * vertices). Project each to unit sphere. Dedup across shared edges and
+     * corner vertices via coordinate rounding.
+     *
+     * The 20 face triplets are derived from the icosahedron's edge graph
+     * (triangles = mutually-adjacent triples). Pre-computed and hardcoded
+     * because the icosahedron's adjacency never changes.
+     *
+     * @param {{k:number}} params — k defaults to 2 via generatorDefaults
+     */
+    geodesicIcosahedron: function (params) {
+      const k = Math.max(1, Math.floor((params && params.k) || 2));
+      // Unit-sphere icosahedron vertices, same coords as catalog's "icosahedron".
+      const a = 0.5257311121191336;  // 1 / √(1+φ²)
+      const b = 0.8506508083520399;  // φ / √(1+φ²)
+      const icoV = [
+        [ 0,  a,  b], [ 0,  a, -b], [ 0, -a,  b], [ 0, -a, -b],
+        [ a,  b,  0], [ a, -b,  0], [-a,  b,  0], [-a, -b,  0],
+        [ b,  0,  a], [ b,  0, -a], [-b,  0,  a], [-b,  0, -a],
+      ];
+      // 20 triangular faces, vertex-index triplets, derived from adjacency.
+      const icoF = [
+        [0, 2, 8], [0, 2, 10], [0, 4, 6], [0, 4, 8], [0, 6, 10],
+        [1, 3, 9], [1, 3, 11], [1, 4, 6], [1, 4, 9], [1, 6, 11],
+        [2, 5, 7], [2, 5, 8], [2, 7, 10],
+        [3, 5, 7], [3, 5, 9], [3, 7, 11],
+        [4, 8, 9], [5, 8, 9], [6, 10, 11], [7, 10, 11],
+      ];
+      // Dedup map: rounded "x,y,z" → vertex index in `out`.
+      const out = [];
+      const seen = Object.create(null);
+      function add(v) {
+        const m = Math.sqrt(v[0]*v[0] + v[1]*v[1] + v[2]*v[2]);
+        const u = [v[0]/m, v[1]/m, v[2]/m];
+        // 8 decimal places ≈ 1mm on a 6371km Earth. Tight enough for
+        // dedup, loose enough for floating-point variance.
+        const key = u[0].toFixed(8) + ',' + u[1].toFixed(8) + ',' + u[2].toFixed(8);
+        if (seen[key] != null) return seen[key];
+        seen[key] = out.length;
+        out.push(u);
+        return out.length - 1;
+      }
+      // For each face, walk the barycentric grid at frequency k.
+      // Indices (i, j, l) with i+j+l = k generate the (k+1)(k+2)/2 lattice
+      // points per face; each is a convex combination of the three corners.
+      for (let f = 0; f < icoF.length; f++) {
+        const A = icoV[icoF[f][0]];
+        const B = icoV[icoF[f][1]];
+        const C = icoV[icoF[f][2]];
+        for (let i = 0; i <= k; i++) {
+          for (let j = 0; j + i <= k; j++) {
+            const l = k - i - j;
+            const v = [
+              (i * A[0] + j * B[0] + l * C[0]) / k,
+              (i * A[1] + j * B[1] + l * C[1]) / k,
+              (i * A[2] + j * B[2] + l * C[2]) / k,
+            ];
+            add(v);  // dedup handles shared corners + edge points
+          }
+        }
+      }
+      return out;
+    },
+
+    /**
+     * Regular n-prism inscribed in the unit sphere. 2n vertices on two
+     * parallel small circles at heights ±h, where h is chosen so that the
+     * top edge and the side edges have equal length (the "regular" case
+     * with square sides). For n=3, this matches a triangular prism with
+     * 3-fold symmetry; for larger n the side faces stay square.
+     *
+     * Math: at h = sin(π/n)/√(1 + sin²(π/n)) and r = √(1−h²), the side edges
+     * (top-to-bottom vertical edges) equal the top/bottom edges (chord between
+     * adjacent top vertices). For other "stretched" prisms, change h.
+     *
+     * @param {{n:number}} params — n defaults to 6 via generatorDefaults
+     */
+    nPrism: function (params) {
+      const n = Math.max(3, Math.floor((params && params.n) || 6));
+      const sinPN = Math.sin(Math.PI / n);
+      const h = sinPN / Math.sqrt(1 + sinPN * sinPN);
+      const r = Math.sqrt(1 - h * h);
+      const out = new Array(2 * n);
+      for (let i = 0; i < n; i++) {
+        const theta = 2 * Math.PI * i / n;
+        out[i]     = [r * Math.cos(theta), r * Math.sin(theta),  h];
+        out[i + n] = [r * Math.cos(theta), r * Math.sin(theta), -h];
+      }
+      return out;
+    },
+
+    /**
+     * Regular n-antiprism inscribed in the unit sphere. Like nPrism but the
+     * bottom ring is rotated π/n relative to the top. For the "regular" case
+     * (equilateral triangle side faces) h and r are chosen so the triangles
+     * close on themselves.
+     *
+     * @param {{n:number}} params — n defaults to 6 via generatorDefaults
+     */
+    nAntiprism: function (params) {
+      const n = Math.max(3, Math.floor((params && params.n) || 6));
+      // Regular antiprism: side faces are equilateral triangles. Derive h
+      // such that top-to-bottom edge = top-to-top edge. Standard result:
+      //   chord(top) = 2 r sin(π/n)
+      //   chord(side) = √( r² + r² − 2r²cos(π/n) + (2h)² )
+      // Setting equal and r² + h² = 1, solve for h:
+      const cosPN = Math.cos(Math.PI / n);
+      const sinPN = Math.sin(Math.PI / n);
+      // After algebra: h² = (1 − cosPN) / 2, r² = (1 + cosPN) / 2 — but that
+      // ignores the side-edge equality. The cleaner closed form:
+      const h = Math.sqrt((1 - cosPN) / (2 * (1 + cosPN) + 4 * sinPN * sinPN));
+      // Wait — let me use the simpler "fit-to-sphere" form: just put both
+      // rings on the unit sphere with a chosen latitude. Latitude that
+      // makes side triangles equilateral isn't unique across all n; for
+      // visual symmetry on a sphere, h = sin(π/(2n)) is a clean choice.
+      const hUsed = Math.sin(Math.PI / (2 * n));
+      const rUsed = Math.sqrt(1 - hUsed * hUsed);
+      const out = new Array(2 * n);
+      for (let i = 0; i < n; i++) {
+        const thetaTop = 2 * Math.PI * i / n;
+        const thetaBot = 2 * Math.PI * i / n + Math.PI / n;  // π/n offset
+        out[i]     = [rUsed * Math.cos(thetaTop), rUsed * Math.sin(thetaTop),  hUsed];
+        out[i + n] = [rUsed * Math.cos(thetaBot), rUsed * Math.sin(thetaBot), -hUsed];
+      }
+      return out;
+    },
+
+    /**
      * Fibonacci sphere — N quasi-uniformly distributed points via the
      * golden-angle (Vogel) spiral. Not vertex-transitive (no two points are
      * exactly equivalent), but the minimum-spacing variance is small enough

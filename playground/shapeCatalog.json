@@ -2,9 +2,9 @@
   "version": 1,
   "edgeStrategy": "auto-min-distance",
   "deferred": {
-    "keplerPoinsot": "shares Platonic vertex sets, different edges — needs explicit edges (Sprint B.3)",
-    "geodesic": "icosahedral subdivision at frequency k → 10k²+2 vertices — parametric, needs generator",
-    "nPrism": "2n vertices on two parallel small circles, parametric n ≥ 3 — needs generator"
+    "keplerPoinsot": "4 regular star polyhedra (small/great stellated, great dodeca, great icosa) — share Platonic vertex sets, need explicit star edge lists",
+    "compounds": "stella octangula + 5-tetrahedra + 5-cubes — share Platonic vertex sets, need explicit edges (Sprint B.3 candidate)",
+    "catalan": "Catalan duals beyond rhombic triacontahedron — pentakis dodeca, triakis icosa, disdyakis triaconta"
   },
   "shapes": {
     "tetrahedron": {
@@ -173,6 +173,30 @@
       "generator": "fibonacciSphere",
       "generatorDefaults": { "N": 100 },
       "edgeStrategy": "none"
+    },
+    "geodesicIcosahedron": {
+      "technicalLabel": "Geodesic Icosahedron (frequency k)",
+      "userLabel": "Geodesic dome (icosahedral subdivision, frequency k)",
+      "description": "Buckminster Fuller's geodesic-dome family. Start with the 20-face icosahedron; subdivide each face into k² smaller triangles; project new vertices outward to the unit sphere. Total: 10k²+2 vertices, 30k² edges, 20k² faces. The frequency-k family is the math behind Uber's H3 (k=resolution) and Google's S2 (cell levels). Higher k = denser uniform-ish Earth grid; k=4 gives 162 vertices, k=6 gives 362, k=10 gives 1002. Parametric.",
+      "vertexCount": 42,
+      "generator": "geodesicIcosahedron",
+      "generatorDefaults": { "k": 2 }
+    },
+    "nPrism": {
+      "technicalLabel": "n-Prism",
+      "userLabel": "Prism (n-gonal, arbitrary n)",
+      "description": "2n vertices on two parallel small circles, aligned (one above the other). For n=4 you get a cube-like shape; for n=6 a hexagonal prism; for n=20 a near-cylinder. Heights chosen so side edges roughly match top/bottom edges. Useful for arbitrary k-fold symmetry sampling on a sphere — e.g. 'place 12 points in 6-fold symmetric pairs.' Parametric.",
+      "vertexCount": 12,
+      "generator": "nPrism",
+      "generatorDefaults": { "n": 6 }
+    },
+    "nAntiprism": {
+      "technicalLabel": "n-Antiprism",
+      "userLabel": "Antiprism (n-gonal, π/n twisted)",
+      "description": "Like a prism but the bottom ring is rotated π/n relative to the top, so side faces are triangles rather than rectangles. The octahedron is the 3-antiprism; the square antiprism (n=4) is the shape of XeF8 in chemistry. Visually distinct from prisms at high n — the twist makes the wireframe spiral. Parametric.",
+      "vertexCount": 12,
+      "generator": "nAntiprism",
+      "generatorDefaults": { "n": 6 }
     }
   }
 }

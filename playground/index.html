@@ -105,6 +105,9 @@
           <option value="truncatedIcosahedron">Soccer ball (truncated icosahedron) &middot; 60 verts</option>
           <option value="rhombicTriacontahedron">32-vertex grid (rhombic triacontahedron / Becker-Hagens) &middot; 32 verts</option>
           <option value="fibonacciSphere">Golden-angle lattice (Fibonacci sphere) &middot; N verts</option>
+          <option value="geodesicIcosahedron">Geodesic dome (icosahedral subdivision) &middot; 10k&sup2;+2 verts</option>
+          <option value="nPrism">Prism (n-gonal) &middot; 2n verts</option>
+          <option value="nAntiprism">Antiprism (n-gonal, twisted) &middot; 2n verts</option>
         </select>
       </label>
     </div>
@@ -116,6 +119,16 @@
     <div class="control-row" id="poly-fibn-row" style="display:none;">
       <label style="flex: 1;">Fibonacci N points: <span id="poly-fibn-display">100</span>
         <input type="range" id="poly-fibn-slider" min="6" max="1000" value="100" step="2" style="width: 100%;">
+      </label>
+    </div>
+    <div class="control-row" id="poly-geok-row" style="display:none;">
+      <label style="flex: 1;">Geodesic frequency k: <span id="poly-geok-display">2</span> &mdash; vertex count <span id="poly-geok-verts">42</span>
+        <input type="range" id="poly-geok-slider" min="1" max="10" value="2" step="1" style="width: 100%;">
+      </label>
+    </div>
+    <div class="control-row" id="poly-polyn-row" style="display:none;">
+      <label style="flex: 1;">Prism n (sides): <span id="poly-polyn-display">6</span> &mdash; vertex count <span id="poly-polyn-verts">12</span>
+        <input type="range" id="poly-polyn-slider" min="3" max="32" value="6" step="1" style="width: 100%;">
       </label>
     </div>
     <div id="salem-map"></div>
@@ -226,11 +239,21 @@
         anchor: { lat: 42.5195, lon: -70.8967 },
         shape: 'cuboctahedron',
         spinDeg: 0,
-        fibN: 100,  // only used when shape === 'fibonacciSphere'
+        fibN: 100,    // fibonacciSphere
+        geoK: 2,      // geodesicIcosahedron frequency
+        polyN: 6,     // nPrism / nAntiprism
       };
 
-      // Shapes whose vertex count depends on params (the N slider applies).
-      const PARAMETRIC_SHAPES = new Set(['fibonacciSphere']);
+      // Map each parametric shape to its control row + state key + param name
+      // sent to the generator. Future parametric shapes (e.g. torus parameters,
+      // user-uploaded shape with N points) drop in by adding an entry here.
+      const PARAMETRIC_SHAPES = {
+        fibonacciSphere:     { row: 'poly-fibn-row',  stateKey: 'fibN',  param: 'N', vertCount: function (v) { return v; } },
+        geodesicIcosahedron: { row: 'poly-geok-row',  stateKey: 'geoK',  param: 'k', vertCount: function (k) { return 10 * k * k + 2; } },
+        nPrism:              { row: 'poly-polyn-row', stateKey: 'polyN', param: 'n', vertCount: function (n) { return 2 * n; } },
+        nAntiprism:          { row: 'poly-polyn-row', stateKey: 'polyN', param: 'n', vertCount: function (n) { return 2 * n; } },
+      };
+      const PARAMETRIC_ROWS = ['poly-fibn-row', 'poly-geok-row', 'poly-polyn-row'];
 
       // ---------------------------------------------------------------
       // Two-Point readout
@@ -302,15 +325,28 @@
         polyLayers.edges.clearLayers();
         polyLayers.pins.clearLayers();
         document.getElementById('poly-spin-display').textContent = state.spinDeg + '°';
-        // Show the N slider only for parametric shapes; hide for fixed-vertex shapes.
-        const fibRow = document.getElementById('poly-fibn-row');
-        fibRow.style.display = PARAMETRIC_SHAPES.has(state.shape) ? '' : 'none';
+
+        // Show only the parametric row that matches the current shape; hide others.
+        const paramCfg = PARAMETRIC_SHAPES[state.shape];
+        for (const rowId of PARAMETRIC_ROWS) {
+          document.getElementById(rowId).style.display = (paramCfg && paramCfg.row === rowId) ? '' : 'none';
+        }
+        // Sync display labels to current state (cheap, idempotent).
         document.getElementById('poly-fibn-display').textContent = state.fibN;
+        document.getElementById('poly-geok-display').textContent = state.geoK;
+        document.getElementById('poly-geok-verts').textContent = 10 * state.geoK * state.geoK + 2;
+        document.getElementById('poly-polyn-display').textContent = state.polyN;
+        document.getElementById('poly-polyn-verts').textContent = 2 * state.polyN;
+
         if (!SE || !SE.ready) return;
         SE.ready.then(function () {
           let cfg;
           try {
-            const params = PARAMETRIC_SHAPES.has(state.shape) ? { N: state.fibN } : undefined;
+            let params;
+            if (paramCfg) {
+              params = {};
+              params[paramCfg.param] = state[paramCfg.stateKey];
+            }
             cfg = SE.configure(state.shape, state.anchor, state.spinDeg * Math.PI / 180, params);
           } catch (e) { return; }
           cfg.edgePolylines.forEach(function (poly) {
@@ -350,7 +386,12 @@
       }
 
       function currentExportBundle() {
-        const params = PARAMETRIC_SHAPES.has(state.shape) ? { N: state.fibN } : undefined;
+        const paramCfg = PARAMETRIC_SHAPES[state.shape];
+        let params;
+        if (paramCfg) {
+          params = {};
+          params[paramCfg.param] = state[paramCfg.stateKey];
+        }
         const cfg = SE.configure(state.shape, state.anchor, state.spinDeg * Math.PI / 180, params);
         return {
           name: 'Geopuesto playground · ' + cfg.shape.technicalLabel + ' anchored at ' + fmtCoord(state.anchor),
@@ -469,6 +510,14 @@
         });
         document.getElementById('poly-fibn-slider').addEventListener('input', function (e) {
           state.fibN = Math.max(6, parseInt(e.target.value, 10) || 100);
+          renderPolyhedra();
+        });
+        document.getElementById('poly-geok-slider').addEventListener('input', function (e) {
+          state.geoK = Math.max(1, parseInt(e.target.value, 10) || 2);
+          renderPolyhedra();
+        });
+        document.getElementById('poly-polyn-slider').addEventListener('input', function (e) {
+          state.polyN = Math.max(3, parseInt(e.target.value, 10) || 6);
           renderPolyhedra();
         });
       }
