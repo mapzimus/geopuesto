@@ -2534,6 +2534,159 @@ document.addEventListener('submit', function (e) {
   }
 });
 
+// ============================================================
+// Polyhedra Suite (Sprint B from V3_VISION.md) — additive module
+// ============================================================
+// Wraps a polyhedron around the sphere with vertex 0 anchored at the
+// current origin. Each vertex is a clickable Leaflet marker that chains
+// through goTo into the existing enrichment pipeline (Wikipedia, Street
+// View, satellite, etc.) — same architectural payoff as the Two-Point
+// variant. Default spin is 0; Stage 2 adds a spin slider.
+//
+// Math: window.ShapeEngine (async catalog load via .ready promise) +
+// window.Rotation (Rodrigues matrices, SLERP for edge arcs).
+
+let currentShape = null;  // catalog shape id, or null
+let shapeEngineReady = false;
+if (window.ShapeEngine && window.ShapeEngine.ready) {
+  window.ShapeEngine.ready.then(function () {
+    shapeEngineReady = true;
+    // If a shape was selected before catalog loaded, render now.
+    if (currentShape) renderPolyhedraOnMapsCurrent();
+  });
+}
+
+const originPolyhedraLayer = L.layerGroup().addTo(mapOrigin);
+const antipodePolyhedraLayer = L.layerGroup().addTo(mapAntipode);
+
+// Hardcoded labels so the dropdown renders before the catalog loads.
+// User-facing labels follow V3_VISION.md UI rule (no jargon at default).
+const POLYHEDRA_CHOICES = [
+  { id: 'tetrahedron',   label: 'Pyramid (tetrahedron) · 4 vertices' },
+  { id: 'cube',          label: 'Cube · 8 vertices' },
+  { id: 'octahedron',    label: 'Octahedron · 6 vertices' },
+  { id: 'icosahedron',   label: 'Star (icosahedron) · 12 vertices' },
+  { id: 'dodecahedron',  label: 'Dodecahedron · 20 vertices' },
+  { id: 'cuboctahedron', label: 'Vector Equilibrium (cuboctahedron) · 12 vertices' },
+];
+
+function buildPolyhedraModuleHtml(lat, lng, shapeId) {
+  if (lat == null || lng == null) return '';
+
+  const options = POLYHEDRA_CHOICES.map(function (s) {
+    const sel = (s.id === shapeId) ? ' selected' : '';
+    return '<option value="' + s.id + '"' + sel + '>' + s.label + '</option>';
+  }).join('');
+  const noneSel = shapeId ? '' : ' selected';
+
+  let detail = '';
+  if (shapeId && shapeEngineReady && window.ShapeEngine) {
+    try {
+      const cfg = window.ShapeEngine.configure(shapeId, { lat: lat, lon: lng }, 0);
+      detail = '<div style="margin-top:12px; font-size:12px; line-height:1.6;">' +
+               '<strong>' + cfg.shape.technicalLabel + '</strong> &middot; ' + cfg.vertices.length + ' vertices &middot; ' + cfg.edges.length + ' edges' +
+               '<div style="opacity:0.65; margin-top:4px;">' + (cfg.shape.description || '') + '</div>' +
+               '</div>';
+    } catch (e) {
+      detail = '<div style="margin-top:10px; opacity:0.55; font-size:11px;">(catalog load pending)</div>';
+    }
+  }
+
+  return '<div class="module full" id="polyhedra-module">' +
+    '<div class="module-bar">Polyhedra Suite</div>' +
+    '<div class="module-body" style="padding:12px; font-size:13px;">' +
+    '<p style="margin:0 0 10px; opacity:0.75;">Wrap a polyhedron around the sphere with vertex 0 anchored at your origin. Each vertex is clickable &mdash; chains through the enrichment pipeline.</p>' +
+    '<div style="display:flex; gap:6px; align-items:center;">' +
+    '<label style="opacity:0.6; font-size:12px;">Shape:</label>' +
+    '<select data-polyhedra-select style="flex:1; padding:6px 8px; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.18); color:inherit; font-family:inherit; font-size:12px; border-radius:4px;">' +
+    '<option value=""' + noneSel + '>&mdash; None &mdash;</option>' +
+    options +
+    '</select>' +
+    '</div>' +
+    detail +
+    '</div></div>';
+}
+
+function setPolyhedraShape(shapeId) {
+  currentShape = (shapeId && POLYHEDRA_CHOICES.some(function (s) { return s.id === shapeId; })) ? shapeId : null;
+  refreshPolyhedraModule();
+}
+
+function refreshPolyhedraModule() {
+  const el = document.getElementById('polyhedra-module');
+  if (!el) return;
+  const lat = currentOriginForEquator ? currentOriginForEquator.lat : null;
+  const lng = currentOriginForEquator ? currentOriginForEquator.lng : null;
+  const html = buildPolyhedraModuleHtml(lat, lng, currentShape);
+  if (!html) return;
+  const range = document.createRange();
+  range.selectNode(el);
+  const frag = range.createContextualFragment(html);
+  el.replaceWith(frag);
+  renderPolyhedraOnMapsCurrent();
+}
+
+function renderPolyhedraOnMapsCurrent() {
+  originPolyhedraLayer.clearLayers();
+  antipodePolyhedraLayer.clearLayers();
+  if (!currentOriginForEquator || !currentShape) return;
+  if (!shapeEngineReady || !window.ShapeEngine) return;
+
+  let cfg;
+  try {
+    cfg = window.ShapeEngine.configure(currentShape, {
+      lat: currentOriginForEquator.lat,
+      lon: currentOriginForEquator.lng,
+    }, 0);
+  } catch (e) { return; }
+
+  const halo = { color: '#000', weight: 5, opacity: 0.5, interactive: false, smoothFactor: 1.0 };
+  const edgeStyle = { color: '#a78bfa', weight: 2, opacity: 0.9, interactive: false, smoothFactor: 1.0 };
+  for (let i = 0; i < cfg.edgePolylines.length; i++) {
+    const poly = cfg.edgePolylines[i];
+    L.polyline(poly, halo).addTo(originPolyhedraLayer);
+    L.polyline(poly, edgeStyle).addTo(originPolyhedraLayer);
+    L.polyline(poly, halo).addTo(antipodePolyhedraLayer);
+    L.polyline(poly, edgeStyle).addTo(antipodePolyhedraLayer);
+  }
+
+  for (let v = 0; v < cfg.vertices.length; v++) {
+    const vert = cfg.vertices[v];
+    const isAnchor = (v === 0);
+    const style = {
+      radius: isAnchor ? 8 : 6,
+      color: isAnchor ? '#f26522' : '#a78bfa',
+      weight: 2,
+      fillColor: isAnchor ? '#f26522' : '#a78bfa',
+      fillOpacity: 0.85,
+    };
+    const labelTxt = isAnchor ? 'Vertex 0 (anchor)' : ('Vertex ' + v);
+    const popupHtml = '<strong>' + labelTxt + '</strong> &mdash; ' + cfg.shape.technicalLabel + '<br>' +
+                      vert.lat.toFixed(3) + '&deg;, ' + vert.lon.toFixed(3) + '&deg;<br>' +
+                      '<button data-polyhedra-goto="' + vert.lat + ',' + vert.lon + '" ' +
+                      'style="margin-top:6px; padding:4px 10px; background:#f26522; color:#0a0e14; ' +
+                      'border:none; cursor:pointer; font-family:inherit; font-size:11px; border-radius:3px;">' +
+                      'Set as origin</button>';
+    L.circleMarker([vert.lat, vert.lon], style).bindPopup(popupHtml).addTo(originPolyhedraLayer);
+    L.circleMarker([vert.lat, vert.lon], style).bindPopup(popupHtml).addTo(antipodePolyhedraLayer);
+  }
+}
+
+document.addEventListener('change', function (e) {
+  const sel = e.target.closest('[data-polyhedra-select]');
+  if (!sel) return;
+  setPolyhedraShape(sel.value || null);
+});
+document.addEventListener('click', function (e) {
+  const gotoBtn = e.target.closest('[data-polyhedra-goto]');
+  if (!gotoBtn) return;
+  e.preventDefault();
+  const parts = gotoBtn.dataset.polyhedraGoto.split(',').map(parseFloat);
+  if (parts.length === 2 && isFinite(parts[0]) && isFinite(parts[1]) && typeof goTo === 'function') {
+    goTo(parts[0], parts[1]);
+  }
+});
+
 function buildEquatorModuleHtml(lat, lng, cities, filters) {
   // Loading state: cities promise hasn't resolved yet (rare — only on first
   // visit + immediate origin pick within ~200 ms of page load)
@@ -3660,6 +3813,9 @@ async function goTo(lat, lng, opts) {
   // Curves Suite · Two-Point variant: re-render its layers against the new
   // origin if B is currently set. No-op when B is null.
   if (typeof renderTwoPointOnMapsCurrent === 'function') renderTwoPointOnMapsCurrent();
+  // Polyhedra Suite: re-render its layers against the new origin if a shape
+  // is currently selected. No-op when currentShape is null.
+  if (typeof renderPolyhedraOnMapsCurrent === 'function') renderPolyhedraOnMapsCurrent();
   // Phase 3b.1: render city pins on both maps right next to the ring. These
   // are the same cities surfaced in the panel — one more spatial channel.
   renderRingCities(lat, lng);
@@ -4417,11 +4573,14 @@ function renderInfo(lat, lng, data, nearby, wikiSummary, photos, sun, weather, c
   );
   // Sprint A: Two-Point Mode additive card. Empty string when no origin is set.
   const twoPointModule = buildTwoPointModuleHtml(lat, lng, currentB);
+  // Sprint B: Polyhedra Suite additive card. Empty string when no origin is set.
+  const polyhedraModule = buildPolyhedraModuleHtml(lat, lng, currentShape);
 
   const modules = [
     { html: heroModule, prio: 10000, size: "full" },
     { html: equatorModule, prio: 2000, size: "full" },
     { html: twoPointModule, prio: 1800, size: "full" },
+    { html: polyhedraModule, prio: 1700, size: "full" },
     { html: wikiModule, prio: 900, size: "full" },
     { html: quakeModule, prio: 500 + (bigQuake ? 8500 : 0), size: bigQuake ? "full" : "half" },
     { html: volcanoModule, prio: 470 + (closeVolcano ? 8200 : 0), size: closeVolcano ? "full" : "half" },
