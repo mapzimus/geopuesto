@@ -15,11 +15,13 @@ Single-file web app that shows what's on the exact opposite side of Earth from a
 Geolocation, Google APIs, and AISStream all need a real HTTP origin (not `file://`). Spin up a server:
 
 ```powershell
-cd C:\Users\mhowe\Documents\dev\maxwellhowegis\geopuesto
-python -m http.server 8000
+cd C:\Users\mhowe\Documents\dev\geopuesto
+python -m http.server 8001
 ```
 
-Then open http://localhost:8000.
+Then open http://localhost:8001 for the antipodal app, or http://localhost:8001/playground/ for the geometry sandbox.
+
+> Note: port 8001, not 8000 — TappyMaps runs on 8000 locally. See `playground/docs/` for sandbox-specific docs.
 
 ## Configuration
 
@@ -138,26 +140,37 @@ GitHub Pages at `maxwellhowegis.com/geopuesto/`:
 - MarineTraffic iframe loads slow over slow connections.
 - Mapillary tier search costs up to 3 API calls per antipode. Free tier has a generous quota but watch usage if traffic grows.
 
-## Files
+## Repo layout
 
-- `index.html` — the entire app (production)
-- `generate-og.py` — generates `og-image.png` from `og-image.svg` (build helper, run manually after editing the SVG)
-- `og-image.svg` / `og-image.png` — Open Graph social-card image (3.4 KB SVG → 88.8 KB rendered PNG)
-- `CLAUDE.md` — this file
-- `docs/` — planning + reference materials (not deployed)
-  - `docs/V2_PLAN.md` — current implementation plan (v2: antipodal ring, general equidistant ring, Geomates)
-  - `docs/geopuesto_master_spec.md` — full v2+ master spec with math, novelty claims, and long-term roadmap
-  - `docs/equidistant_geometry_demo.jsx` — Three.js visualization reference for v2 features
+This repo holds **two related apps** that share a sphere-math core:
+
+```
+geopuesto/
+├── index.html              ← the antipodal app (production, deployed at maxwellhowegis.com/geopuesto/)
+├── geometry.js             ← shared sphere kernel (used by BOTH apps)
+├── cities.js               ← shared GeoNames loader (used by BOTH apps)
+├── data/cities1000.json    ← shared dataset (~14 MB)
+├── geometry-tests.html     ← invariant tests for the shared kernel
+├── generate-og.py · og-image.* · preview-ring.html · CLAUDE.md (this file)
+└── playground/             ← geometry sandbox (Two-Point Mode, Polyhedra Suite, Curves Suite)
+    ├── index.html          ← the playground app entry point
+    ├── twoPoint.js, bearings.js, rotation.js, shapeEngine.js,
+    │   shapeCatalog.json, vertexCache.js, shareLink.js, exportGeo.js
+    └── docs/               ← V2_PLAN.md, V3_VISION.md, V3_ADDITIONS, master spec, previews
+```
+
+**Top level = the consumer antipode app.** Single-file, rich enrichment (Wikipedia / Street View / satellite / AIS / radio), as documented above. This is what `maxwellhowegis.com/geopuesto/` serves.
+
+**`playground/` = the geometry research sandbox.** Pure geometry — no API keys, no enrichment, no Wikipedia. Pick points, pick curves/shapes, see the math rendered. Deliberately stripped down. See [`playground/docs/V3_VISION.md`](playground/docs/V3_VISION.md) for the full architecture and [`playground/docs/V2_PLAN.md`](playground/docs/V2_PLAN.md) for the phased plan.
 
 ## Current development
 
-**v2 is in active planning.** See [`docs/V2_PLAN.md`](docs/V2_PLAN.md) for the phased implementation plan. Headline features:
+The two apps evolve independently now:
 
-1. **Antipodal Ring (v1 ship)** — cities along your "personal equator," the great circle perpendicular to your antipodal axis
-2. **General Equidistant Ring (v2 ship)** — same ring math generalized to any two user-picked points
-3. **Geomates (v2 IP)** — the Midpoint Pair (`M_near` = surface midpoint, `M_far` = its antipode) surfaced as a novel paired-discovery feature
+- **Antipodal app (this file's main subject):** mature. v1 + Phase 3b polish shipped. Ongoing roadmap items in "Smaller roadmap items" below.
+- **Playground (`playground/`):** Sprint A math (Two-Point Mode kernel) and Sprint B math (Polyhedra Suite engine + catalog) are landed and exercised by `playground/index.html`. Sprint C math (share links + GeoJSON/KML export) also landed. Next: clean up the playground page from its test-harness origins into a proper app.
 
-Stack stays pure JS — no FastAPI backend, no React rewrite, no service tier. The whole effort is an extension of `index.html` plus new sibling files (`geometry.js`, `cities.js`, `data/cities1000.json` — the comprehensive GeoNames dataset, ~169k cities, ~14 MB raw / ~4.7 MB gzipped).
+The two apps **share `geometry.js` and `cities.js` at the top level**. If you modify those, verify both `geometry-tests.html` (top-level invariants) and `playground/index.html` (which uses them via `../geometry.js`).
 
 ## Smaller roadmap items (not in v2 scope)
 
