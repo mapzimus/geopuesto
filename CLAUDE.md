@@ -168,9 +168,37 @@ geopuesto/
 The two apps evolve independently now:
 
 - **Antipodal app (this file's main subject):** mature. v1 + Phase 3b polish shipped. Ongoing roadmap items in "Smaller roadmap items" below.
-- **Playground (`playground/`):** Sprint A math (Two-Point Mode kernel) and Sprint B math (Polyhedra Suite engine + catalog) are landed and exercised by `playground/index.html`. Sprint C math (share links + GeoJSON/KML export) also landed. Next: clean up the playground page from its test-harness origins into a proper app.
+- **Playground (`playground/`):** ships three top-level categories live.
+  - **Two-Point Mode**: A→B orthodrome, perpendicular bisector, four named equidistant points (M, −M, n, −n), cross-track / along-track, bearing asymmetry.
+  - **Polyhedra Suite**: 13 shapes in catalog. 5 Platonics + cuboctahedron (explicit vertices). Truncated icosahedron, geodesic icosahedron at frequency k, n-prism, n-antiprism, Fibonacci sphere (parametric, via the `generators` registry in `shapeEngine.js`). Rhombic triacontahedron / Becker-Hagens grid (32 inline vertices, edges suppressed). Stella octangula (cube vertices, explicit star edges).
+  - **Curves Suite**: 4 variants — small-circle-at-d, loxodrome / rhumb line, portolan windrose (32 rhumb lines), isoazimuthal heading ring.
+  - Share + Export (Sprint C): URL-hash state for any configuration; GeoJSON + KML download.
 
-The two apps **share `geometry.js` and `cities.js` at the top level**. If you modify those, verify both `geometry-tests.html` (top-level invariants) and `playground/index.html` (which uses them via `../geometry.js`).
+The two apps **share `geometry.js` and `cities.js` at the top level**. `geometry.js` now exports
+`sampleGreatCircle`, `sampleSmallCircle`, `sampleLoxodrome`, `sampleIsoazimuthal` alongside the
+original kernel. If you modify these, verify both `geometry-tests.html` (top-level invariants)
+and `playground/index.html` (which uses them via `../geometry.js`).
+
+### Deferred (still on the playground roadmap)
+
+- **Compound polyhedra**: 5-tetrahedra and 5-cubes compounds — share dodecahedron vertices, need
+  explicit edge lists for the 5 interpenetrating subsets.
+- **Kepler-Poinsot stars**: 4 regular star polyhedra. Share Platonic vertex sets; differ only in
+  the star edge lists (pentagrams as faces, etc.).
+- **Vertex enrichment list (Polyhedra Stage 2 polish)**: nearest-city name per polyhedron vertex
+  via throttled Nominatim. Adds the "explore each vertex" UX the v2 docs emphasize. Needs the
+  Tier-1 rate-limit pipeline established before enabling.
+- **Analysis Suite (V3_VISION Phase 4)**: dataset overlays (NOAA earthquakes, magnetic anomalies,
+  shipwrecks), Monte Carlo random-rotation null model, spherical-harmonics decomposition. The
+  Becker-Hagens point set is in the catalog specifically to support these tests.
+- **Real-Earth Mode (Phase 6)**: ellipsoidal geodesics via Vincenty/Karney. Deferred indefinitely.
+
+### Parallel-session notes
+
+The other Claude session sometimes works in this repo concurrently (e.g., the share-link
+scroll-restore fix landed during a feature push and the rebase resolved cleanly). Pattern:
+small commits, frequent `git status` checks, push promptly. Rebase-then-push handles
+conflicts when both sessions modify nearby files.
 
 ## Smaller roadmap items (not in v2 scope)
 
