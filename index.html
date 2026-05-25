@@ -1958,8 +1958,25 @@ function renderPersonalEquator(lat, lng) {
   antipodeEquatorLayer.clearLayers();
   if (!window.Geometry) return;  // geometry.js not loaded — skip silently
   const P = Geometry.latLonToXYZ(lat, lng);
-  const polyline = Geometry.sampleGreatCircle(P, 360);
-  const segments = Geometry.antimeridianSplit(polyline);
+  // 720 samples (0.5° arc each) keeps the curve looking smooth when the GC
+  // runs at high latitudes — for near-equatorial origins the GC's max-lat
+  // approaches 90° and 360 samples render visibly polygonal.
+  const polyline = Geometry.sampleGreatCircle(P, 720);
+  // Two-stage cleanup before draw:
+  //   1) antimeridianSplit — break at ±180° longitude wraps so Leaflet
+  //      doesn't draw a line all the way across the map.
+  //   2) clipPolylineToLat at 85° — Web Mercator can't represent anything
+  //      past ~85.0511°, so samples in the polar caps all collapse to the
+  //      same y at the top/bottom map edge and Leaflet bridges them with a
+  //      flat horizontal stripe (visible bug for near-equatorial origins
+  //      where the GC max-lat approaches 90°).
+  const splitSegs = Geometry.antimeridianSplit(polyline);
+  const segments = [];
+  for (const seg of splitSegs) {
+    for (const clipped of Geometry.clipPolylineToLat(seg, 85)) {
+      segments.push(clipped);
+    }
+  }
   // Two-pass render: dark halo first for contrast against variable tile luminance
   // (continents vs ocean vs city labels), then amber line on top. Without the
   // halo, the line gets lost over white country labels and bright coastlines.

@@ -219,6 +219,58 @@
     return segments;
   }
 
+  /**
+   * Clip a polyline to the latitude band [−maxLat, +maxLat]. Splits the
+   * polyline wherever it crosses the band edges, interpolating to the exact
+   * boundary, and drops the out-of-band portion.
+   *
+   * Use case: Web Mercator (Leaflet's default CRS) is undefined past
+   * ~85.0511°. Polylines extending into the polar caps get all their samples
+   * clipped to the same y at the top/bottom edge, drawing as a horizontal
+   * stripe across the map instead of disappearing over the pole. Calling
+   * this with maxLat = 85 before rendering produces a faithful "the great
+   * circle exits the visible map" look instead.
+   *
+   * @param {Array<[number, number]>} polyline
+   * @param {number} maxLat  positive latitude (typically 85 for Web Mercator)
+   * @returns {Array<Array<[number, number]>>}  segments fully inside the band
+   */
+  function clipPolylineToLat(polyline, maxLat) {
+    if (!polyline || polyline.length === 0) return [];
+    if (!isFinite(maxLat) || maxLat <= 0 || maxLat >= 90) return [polyline];
+    const segments = [];
+    let current = [];
+    const inBand = function (pt) { return Math.abs(pt[0]) <= maxLat; };
+    const interpAtBand = function (a, b) {
+      // a is in band, b is out — return the [lat, lon] where the segment
+      // crosses lat = ±maxLat (the boundary on b's side).
+      const boundary = b[0] > 0 ? maxLat : -maxLat;
+      const t = (boundary - a[0]) / (b[0] - a[0]);
+      const lon = a[1] + t * (b[1] - a[1]);
+      return [boundary, lon];
+    };
+    if (inBand(polyline[0])) current.push(polyline[0]);
+    for (let i = 1; i < polyline.length; i++) {
+      const prev = polyline[i - 1];
+      const cur = polyline[i];
+      const prevIn = inBand(prev);
+      const curIn = inBand(cur);
+      if (prevIn && curIn) {
+        current.push(cur);
+      } else if (prevIn && !curIn) {
+        current.push(interpAtBand(prev, cur));
+        if (current.length >= 2) segments.push(current);
+        current = [];
+      } else if (!prevIn && curIn) {
+        current = [interpAtBand(cur, prev), cur];
+      }
+      // !prevIn && !curIn: both outside, drop. (Could re-enter and exit
+      // within one step, but for our sampling density that's negligible.)
+    }
+    if (current.length >= 2) segments.push(current);
+    return segments;
+  }
+
   // ---------------------------------------------------------------------------
   // The general equidistant ring (spec §22)
   // ---------------------------------------------------------------------------
@@ -372,6 +424,7 @@
     perpendicularBasis,
     sampleGreatCircle,
     antimeridianSplit,
+    clipPolylineToLat,
     equidistantRing,
     midpointPair,
     // City queries
