@@ -152,8 +152,8 @@
       <label>Curve type:
         <select id="curve-type-select">
           <option value="smallCircle" selected>Small circle at distance d</option>
+          <option value="loxodrome">Loxodrome / rhumb line (constant bearing)</option>
           <option value="isoazimuthal" disabled>Isoazimuthal heading ring (coming next)</option>
-          <option value="loxodrome" disabled>Loxodrome / rhumb line (coming next)</option>
           <option value="windrose" disabled>Portolan windrose (32 rhumb lines)</option>
         </select>
       </label>
@@ -161,6 +161,11 @@
     <div class="control-row" id="curve-distkm-row">
       <label style="flex: 1;">Distance d: <span id="curve-distkm-display">2000</span> km
         <input type="range" id="curve-distkm-slider" min="100" max="19500" value="2000" step="100" style="width: 100%;">
+      </label>
+    </div>
+    <div class="control-row" id="curve-bearing-row" style="display:none;">
+      <label style="flex: 1;">Bearing β: <span id="curve-bearing-display">45</span>° &nbsp;<span style="opacity:0.6">(0 = N, 90 = E, 180 = S, 270 = W)</span>
+        <input type="range" id="curve-bearing-slider" min="0" max="359" value="45" step="1" style="width: 100%;">
       </label>
     </div>
     <div id="curves-map"></div>
@@ -277,6 +282,16 @@
         curveP: { lat: 42.5195, lon: -70.8967 },  // Curves Suite center
         curveType: 'smallCircle',
         curveDistKm: 2000,
+        curveBearingDeg: 45,
+      };
+
+      // Per-curve-type config: which control rows to show + which math fn to call.
+      // Future variants (isoazimuthal, windrose) follow this pattern.
+      const CURVE_TYPES = {
+        smallCircle:   { needsBearing: false, label: 'small circle' },
+        loxodrome:     { needsBearing: true,  label: 'loxodrome (rhumb line)' },
+        isoazimuthal:  { needsBearing: true,  label: 'isoazimuthal heading ring' },
+        windrose:      { needsBearing: false, label: 'portolan windrose' },
       };
 
       // Map each parametric shape to its control row + state key + param name
@@ -432,50 +447,71 @@
         curvesLayer.polyline.clearLayers();
         curvesLayer.pin.clearLayers();
         document.getElementById('curve-distkm-display').textContent = state.curveDistKm;
+        document.getElementById('curve-bearing-display').textContent = state.curveBearingDeg;
 
-        if (state.curveType !== 'smallCircle') {
-          // Only smallCircle implemented for now; placeholder caption.
-          document.getElementById('curve-caption').textContent =
-            'This curve variant is not yet implemented. Try "Small circle at distance d".';
-          return;
-        }
+        // Show the bearing row iff the current curve type needs a bearing.
+        const typeCfg = CURVE_TYPES[state.curveType] || CURVE_TYPES.smallCircle;
+        document.getElementById('curve-bearing-row').style.display = typeCfg.needsBearing ? '' : 'none';
+
         if (!window.Geometry) return;
 
-        // Anchor pin at P.
+        // Always draw the anchor pin.
         L.circleMarker([state.curveP.lat, state.curveP.lon], {
-          radius: 7,
-          color: '#f26522',
-          weight: 2,
-          fillColor: '#f26522',
-          fillOpacity: 1,
+          radius: 7, color: '#f26522', weight: 2, fillColor: '#f26522', fillOpacity: 1,
         }).bindTooltip(
           'Center P<br>' + state.curveP.lat.toFixed(3) + ', ' + state.curveP.lon.toFixed(3),
           { direction: 'top' }
         ).addTo(curvesLayer.pin);
 
-        // Compute the small circle.
-        const dRad = state.curveDistKm / Geometry.EARTH_R_KM;
-        const samples = Geometry.sampleSmallCircle(state.curveP, dRad, 360);
-        const segments = Geometry.antimeridianSplit(samples);
-        // Halo + line pattern to read against any basemap luminance.
+        // Halo + line styling, identical across curve types.
         const halo = { color: '#000', weight: 5, opacity: 0.5, interactive: false, smoothFactor: 1.0 };
         const line = { color: '#00bfa5', weight: 2.5, opacity: 0.95, interactive: false, smoothFactor: 1.0 };
+
+        let samples, caption;
+        if (state.curveType === 'smallCircle') {
+          const dRad = state.curveDistKm / Geometry.EARTH_R_KM;
+          samples = Geometry.sampleSmallCircle(state.curveP, dRad, 360);
+          const angDeg = (dRad * 180 / Math.PI).toFixed(1);
+          const fraction = (dRad / Math.PI).toFixed(3);
+          const note = dRad >= Math.PI - 1e-6
+            ? ' — at antipode (degenerate point)'
+            : dRad >= Math.PI / 2
+              ? ' — past the horizon great circle (P’s great circle is at d = π/2 ≈ 10,007.5 km)'
+              : '';
+          caption = 'Small circle at d = ' + state.curveDistKm + ' km (' + angDeg + '° of arc, ' + fraction + ' of π).' + note;
+        } else if (state.curveType === 'loxodrome') {
+          samples = Geometry.sampleLoxodrome(state.curveP, state.curveBearingDeg, state.curveDistKm, 240);
+          // Tick the destination pin in teal so users can read the rhumb-line endpoint.
+          const tail = samples[samples.length - 1];
+          if (tail) {
+            L.circleMarker([tail[0], tail[1]], {
+              radius: 5, color: '#00bfa5', weight: 2, fillColor: '#00bfa5', fillOpacity: 1,
+            }).bindTooltip(
+              'Rhumb endpoint<br>' + tail[0].toFixed(3) + ', ' + tail[1].toFixed(3),
+              { direction: 'top' }
+            ).addTo(curvesLayer.pin);
+          }
+          const compass = (state.curveBearingDeg + 360) % 360;
+          const card = compass < 22.5 || compass >= 337.5 ? 'N' :
+                       compass < 67.5 ? 'NE' : compass < 112.5 ? 'E' :
+                       compass < 157.5 ? 'SE' : compass < 202.5 ? 'S' :
+                       compass < 247.5 ? 'SW' : compass < 292.5 ? 'W' : 'NW';
+          const polarNote = (tail && Math.abs(tail[0]) >= 89.4)
+            ? ' — path clipped near the pole (rhumb lines spiral infinitely into a pole; truncated at ±89.5°)'
+            : '';
+          caption = 'Loxodrome at constant bearing ' + state.curveBearingDeg + '° (' + card + ') for ' + state.curveDistKm + ' km. Constant compass course — straight line on a Mercator map.' + polarNote;
+        } else {
+          document.getElementById('curve-caption').textContent =
+            'The "' + typeCfg.label + '" variant is not yet implemented. Try "Small circle at distance d" or "Loxodrome".';
+          return;
+        }
+
+        const segments = Geometry.antimeridianSplit(samples);
         for (const seg of segments) {
           L.polyline(seg, halo).addTo(curvesLayer.polyline);
           L.polyline(seg, line).addTo(curvesLayer.polyline);
         }
-
-        // Caption summarizes the geometry (angular vs surface distance).
-        const angDeg = (dRad * 180 / Math.PI).toFixed(1);
-        const fraction = (dRad / Math.PI).toFixed(3);
-        const note = dRad >= Math.PI - 1e-6
-          ? ' — at antipode (degenerate point)'
-          : dRad >= Math.PI / 2
-            ? ' — past the horizon great circle (P’s great circle is at d = π/2 ≈ 10,007.5 km)'
-            : '';
-        document.getElementById('curve-caption').textContent =
-          'Small circle at d = ' + state.curveDistKm + ' km (' + angDeg + '° of arc, ' +
-          fraction + ' of π).' + note;
+        document.getElementById('curve-caption').textContent = caption;
       }
 
       function bindCurvesInputs() {
@@ -492,6 +528,11 @@
         });
         document.getElementById('curve-distkm-slider').addEventListener('input', function (e) {
           state.curveDistKm = parseInt(e.target.value, 10) || 2000;
+          renderCurves();
+        });
+        document.getElementById('curve-bearing-slider').addEventListener('input', function (e) {
+          state.curveBearingDeg = parseInt(e.target.value, 10);
+          if (!isFinite(state.curveBearingDeg)) state.curveBearingDeg = 45;
           renderCurves();
         });
       }

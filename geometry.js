@@ -162,6 +162,66 @@
   }
 
   /**
+   * Sample a loxodrome (rhumb line) — the path of constant compass bearing
+   * from a start point P. Closed-form via Mercator linearization: the rhumb
+   * line is a straight line in (longitude, Mercator-y) space because
+   * Mercator's y-coordinate is the inverse Gudermannian
+   *   y(φ) = ln(tan(π/4 + φ/2))
+   * whose derivative is sec(φ), exactly canceling the cos(φ) term in the
+   * longitude/latitude relationship.
+   *
+   * Math:
+   *   φ(s) = φ₀ + (s/R)·cos(β)        — latitude is linear in arc length
+   *   λ(s) = λ₀ + tan(β)·[ψ(φ(s))-ψ(φ₀)]   for cos(β) ≠ 0
+   *   λ(s) = λ₀ + (s·sin(β))/(R·cos(φ₀))   for due E/W (β = ±π/2)
+   * where ψ(φ) = ln(tan(π/4 + φ/2)) is Mercator's inverse Gudermannian.
+   *
+   * Clamping: φ is clamped to ±89.5° before computing ψ, so a rhumb line
+   * approaching the pole spirals there visibly but doesn't blow up to NaN.
+   * Beyond the clamp the path is truncated (returned polyline ends early).
+   *
+   * @param {{lat:number, lon:number}} P         start point (degrees)
+   * @param {number} bearingDeg                  initial bearing (0 = N, 90 = E)
+   * @param {number} distanceKm                  total arc length along the rhumb
+   * @param {number} [nSamples=200]
+   * @returns {Array<[number, number]>}          polyline; NOT antimeridian-split
+   */
+  function sampleLoxodrome(P, bearingDeg, distanceKm, nSamples) {
+    if (nSamples == null) nSamples = 200;
+    const beta = bearingDeg * Math.PI / 180;
+    const phi0 = P.lat * Math.PI / 180;
+    const lam0 = P.lon * Math.PI / 180;
+    const cosB = Math.cos(beta);
+    const sinB = Math.sin(beta);
+    const POLE_CLAMP = (89.5) * Math.PI / 180;  // ±89.5° before Mercator blows up
+    const psi0 = Math.log(Math.tan(Math.PI / 4 + clamp(phi0, -POLE_CLAMP, POLE_CLAMP) / 2));
+    const out = [];
+    for (let i = 0; i <= nSamples; i++) {
+      const s = (i / nSamples) * distanceKm;
+      const sR = s / EARTH_R_KM;
+      let phi, lam;
+      if (Math.abs(cosB) < 1e-12) {
+        // Due east or due west: constant latitude
+        phi = phi0;
+        lam = lam0 + sinB * sR / Math.cos(phi0);
+      } else {
+        phi = phi0 + sR * cosB;
+        const phiClamped = clamp(phi, -POLE_CLAMP, POLE_CLAMP);
+        const psi = Math.log(Math.tan(Math.PI / 4 + phiClamped / 2));
+        lam = lam0 + (sinB / cosB) * (psi - psi0);
+        // Stop drawing once we've effectively reached the pole — the path
+        // beyond is a spiral that doesn't render meaningfully.
+        if (Math.abs(phi) > POLE_CLAMP + 1e-6) {
+          out.push([phiClamped * 180 / Math.PI, lam * 180 / Math.PI]);
+          break;
+        }
+      }
+      out.push([phi * 180 / Math.PI, lam * 180 / Math.PI]);
+    }
+    return out;
+  }
+
+  /**
    * Sample a small circle on the unit sphere: the locus of points at angular
    * distance `dRad` (radians) from center point P. At dRad=0 collapses to a
    * point; at dRad=π/2 it's the great circle whose pole is P; at dRad=π it's
@@ -466,6 +526,7 @@
     perpendicularBasis,
     sampleGreatCircle,
     sampleSmallCircle,
+    sampleLoxodrome,
     antimeridianSplit,
     clipPolylineToLat,
     equidistantRing,
