@@ -161,6 +161,48 @@
     return out;
   }
 
+  /**
+   * Sample a small circle on the unit sphere: the locus of points at angular
+   * distance `dRad` (radians) from center point P. At dRad=0 collapses to a
+   * point; at dRad=π/2 it's the great circle whose pole is P; at dRad=π it's
+   * P's antipode. Foundational for the Curves Suite — "ring of cities at d km
+   * from here," loxodromes (constant-bearing path, intersected with small
+   * circles), isoazimuthal curves (which are families of small-circle points).
+   *
+   * Math: build an orthonormal frame {P, E, N} where E, N span the plane
+   * perpendicular to P. Walk around the small circle as
+   *   Q(t) = cos(dRad)·P + sin(dRad)·(cos(t)·E + sin(t)·N)
+   * for t ∈ [0, 2π).
+   *
+   * @param {{lat:number, lon:number}} P  center point (degrees)
+   * @param {number} dRad                 angular distance from P (radians)
+   * @param {number} [nSamples=360]
+   * @returns {Array<[number, number]>}   polyline as [[lat, lon], ...]
+   *                                       Does NOT split at the antimeridian
+   *                                       — use antimeridianSplit() for that.
+   */
+  function sampleSmallCircle(P, dRad, nSamples) {
+    if (nSamples == null) nSamples = 360;
+    const p = latLonToXYZ(P.lat, P.lon);
+    const basis = perpendicularBasis(p);  // { Nperp, Eperp } both ⟂ p
+    const cosD = Math.cos(dRad);
+    const sinD = Math.sin(dRad);
+    const out = new Array(nSamples);
+    for (let i = 0; i < nSamples; i++) {
+      const t = (i / nSamples) * 2 * Math.PI;
+      const c = Math.cos(t);
+      const s = Math.sin(t);
+      const q = [
+        cosD * p[0] + sinD * (c * basis.Eperp[0] + s * basis.Nperp[0]),
+        cosD * p[1] + sinD * (c * basis.Eperp[1] + s * basis.Nperp[1]),
+        cosD * p[2] + sinD * (c * basis.Eperp[2] + s * basis.Nperp[2]),
+      ];
+      const ll = xyzToLatLon(q);
+      out[i] = [ll.lat, ll.lon];
+    }
+    return out;
+  }
+
   // ---------------------------------------------------------------------------
   // Antimeridian splitting (spec §11.2, §17.1 — P0 blocker)
   // ---------------------------------------------------------------------------
@@ -423,6 +465,7 @@
     // Spherical geometry constructions
     perpendicularBasis,
     sampleGreatCircle,
+    sampleSmallCircle,
     antimeridianSplit,
     clipPolylineToLat,
     equidistantRing,

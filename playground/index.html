@@ -31,7 +31,7 @@
     .readout .value { color: var(--fg); }
     .readout.warn { background: rgba(255, 90, 74, 0.08); border-left-color: var(--fail); }
     .readout.warn .value { color: var(--fail); }
-    #salem-map { height: 360px; margin-top: 8px; border: 1px solid var(--border); border-radius: 4px; }
+    #salem-map, #curves-map { height: 360px; margin-top: 8px; border: 1px solid var(--border); border-radius: 4px; }
     .map-caption { color: var(--muted); font-family: var(--mono); font-size: 11px; margin-top: 6px; }
     .control-row { display: flex; gap: 12px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; font-family: var(--mono); font-size: 12px; }
     .control-row label { display: flex; flex-direction: column; gap: 4px; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; }
@@ -135,6 +135,37 @@
     <div id="salem-map"></div>
     <div class="map-caption" id="poly-caption">
       Vertex 0 anchored at the input above. Spin rotates the polyhedron around that axis.
+    </div>
+  </section>
+
+  <section>
+    <h2>Curves Suite &middot; loci on the sphere</h2>
+    <div class="map-caption" style="margin-bottom: 10px;">
+      Pick a center point P and a curve type. Each variant of the Curves Suite
+      is &ldquo;from a point, draw this kind of line/curve.&rdquo; The unifying
+      abstraction from <a href="docs/V3_ADDITIONS_2026-05-24.md">V3_ADDITIONS</a>.
+    </div>
+    <div class="control-row">
+      <label>Center P:
+        <input type="text" id="curve-p-input" value="42.5195,-70.8967" placeholder="lat, lon">
+      </label>
+      <label>Curve type:
+        <select id="curve-type-select">
+          <option value="smallCircle" selected>Small circle at distance d</option>
+          <option value="isoazimuthal" disabled>Isoazimuthal heading ring (coming next)</option>
+          <option value="loxodrome" disabled>Loxodrome / rhumb line (coming next)</option>
+          <option value="windrose" disabled>Portolan windrose (32 rhumb lines)</option>
+        </select>
+      </label>
+    </div>
+    <div class="control-row" id="curve-distkm-row">
+      <label style="flex: 1;">Distance d: <span id="curve-distkm-display">2000</span> km
+        <input type="range" id="curve-distkm-slider" min="100" max="19500" value="2000" step="100" style="width: 100%;">
+      </label>
+    </div>
+    <div id="curves-map"></div>
+    <div class="map-caption" id="curve-caption">
+      Small circle: locus of points at angular distance d/R from P. Pure great-circle math (no flat-Earth fudging).
     </div>
   </section>
 
@@ -243,6 +274,9 @@
         fibN: 100,    // fibonacciSphere
         geoK: 2,      // geodesicIcosahedron frequency
         polyN: 6,     // nPrism / nAntiprism
+        curveP: { lat: 42.5195, lon: -70.8967 },  // Curves Suite center
+        curveType: 'smallCircle',
+        curveDistKm: 2000,
       };
 
       // Map each parametric shape to its control row + state key + param name
@@ -370,6 +404,95 @@
           document.getElementById('poly-caption').textContent =
             cfg.shape.technicalLabel + ' · ' + cfg.vertices.length + ' vertices · ' +
             cfg.edges.length + ' edges · spin ' + state.spinDeg + '°';
+        });
+      }
+
+      // ---------------------------------------------------------------
+      // Curves Suite (V3_ADDITIONS "Open Question" — the third top-level
+      // category alongside Two-Point and Polyhedra). Currently ships with
+      // small-circle-at-distance-d; isoazimuthal / loxodrome / windrose
+      // variants follow the same UI pattern.
+      // ---------------------------------------------------------------
+      let curvesMap = null;
+      const curvesLayer = { polyline: null, pin: null };
+
+      function ensureCurvesMap() {
+        if (curvesMap) return curvesMap;
+        curvesMap = L.map('curves-map', { worldCopyJump: true }).setView([20, -30], 1);
+        L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+          attribution: 'Esri Dark Gray Canvas', maxZoom: 16, subdomains: ['', ''],
+        }).addTo(curvesMap);
+        curvesLayer.polyline = L.layerGroup().addTo(curvesMap);
+        curvesLayer.pin = L.layerGroup().addTo(curvesMap);
+        return curvesMap;
+      }
+
+      function renderCurves() {
+        ensureCurvesMap();
+        curvesLayer.polyline.clearLayers();
+        curvesLayer.pin.clearLayers();
+        document.getElementById('curve-distkm-display').textContent = state.curveDistKm;
+
+        if (state.curveType !== 'smallCircle') {
+          // Only smallCircle implemented for now; placeholder caption.
+          document.getElementById('curve-caption').textContent =
+            'This curve variant is not yet implemented. Try "Small circle at distance d".';
+          return;
+        }
+        if (!window.Geometry) return;
+
+        // Anchor pin at P.
+        L.circleMarker([state.curveP.lat, state.curveP.lon], {
+          radius: 7,
+          color: '#f26522',
+          weight: 2,
+          fillColor: '#f26522',
+          fillOpacity: 1,
+        }).bindTooltip(
+          'Center P<br>' + state.curveP.lat.toFixed(3) + ', ' + state.curveP.lon.toFixed(3),
+          { direction: 'top' }
+        ).addTo(curvesLayer.pin);
+
+        // Compute the small circle.
+        const dRad = state.curveDistKm / Geometry.EARTH_R_KM;
+        const samples = Geometry.sampleSmallCircle(state.curveP, dRad, 360);
+        const segments = Geometry.antimeridianSplit(samples);
+        // Halo + line pattern to read against any basemap luminance.
+        const halo = { color: '#000', weight: 5, opacity: 0.5, interactive: false, smoothFactor: 1.0 };
+        const line = { color: '#00bfa5', weight: 2.5, opacity: 0.95, interactive: false, smoothFactor: 1.0 };
+        for (const seg of segments) {
+          L.polyline(seg, halo).addTo(curvesLayer.polyline);
+          L.polyline(seg, line).addTo(curvesLayer.polyline);
+        }
+
+        // Caption summarizes the geometry (angular vs surface distance).
+        const angDeg = (dRad * 180 / Math.PI).toFixed(1);
+        const fraction = (dRad / Math.PI).toFixed(3);
+        const note = dRad >= Math.PI - 1e-6
+          ? ' — at antipode (degenerate point)'
+          : dRad >= Math.PI / 2
+            ? ' — past the horizon great circle (P’s great circle is at d = π/2 ≈ 10,007.5 km)'
+            : '';
+        document.getElementById('curve-caption').textContent =
+          'Small circle at d = ' + state.curveDistKm + ' km (' + angDeg + '° of arc, ' +
+          fraction + ' of π).' + note;
+      }
+
+      function bindCurvesInputs() {
+        document.getElementById('curve-p-input').addEventListener('change', function (e) {
+          const p = parseLatLon(e.target.value);
+          if (p) {
+            state.curveP = p;
+            renderCurves();
+          }
+        });
+        document.getElementById('curve-type-select').addEventListener('change', function (e) {
+          state.curveType = e.target.value;
+          renderCurves();
+        });
+        document.getElementById('curve-distkm-slider').addEventListener('input', function (e) {
+          state.curveDistKm = parseInt(e.target.value, 10) || 2000;
+          renderCurves();
         });
       }
 
@@ -529,9 +652,11 @@
       wireSprintC();
       bindTwoPointInputs();
       bindPolyhedraInputs();
+      bindCurvesInputs();
       renderTwoPoint();
       renderCrossTrack();
       renderPolyhedra();
+      renderCurves();
 
     })();
   </script>
