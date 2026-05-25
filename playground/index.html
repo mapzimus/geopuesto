@@ -31,7 +31,7 @@
     .readout .value { color: var(--fg); }
     .readout.warn { background: rgba(255, 90, 74, 0.08); border-left-color: var(--fail); }
     .readout.warn .value { color: var(--fail); }
-    #salem-map, #curves-map { height: 360px; margin-top: 8px; border: 1px solid var(--border); border-radius: 4px; }
+    #salem-map, #curves-map, #analysis-map { height: 360px; margin-top: 8px; border: 1px solid var(--border); border-radius: 4px; }
     .map-caption { color: var(--muted); font-family: var(--mono); font-size: 11px; margin-top: 6px; }
     .control-row { display: flex; gap: 12px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; font-family: var(--mono); font-size: 12px; }
     .control-row label { display: flex; flex-direction: column; gap: 4px; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; }
@@ -181,6 +181,32 @@
     <div class="map-caption" id="curve-caption">
       Small circle: locus of points at angular distance d/R from P. Pure great-circle math (no flat-Earth fudging).
     </div>
+  </section>
+
+  <section>
+    <h2>Analysis Suite &middot; dataset overlays (v0)</h2>
+    <div class="map-caption" style="margin-bottom: 10px;">
+      Real geophysical data on the sphere. The basic ingredient for the
+      Becker-Hagens spatial-statistics test in
+      <a href="docs/V3_VISION.md">V3_VISION</a> Phase 4 — &ldquo;does this
+      alleged Earth grid coincide with real anomalies more than chance?&rdquo;
+      The current overlay is USGS recent earthquakes; future variants will
+      add volcanoes, magnetic anomalies, shipwrecks, and Monte Carlo
+      null-hypothesis testing.
+    </div>
+    <div class="control-row">
+      <label>Dataset:
+        <select id="analysis-source">
+          <option value="usgs-25-week" selected>USGS earthquakes (M ≥ 2.5, last 7 days)</option>
+          <option value="usgs-45-month" disabled>USGS earthquakes (M ≥ 4.5, last 30 days &mdash; coming next)</option>
+          <option value="volcanoes" disabled>Smithsonian active volcanoes (coming next)</option>
+        </select>
+      </label>
+      <button id="analysis-load-btn">Load + render</button>
+      <button id="analysis-clear-btn" style="border-color: var(--border); background: transparent; color: var(--fg);">Clear</button>
+    </div>
+    <div id="analysis-map"></div>
+    <div class="map-caption" id="analysis-caption">Click &ldquo;Load + render&rdquo; to fetch the dataset. Markers are sized + colored by magnitude (gray ≤ 4, orange 4-5, red ≥ 5).</div>
   </section>
 
   <section>
@@ -713,6 +739,89 @@
       }
 
       // ---------------------------------------------------------------
+      // Analysis Suite (v0) — overlay real geophysical datasets on the
+      // sphere. Currently ships with USGS recent earthquakes; future
+      // variants from V3_VISION Phase 4: volcanoes, magnetic anomalies,
+      // shipwrecks, plus Voronoi cells around point sets + Monte Carlo
+      // null-hypothesis tests for "is this grid coincidence real?"
+      // ---------------------------------------------------------------
+      let analysisMap = null;
+      const analysisLayer = L.layerGroup();
+
+      function ensureAnalysisMap() {
+        if (analysisMap) return analysisMap;
+        analysisMap = L.map('analysis-map', { worldCopyJump: true }).setView([20, 0], 1);
+        L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+          attribution: 'Esri Dark Gray Canvas', maxZoom: 16, subdomains: ['', ''],
+        }).addTo(analysisMap);
+        analysisLayer.addTo(analysisMap);
+        return analysisMap;
+      }
+
+      async function loadAnalysisDataset() {
+        const caption = document.getElementById('analysis-caption');
+        const source = document.getElementById('analysis-source').value;
+        ensureAnalysisMap();
+        analysisLayer.clearLayers();
+        caption.textContent = 'Fetching ' + source + '…';
+        let url;
+        if (source === 'usgs-25-week') {
+          url = 'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_week.geojson';
+        } else {
+          caption.textContent = 'Unknown dataset ' + source;
+          return;
+        }
+        try {
+          const r = await fetch(url);
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          const j = await r.json();
+          const features = j.features || [];
+          let minMag = Infinity, maxMag = -Infinity;
+          for (const f of features) {
+            const coords = (f.geometry && f.geometry.coordinates) || null;
+            if (!coords) continue;
+            // GeoJSON stores coordinates as [lon, lat, depth].
+            const lon = coords[0], lat = coords[1];
+            const mag = f.properties.mag != null ? f.properties.mag : 0;
+            if (mag < minMag) minMag = mag;
+            if (mag > maxMag) maxMag = mag;
+            const place = f.properties.place || '(unknown location)';
+            const time = new Date(f.properties.time).toUTCString();
+            const depth = coords[2] != null ? coords[2].toFixed(0) + ' km depth' : '';
+            // Marker scales with magnitude; color tier matches the caption.
+            const radius = Math.max(2, mag * 1.5);
+            const color = mag >= 5 ? '#ff5a4a' : mag >= 4 ? '#f26522' : '#7c8aa8';
+            L.circleMarker([lat, lon], {
+              radius: radius,
+              color: color,
+              weight: 1,
+              fillColor: color,
+              fillOpacity: 0.55,
+            }).bindTooltip(
+              'M' + mag.toFixed(1) + ' — ' + place + '<br>' + time + (depth ? ' · ' + depth : ''),
+              { direction: 'top' }
+            ).addTo(analysisLayer);
+          }
+          caption.textContent = features.length + ' earthquakes rendered (M ' +
+            (isFinite(minMag) ? minMag.toFixed(1) : '?') + '–' +
+            (isFinite(maxMag) ? maxMag.toFixed(1) : '?') + ', USGS GeoJSON feed). ' +
+            'Compare against polyhedron configurations above — the Becker-Hagens grid (rhombic triacontahedron, 32 verts) is the classic claim to test.';
+        } catch (e) {
+          caption.textContent = 'Failed to fetch USGS feed: ' + e.message;
+        }
+      }
+
+      function clearAnalysis() {
+        if (analysisLayer) analysisLayer.clearLayers();
+        document.getElementById('analysis-caption').textContent = 'Cleared. Click "Load + render" to fetch again.';
+      }
+
+      function bindAnalysisInputs() {
+        document.getElementById('analysis-load-btn').addEventListener('click', loadAnalysisDataset);
+        document.getElementById('analysis-clear-btn').addEventListener('click', clearAnalysis);
+      }
+
+      // ---------------------------------------------------------------
       // Sprint C — Share + Export from current state
       // ---------------------------------------------------------------
       function currentShareConfig() {
@@ -871,6 +980,7 @@
       bindTwoPointInputs();
       bindPolyhedraInputs();
       bindCurvesInputs();
+      bindAnalysisInputs();
       renderTwoPoint();
       renderCrossTrack();
       renderPolyhedra();
