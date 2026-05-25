@@ -1741,6 +1741,13 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="geometry.js"></script>
 <script src="cities.js"></script>
+<script src="twoPoint.js"></script>
+<script src="bearings.js"></script>
+<script src="rotation.js"></script>
+<script src="shapeEngine.js"></script>
+<script src="vertexCache.js"></script>
+<script src="shareLink.js"></script>
+<script src="exportGeo.js"></script>
 <script>
 // ============================================================
 //  CONFIG — paste your API keys here to unlock extra modules.
@@ -2318,6 +2325,214 @@ function summarizeByContinent(matches) {
   }
   return counts;
 }
+
+// ============================================================
+// Curves Suite · Two-Point variant (Sprint A from V3_VISION.md)
+// ============================================================
+// First member of the eventual Curves Suite (V3_ADDITIONS_2026-05-24.md
+// "Open Question"). Shared abstraction: pick a point, pick a curve type,
+// render it, enrich cities along it. This variant takes TWO points and
+// yields the A-B orthodrome + perpendicular-bisector + four named
+// equidistant points (M, -M, n, -n). Future variants: isoazimuthal curves,
+// loxodromes/rhumb lines, portolan windroses, small circles at distance d.
+//
+// Math: window.TwoPoint + window.Bearings.
+// Map rendering: mirrors renderPersonalEquator's layer-group pattern (line ~1963).
+
+let currentB = null;  // {lat, lng} or null — second point for the orthodrome variant
+
+// Layer groups for the orthodrome + bisector polylines and the named-point
+// pins. Cleared and redrawn on every B change or origin change.
+const originTwoPointLayer = L.layerGroup().addTo(mapOrigin);
+const antipodeTwoPointLayer = L.layerGroup().addTo(mapAntipode);
+
+function renderTwoPointOnMapsCurrent() {
+  originTwoPointLayer.clearLayers();
+  antipodeTwoPointLayer.clearLayers();
+  if (!currentOriginForEquator || !currentB) return;
+  if (!window.Geometry || !window.TwoPoint) return;
+
+  const A = { lat: currentOriginForEquator.lat, lon: currentOriginForEquator.lng };
+  const B = { lat: currentB.lat, lon: currentB.lng };
+  const derived = window.TwoPoint.derive(A, B);
+  if (derived.degenerate) return;
+
+  const G = window.Geometry;
+  const a = G.latLonToXYZ(A.lat, A.lon);
+  const b = G.latLonToXYZ(B.lat, B.lon);
+  const orthoPole = G.normalize(G.cross(a, b));
+  const bisectorPole = G.normalize(G.sub(a, b));
+  const orthoSegs = G.antimeridianSplit(G.sampleGreatCircle(orthoPole, 360));
+  const bisectorSegs = G.antimeridianSplit(G.sampleGreatCircle(bisectorPole, 360));
+
+  // Match the equator's halo+line pattern so the new lines read against
+  // variable basemap luminance (continents vs ocean vs city labels).
+  const halo = { color: '#000', weight: 6, opacity: 0.55, interactive: false, smoothFactor: 1.0 };
+  const orthoLineStyle = { color: '#f26522', weight: 3, opacity: 1.0, interactive: false, smoothFactor: 1.0 };
+  const bisectorLineStyle = { color: '#00bfa5', weight: 3, opacity: 0.9, dashArray: '8,6', interactive: false, smoothFactor: 1.0 };
+
+  for (const seg of orthoSegs) {
+    L.polyline(seg, halo).addTo(originTwoPointLayer);
+    L.polyline(seg, orthoLineStyle).addTo(originTwoPointLayer);
+    L.polyline(seg, halo).addTo(antipodeTwoPointLayer);
+    L.polyline(seg, orthoLineStyle).addTo(antipodeTwoPointLayer);
+  }
+  for (const seg of bisectorSegs) {
+    L.polyline(seg, halo).addTo(originTwoPointLayer);
+    L.polyline(seg, bisectorLineStyle).addTo(originTwoPointLayer);
+    L.polyline(seg, halo).addTo(antipodeTwoPointLayer);
+    L.polyline(seg, bisectorLineStyle).addTo(antipodeTwoPointLayer);
+  }
+
+  // Five pins: B itself + the four named equidistant points. Each popup has
+  // a "Set as origin" button that chains through goTo via event delegation.
+  const pins = [
+    { p: { lat: B.lat, lon: B.lon }, label: 'B', desc: 'second point', color: '#00bfa5' },
+    { p: derived.M, label: 'M', desc: 'midpoint of A&rarr;B arc', color: '#3b82f6' },
+    { p: derived.mAntipode, label: '&minus;M', desc: 'Geomate (antipodal midpoint)', color: '#3b82f6' },
+    { p: derived.n, label: 'n', desc: 'north pole of the A&ndash;B great circle', color: '#fbbf24' },
+    { p: derived.nAntipode, label: '&minus;n', desc: 'south pole', color: '#fbbf24' },
+  ];
+  for (const pin of pins) {
+    const style = { radius: 7, color: pin.color, weight: 2, fillColor: pin.color, fillOpacity: 0.85 };
+    const popupHtml = '<strong>' + pin.label + '</strong> &mdash; ' + pin.desc + '<br>' +
+                      pin.p.lat.toFixed(3) + '&deg;, ' + pin.p.lon.toFixed(3) + '&deg;<br>' +
+                      '<button data-twopoint-goto="' + pin.p.lat + ',' + pin.p.lon + '" ' +
+                      'style="margin-top:6px; padding:4px 10px; background:#f26522; color:#0a0e14; ' +
+                      'border:none; cursor:pointer; font-family:inherit; font-size:11px; border-radius:3px;">' +
+                      'Set as origin</button>';
+    L.circleMarker([pin.p.lat, pin.p.lon], style).bindPopup(popupHtml).addTo(originTwoPointLayer);
+    L.circleMarker([pin.p.lat, pin.p.lon], style).bindPopup(popupHtml).addTo(antipodeTwoPointLayer);
+  }
+}
+
+function buildTwoPointModuleHtml(lat, lng, B) {
+  if (lat == null || lng == null) return '';
+
+  if (!B) {
+    return `<div class="module full" id="two-point-module">
+      <div class="module-bar">Two-Point Mode</div>
+      <div class="module-body" style="padding: 12px; font-size: 13px;">
+        <p style="margin: 0 0 10px; opacity: 0.75;">Pick a second point B. The four named points (M, &minus;M, n, &minus;n) and bearings A&rarr;B reveal the great-circle structure connecting A to B.</p>
+        <form data-twopoint-form style="display:flex; gap:6px; margin-bottom:8px;">
+          <input type="text" data-twopoint-input placeholder="lat, lon (e.g. 35.69, 139.69)" style="flex:1; padding:6px 8px; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.18); color:inherit; font-family:inherit; font-size:12px; border-radius:4px;" />
+          <button type="submit" style="padding:6px 12px; background:#f26522; color:#0a0e14; border:none; cursor:pointer; font-family:inherit; font-size:12px; border-radius:4px;">Set B</button>
+        </form>
+        <div style="display:flex; gap:6px; flex-wrap:wrap; font-size:11px;">
+          <span style="opacity:0.6; padding:4px 0;">quick picks:</span>
+          <button data-twopoint-set="35.6895,139.6917" style="padding:4px 10px; background:transparent; border:1px solid rgba(255,255,255,0.2); color:inherit; cursor:pointer; font-family:inherit; border-radius:4px;">Tokyo</button>
+          <button data-twopoint-set="51.5074,-0.1278" style="padding:4px 10px; background:transparent; border:1px solid rgba(255,255,255,0.2); color:inherit; cursor:pointer; font-family:inherit; border-radius:4px;">London</button>
+          <button data-twopoint-set="-33.8688,151.2093" style="padding:4px 10px; background:transparent; border:1px solid rgba(255,255,255,0.2); color:inherit; cursor:pointer; font-family:inherit; border-radius:4px;">Sydney</button>
+          <button data-twopoint-set="-1.286,36.817" style="padding:4px 10px; background:transparent; border:1px solid rgba(255,255,255,0.2); color:inherit; cursor:pointer; font-family:inherit; border-radius:4px;">Nairobi</button>
+          <button data-twopoint-set="-22.9068,-43.1729" style="padding:4px 10px; background:transparent; border:1px solid rgba(255,255,255,0.2); color:inherit; cursor:pointer; font-family:inherit; border-radius:4px;">Rio</button>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  const A = { lat: lat, lon: lng };
+  const Bo = { lat: B.lat, lon: B.lng };
+  const derived = window.TwoPoint.derive(A, Bo);
+  const bearings = window.Bearings.pair(A, Bo);
+
+  if (derived.degenerate) {
+    const msg = derived.degenerate === 'identical'
+      ? 'B is identical to A — pick a different second point.'
+      : 'B is the antipode of A — every point on the sphere is equidistant from A and B, so the perpendicular bisector great circle isn\'t unique. Pick a non-antipodal B.';
+    return `<div class="module full" id="two-point-module">
+      <div class="module-bar">Two-Point Mode</div>
+      <div class="module-body" style="padding:12px; font-size:13px;">
+        <p style="margin:0 0 10px;">${msg}</p>
+        <button data-twopoint-clear style="padding:6px 12px; background:transparent; border:1px solid rgba(255,255,255,0.3); color:inherit; cursor:pointer; font-family:inherit; border-radius:4px;">Clear B</button>
+      </div>
+    </div>`;
+  }
+
+  function fmtPt(p) {
+    const ns = p.lat >= 0 ? 'N' : 'S';
+    const ew = p.lon >= 0 ? 'E' : 'W';
+    return `${Math.abs(p.lat).toFixed(2)}&deg;${ns}, ${Math.abs(p.lon).toFixed(2)}&deg;${ew}`;
+  }
+
+  const distKm = Math.round(derived.distanceKm).toLocaleString();
+  return `<div class="module full" id="two-point-module">
+    <div class="module-bar">Two-Point Mode &middot; A &rarr; B</div>
+    <div class="module-body" style="padding:12px; font-size:13px; line-height:1.7;">
+      <div><strong>B:</strong> ${fmtPt({lat: B.lat, lon: B.lng})}</div>
+      <div><strong>Arc distance:</strong> ${distKm} km</div>
+      <div><strong>Initial bearing at A:</strong> ${bearings.initial.toFixed(0)}&deg;</div>
+      <div><strong>Final bearing at B:</strong> ${bearings.final.toFixed(0)}&deg;</div>
+      <div><strong>Bearing asymmetry:</strong> ${bearings.asymmetryDeg.toFixed(1)}&deg; <span style="opacity:0.55; font-size:11px;">(0&deg; on meridians/equator; large on Arctic-crossing great circles)</span></div>
+      <h4 style="margin:14px 0 6px; opacity:0.7; font-size:11px; text-transform:uppercase; letter-spacing:0.08em; font-weight:600;">Four named points equidistant from A and B</h4>
+      <div><strong>M</strong> (midpoint of A&ndash;B arc): ${fmtPt(derived.M)}</div>
+      <div><strong>&minus;M</strong> (Geomate &mdash; antipodal midpoint): ${fmtPt(derived.mAntipode)}</div>
+      <div><strong>n</strong> (north pole of the A&ndash;B great circle): ${fmtPt(derived.n)}</div>
+      <div><strong>&minus;n</strong> (south pole): ${fmtPt(derived.nAntipode)}</div>
+      <button data-twopoint-clear style="margin-top:14px; padding:6px 12px; background:transparent; border:1px solid rgba(255,255,255,0.3); color:inherit; cursor:pointer; font-family:inherit; border-radius:4px;">Clear B</button>
+    </div>
+  </div>`;
+}
+
+function setTwoPointB(lat, lng) {
+  if (!isFinite(lat) || !isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) return;
+  currentB = { lat: lat, lng: lng };
+  refreshTwoPointModule();
+}
+
+function clearTwoPointB() {
+  currentB = null;
+  refreshTwoPointModule();
+}
+
+function refreshTwoPointModule() {
+  const el = document.getElementById('two-point-module');
+  if (!el) return;
+  const lat = currentOriginForEquator ? currentOriginForEquator.lat : null;
+  const lng = currentOriginForEquator ? currentOriginForEquator.lng : null;
+  const html = buildTwoPointModuleHtml(lat, lng, currentB);
+  if (!html) return;
+  // Replace via Range.createContextualFragment (XSS-safer than innerHTML; the
+  // hook on this repo blocks `.innerHTML =` assignments specifically).
+  const range = document.createRange();
+  range.selectNode(el);
+  const frag = range.createContextualFragment(html);
+  el.replaceWith(frag);
+  renderTwoPointOnMapsCurrent();
+}
+
+document.addEventListener('click', function (e) {
+  const setBtn = e.target.closest('[data-twopoint-set]');
+  if (setBtn) {
+    e.preventDefault();
+    const parts = setBtn.dataset.twopointSet.split(',').map(parseFloat);
+    if (parts.length === 2) setTwoPointB(parts[0], parts[1]);
+    return;
+  }
+  if (e.target.closest('[data-twopoint-clear]')) {
+    e.preventDefault();
+    clearTwoPointB();
+    return;
+  }
+  const gotoBtn = e.target.closest('[data-twopoint-goto]');
+  if (gotoBtn) {
+    e.preventDefault();
+    const parts = gotoBtn.dataset.twopointGoto.split(',').map(parseFloat);
+    if (parts.length === 2 && isFinite(parts[0]) && isFinite(parts[1]) && typeof goTo === 'function') {
+      goTo(parts[0], parts[1]);
+    }
+  }
+});
+document.addEventListener('submit', function (e) {
+  const form = e.target.closest('[data-twopoint-form]');
+  if (!form) return;
+  e.preventDefault();
+  const input = form.querySelector('[data-twopoint-input]');
+  if (!input) return;
+  const parts = input.value.split(',').map(function (s) { return parseFloat(s.trim()); });
+  if (parts.length === 2 && isFinite(parts[0]) && isFinite(parts[1])) {
+    setTwoPointB(parts[0], parts[1]);
+  }
+});
 
 function buildEquatorModuleHtml(lat, lng, cities, filters) {
   // Loading state: cities promise hasn't resolved yet (rare — only on first
@@ -3442,6 +3657,9 @@ async function goTo(lat, lng, opts) {
   // Phase 3b: remember current origin so refreshEquatorModule() can rebuild
   // the city list on filter changes without needing to re-call renderInfo.
   currentOriginForEquator = { lat: lat, lng: lng };
+  // Curves Suite · Two-Point variant: re-render its layers against the new
+  // origin if B is currently set. No-op when B is null.
+  if (typeof renderTwoPointOnMapsCurrent === 'function') renderTwoPointOnMapsCurrent();
   // Phase 3b.1: render city pins on both maps right next to the ring. These
   // are the same cities surfaced in the panel — one more spatial channel.
   renderRingCities(lat, lng);
@@ -4197,10 +4415,13 @@ function renderInfo(lat, lng, data, nearby, wikiSummary, photos, sun, weather, c
     window.GeopuestoCitiesResolved,
     equatorFilters
   );
+  // Sprint A: Two-Point Mode additive card. Empty string when no origin is set.
+  const twoPointModule = buildTwoPointModuleHtml(lat, lng, currentB);
 
   const modules = [
     { html: heroModule, prio: 10000, size: "full" },
     { html: equatorModule, prio: 2000, size: "full" },
+    { html: twoPointModule, prio: 1800, size: "full" },
     { html: wikiModule, prio: 900, size: "full" },
     { html: quakeModule, prio: 500 + (bigQuake ? 8500 : 0), size: bigQuake ? "full" : "half" },
     { html: volcanoModule, prio: 470 + (closeVolcano ? 8200 : 0), size: closeVolcano ? "full" : "half" },
