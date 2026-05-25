@@ -154,7 +154,7 @@
           <option value="smallCircle" selected>Small circle at distance d</option>
           <option value="loxodrome">Loxodrome / rhumb line (constant bearing)</option>
           <option value="windrose">Portolan windrose (32 rhumb lines from center)</option>
-          <option value="isoazimuthal" disabled>Isoazimuthal heading ring (coming next)</option>
+          <option value="isoazimuthal">Isoazimuthal heading ring (constant back-bearing θ)</option>
         </select>
       </label>
     </div>
@@ -500,6 +500,19 @@
             ? ' — path clipped near the pole (rhumb lines spiral infinitely into a pole; truncated at ±89.5°)'
             : '';
           caption = 'Loxodrome at constant bearing ' + state.curveBearingDeg + '° (' + card + ') for ' + state.curveDistKm + ' km. Constant compass course — straight line on a Mercator map.' + polarNote;
+        } else if (state.curveType === 'isoazimuthal') {
+          // Locus of points where back-bearing toward P equals θ. Brute-force
+          // azimuth search at 1° resolution; the geometry kernel handles the
+          // search + skip-near-antipode logic.
+          samples = Geometry.sampleIsoazimuthal(state.curveP, state.curveBearingDeg, 180);
+          const compass = (state.curveBearingDeg + 360) % 360;
+          const card = compass < 22.5 || compass >= 337.5 ? 'N' :
+                       compass < 67.5 ? 'NE' : compass < 112.5 ? 'E' :
+                       compass < 157.5 ? 'SE' : compass < 202.5 ? 'S' :
+                       compass < 247.5 ? 'SW' : compass < 292.5 ? 'W' : 'NW';
+          caption = 'Isoazimuthal at θ = ' + state.curveBearingDeg + '° (' + card + '). Every point on this curve is where you would face ' + card +
+                    ' to head back to P along the great-circle path. Distinct from a loxodrome (which has constant bearing along its OWN path) — ' +
+                    'this curve has constant bearing AT EACH POINT toward P.';
         } else if (state.curveType === 'windrose') {
           // 32 rhumb lines from P at evenly-spaced bearings (every 11.25°).
           // This is the navigational pattern in pre-Mercator portolan charts.

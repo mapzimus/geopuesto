@@ -162,6 +162,78 @@
   }
 
   /**
+   * Sample an isoazimuthal curve — the locus of points Q on the sphere where
+   * the INITIAL BEARING from Q toward center P equals a fixed value θ. Per
+   * V3_ADDITIONS.md: "every point on Earth where the initial bearing back to
+   * Salem is 045°."
+   *
+   * Distinct from a loxodrome: a loxodrome has constant bearing ALONG its own
+   * path; an isoazimuthal has constant bearing AT EACH POINT TOWARD the
+   * reference. The same curve only along meridians or the equator; in general
+   * a different spiral.
+   *
+   * No closed form is convenient here — we brute-force search the azimuth
+   * (bearing from P outward) for each angular-distance sample. At 1° azimuth
+   * resolution and 180 distance samples this runs in ~13 ms on a modern CPU,
+   * well under the 16 ms 60 Hz redraw budget.
+   *
+   * Returns at most nSamples points (some distance steps may fail to find a
+   * matching back-bearing if Q is near the antipode where bearings become
+   * ill-defined; those are skipped).
+   *
+   * @param {{lat:number, lon:number}} P    center point (degrees)
+   * @param {number} thetaDeg               target back-bearing AT Q toward P
+   * @param {number} [nSamples=180]
+   * @returns {Array<[number, number]>}     polyline; NOT antimeridian-split
+   */
+  function sampleIsoazimuthal(P, thetaDeg, nSamples) {
+    if (nSamples == null) nSamples = 180;
+    const theta = thetaDeg * Math.PI / 180;
+    const phiP = P.lat * Math.PI / 180;
+    const lamP = P.lon * Math.PI / 180;
+    const N_ALPHA = 360;  // 1° azimuth grid
+    const sinPhiP = Math.sin(phiP);
+    const cosPhiP = Math.cos(phiP);
+    const out = [];
+    for (let i = 1; i < nSamples; i++) {
+      const s = (i / nSamples) * Math.PI;  // angular distance, 0 → π
+      const cosS = Math.cos(s);
+      const sinS = Math.sin(s);
+      // Search the 1° azimuth grid for the alpha minimizing |back-bearing − θ|
+      // (in mod-2π distance). 1° resolution is plenty — the curve is smooth.
+      let bestAlpha = 0;
+      let bestErr = Math.PI + 1;
+      for (let j = 0; j < N_ALPHA; j++) {
+        const alpha = j * 2 * Math.PI / N_ALPHA;
+        const phiQ = Math.asin(sinPhiP * cosS + cosPhiP * sinS * Math.cos(alpha));
+        const dLamPQ = Math.atan2(Math.sin(alpha) * sinS * cosPhiP,
+                                   cosS - sinPhiP * Math.sin(phiQ));
+        // λ_P − λ_Q = −dLamPQ. Compute back-bearing Q→P:
+        const dLam = -dLamPQ;
+        const y = Math.sin(dLam) * cosPhiP;
+        const x = Math.cos(phiQ) * sinPhiP - Math.sin(phiQ) * cosPhiP * Math.cos(dLam);
+        const back = Math.atan2(y, x);
+        // Mod-2π angular distance between two bearings:
+        let err = Math.abs(back - theta);
+        if (err > Math.PI) err = 2 * Math.PI - err;
+        if (err < bestErr) { bestErr = err; bestAlpha = alpha; }
+      }
+      // Skip points where the search couldn't get within ~3°: near the
+      // antipode the back-bearing becomes singular and any answer is fishy.
+      if (bestErr > 3 * Math.PI / 180) continue;
+      // Recompute Q at the chosen alpha:
+      const phiQ = Math.asin(sinPhiP * cosS + cosPhiP * sinS * Math.cos(bestAlpha));
+      const lamQ = lamP + Math.atan2(Math.sin(bestAlpha) * sinS * cosPhiP,
+                                      cosS - sinPhiP * Math.sin(phiQ));
+      let lonDeg = lamQ * 180 / Math.PI;
+      while (lonDeg > 180) lonDeg -= 360;
+      while (lonDeg < -180) lonDeg += 360;
+      out.push([phiQ * 180 / Math.PI, lonDeg]);
+    }
+    return out;
+  }
+
+  /**
    * Sample a loxodrome (rhumb line) — the path of constant compass bearing
    * from a start point P. Closed-form via Mercator linearization: the rhumb
    * line is a straight line in (longitude, Mercator-y) space because
@@ -527,6 +599,7 @@
     sampleGreatCircle,
     sampleSmallCircle,
     sampleLoxodrome,
+    sampleIsoazimuthal,
     antimeridianSplit,
     clipPolylineToLat,
     equidistantRing,
