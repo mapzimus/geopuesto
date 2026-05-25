@@ -2,9 +2,10 @@
   "version": 1,
   "edgeStrategy": "auto-min-distance",
   "deferred": {
-    "truncatedIcosahedron": "60 vertices via (0,±1,±3φ) row family — Sprint B.2",
-    "rhombicTriacontahedron": "icosahedron + dodecahedron vertices unioned (32) — Sprint B.2",
-    "keplerPoinsot": "shares Platonic vertex sets, different edges — Sprint B.3 needs explicit edges"
+    "keplerPoinsot": "shares Platonic vertex sets, different edges — needs explicit edges (Sprint B.3)",
+    "geodesic": "icosahedral subdivision at frequency k → 10k²+2 vertices — parametric, needs generator",
+    "fibonacciSphere": "golden-angle quasi-uniform N points — parametric, needs generator",
+    "nPrism": "2n vertices on two parallel small circles, parametric n ≥ 3 — needs generator"
   },
   "shapes": {
     "tetrahedron": {
@@ -115,6 +116,54 @@
         [ 0.0,                 0.7071067811865476, -0.7071067811865476],
         [ 0.0,                -0.7071067811865476,  0.7071067811865476],
         [ 0.0,                -0.7071067811865476, -0.7071067811865476]
+      ]
+    },
+    "truncatedIcosahedron": {
+      "technicalLabel": "Truncated Icosahedron",
+      "userLabel": "Soccer ball (truncated icosahedron)",
+      "description": "12 pentagons + 20 hexagons, 60 vertices. The classic soccer-ball pattern. Same atomic structure as the buckminsterfullerene C60 molecule. Vertices generated parametrically from three coordinate families with even permutations.",
+      "vertexCount": 60,
+      "generator": "truncatedIcosahedron"
+    },
+    "rhombicTriacontahedron": {
+      "technicalLabel": "Rhombic Triacontahedron (Becker-Hagens point set)",
+      "userLabel": "32-vertex grid (Becker-Hagens / rhombic triacontahedron)",
+      "description": "32 vertices = the union of the icosahedron's 12 + the dodecahedron's 20, both inscribed in the same unit sphere. This matches the Becker-Hagens 'Earth grid' speculation (32 alleged anomaly points on Earth's surface). Note: a strict rhombic triacontahedron has its two vertex classes at different radii from the center, so this catalog entry is geometrically a point set, not a true polyhedron — that's why edges are disabled (edgeStrategy: none). When the Analysis Suite lands, this is the shape to overlay against real anomaly datasets to test the grid hypothesis.",
+      "vertexCount": 32,
+      "edgeStrategy": "none",
+      "vertices": [
+        [ 0.0,                  0.5257311121191336,  0.8506508083520399],
+        [ 0.0,                  0.5257311121191336, -0.8506508083520399],
+        [ 0.0,                 -0.5257311121191336,  0.8506508083520399],
+        [ 0.0,                 -0.5257311121191336, -0.8506508083520399],
+        [ 0.5257311121191336,   0.8506508083520399,  0.0               ],
+        [ 0.5257311121191336,  -0.8506508083520399,  0.0               ],
+        [-0.5257311121191336,   0.8506508083520399,  0.0               ],
+        [-0.5257311121191336,  -0.8506508083520399,  0.0               ],
+        [ 0.8506508083520399,   0.0,                 0.5257311121191336],
+        [ 0.8506508083520399,   0.0,                -0.5257311121191336],
+        [-0.8506508083520399,   0.0,                 0.5257311121191336],
+        [-0.8506508083520399,   0.0,                -0.5257311121191336],
+        [ 0.5773502691896258,   0.5773502691896258,  0.5773502691896258],
+        [ 0.5773502691896258,   0.5773502691896258, -0.5773502691896258],
+        [ 0.5773502691896258,  -0.5773502691896258,  0.5773502691896258],
+        [ 0.5773502691896258,  -0.5773502691896258, -0.5773502691896258],
+        [-0.5773502691896258,   0.5773502691896258,  0.5773502691896258],
+        [-0.5773502691896258,   0.5773502691896258, -0.5773502691896258],
+        [-0.5773502691896258,  -0.5773502691896258,  0.5773502691896258],
+        [-0.5773502691896258,  -0.5773502691896258, -0.5773502691896258],
+        [ 0.0,                  0.3568220897730899,  0.9341723589627158],
+        [ 0.0,                  0.3568220897730899, -0.9341723589627158],
+        [ 0.0,                 -0.3568220897730899,  0.9341723589627158],
+        [ 0.0,                 -0.3568220897730899, -0.9341723589627158],
+        [ 0.3568220897730899,   0.9341723589627158,  0.0               ],
+        [ 0.3568220897730899,  -0.9341723589627158,  0.0               ],
+        [-0.3568220897730899,   0.9341723589627158,  0.0               ],
+        [-0.3568220897730899,  -0.9341723589627158,  0.0               ],
+        [ 0.9341723589627158,   0.0,                 0.3568220897730899],
+        [ 0.9341723589627158,   0.0,                -0.3568220897730899],
+        [-0.9341723589627158,   0.0,                 0.3568220897730899],
+        [-0.9341723589627158,   0.0,                -0.3568220897730899]
       ]
     }
   }

@@ -94,8 +94,79 @@
     if (!shape) {
       throw new Error("ShapeEngine: unknown shape '" + shapeId + "'");
     }
+    // Resolve `generator` references lazily: the catalog can specify either
+    // explicit `vertices` (regular shapes) or a `generator` name (parametric
+    // shapes too tedious to inline). Result is memoized onto the shape object
+    // so subsequent configure() calls hit the cache.
+    if (!shape.vertices && shape.generator) {
+      const gen = generators[shape.generator];
+      if (!gen) {
+        throw new Error("ShapeEngine: unknown generator '" + shape.generator + "' for shape '" + shapeId + "'");
+      }
+      shape.vertices = gen();
+    }
     return shape;
   }
+
+  // ---------------------------------------------------------------------------
+  // Built-in vertex generators
+  // ---------------------------------------------------------------------------
+  // A generator is a function that returns a vertex array — used when the
+  // shape's vertices are too many to inline in JSON (truncated icosahedron's
+  // 60 verts) or are parametric (n-prism, Fibonacci sphere, geodesic
+  // subdivision, all coming in Sprint B.2+).
+  //
+  // Catalog entries opt in by setting `"generator": "<name>"` instead of
+  // `"vertices": [...]`. Both modes coexist; explicit vertices always win.
+
+  const generators = {
+    /**
+     * Truncated icosahedron — the soccer ball, also the buckminsterfullerene
+     * C60 molecule structure. 60 vertices via three coordinate families with
+     * even permutations and all sign choices:
+     *   (0, ±1, ±3φ)       — 12 verts
+     *   (±1, ±(2+φ), ±2φ)  — 24 verts
+     *   (±φ, ±2, ±(1+2φ))  — 24 verts
+     * All ÷ √(9φ + 10) to land on the unit sphere.
+     */
+    truncatedIcosahedron: function () {
+      const phi = (1 + Math.sqrt(5)) / 2;
+      const norm = Math.sqrt(9 * phi + 10);
+      const out = [];
+      // Row 1: family (0, ±1, ±3φ) and its 3 even cyclic permutations.
+      // (0, ±1, ±3φ) → (±1, ±3φ, 0) → (±3φ, 0, ±1). 4 sign combos × 3 perms.
+      for (let s1 = -1; s1 <= 1; s1 += 2) {
+        for (let s2 = -1; s2 <= 1; s2 += 2) {
+          out.push([0,            s1 * 1,        s2 * 3 * phi]);
+          out.push([s1 * 1,       s2 * 3 * phi,  0           ]);
+          out.push([s1 * 3 * phi, 0,             s2 * 1      ]);
+        }
+      }
+      // Row 2: family (±1, ±(2+φ), ±2φ) and its cyclic permutations.
+      // 8 sign combos × 3 perms.
+      for (let s1 = -1; s1 <= 1; s1 += 2) {
+        for (let s2 = -1; s2 <= 1; s2 += 2) {
+          for (let s3 = -1; s3 <= 1; s3 += 2) {
+            out.push([s1 * 1,           s2 * (2 + phi),   s3 * 2 * phi    ]);
+            out.push([s1 * (2 + phi),   s2 * 2 * phi,     s3 * 1          ]);
+            out.push([s1 * 2 * phi,     s2 * 1,           s3 * (2 + phi)  ]);
+          }
+        }
+      }
+      // Row 3: family (±φ, ±2, ±(1+2φ)) and its cyclic permutations.
+      for (let s1 = -1; s1 <= 1; s1 += 2) {
+        for (let s2 = -1; s2 <= 1; s2 += 2) {
+          for (let s3 = -1; s3 <= 1; s3 += 2) {
+            out.push([s1 * phi,         s2 * 2,           s3 * (1 + 2*phi)]);
+            out.push([s1 * 2,           s2 * (1 + 2*phi), s3 * phi        ]);
+            out.push([s1 * (1 + 2*phi), s2 * phi,         s3 * 2          ]);
+          }
+        }
+      }
+      // Normalize all 60 to unit-sphere radius.
+      return out.map(function (v) { return [v[0]/norm, v[1]/norm, v[2]/norm]; });
+    },
+  };
 
   /** Squared Euclidean distance between two 3-vectors. */
   function dist2(a, b) {
@@ -136,8 +207,21 @@
 
   function getEdgesInternal(shapeId, shape) {
     if (edgeCache[shapeId]) return edgeCache[shapeId];
-    const explicit = shape.edges;
-    const computed = explicit ? explicit : computeEdges(shape.vertices);
+    // Three edge sources in priority order:
+    //   1. `edgeStrategy: "none"` — explicit opt-out, return []. Used by point
+    //      sets that don't form a clean edge-transitive polyhedron (e.g. the
+    //      rhombic triacontahedron when both vertex classes share unit radius,
+    //      per the Becker-Hagens Earth-grid framing).
+    //   2. `edges: [[i,j],...]` — explicit edge list from the catalog.
+    //   3. Auto-detect: min-pairwise-distance, works for edge-transitive shapes.
+    let computed;
+    if (shape.edgeStrategy === 'none') {
+      computed = [];
+    } else if (shape.edges) {
+      computed = shape.edges;
+    } else {
+      computed = computeEdges(shape.vertices);
+    }
     edgeCache[shapeId] = computed;
     return computed;
   }
