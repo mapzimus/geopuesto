@@ -2,8 +2,8 @@
   "version": 1,
   "edgeStrategy": "auto-min-distance",
   "deferred": {
-    "keplerPoinsot": "4 regular star polyhedra (small/great stellated, great dodeca, great icosa) — share Platonic vertex sets, need explicit star edge lists",
-    "compounds": "stella octangula + 5-tetrahedra + 5-cubes — share Platonic vertex sets, need explicit edges (Sprint B.3 candidate)",
+    "keplerPoinsot_wireframeDuplicates": "great dodecahedron (= icosa wireframe; only face interpretation differs) + great icosahedron (= small-stellated-dodeca wireframe; same) — not added because wireframe-only render can't distinguish them. Would need face rendering.",
+    "compounds": "5-tetrahedra + 5-cubes — share dodeca vertices in specific subsets; need vertex-partition enumeration (Sprint B.3 candidate)",
     "catalan": "Catalan duals beyond rhombic triacontahedron — pentakis dodeca, triakis icosa, disdyakis triaconta"
   },
   "shapes": {
@@ -197,6 +197,77 @@
       "vertexCount": 12,
       "generator": "nAntiprism",
       "generatorDefaults": { "n": 6 }
+    },
+    "smallStellatedDodecahedron": {
+      "technicalLabel": "Small Stellated Dodecahedron",
+      "userLabel": "Pentagram star (small stellated dodecahedron)",
+      "description": "One of four Kepler-Poinsot regular star polyhedra. Vertices are the icosahedron's 12, but edges connect each vertex to its 5 SECOND-nearest neighbors (pentagram diagonals, d²≈2.894 in this layout) rather than the 5 nearest. Twelve pentagram faces interpenetrate the interior. At wireframe-only render, this is visually identical to the Great Icosahedron (which has the same edge set, just interprets the faces as 20 interpenetrating triangles instead of 12 pentagrams). Discovered by Kepler.",
+      "vertexCount": 12,
+      "vertices": [
+        [ 0.0,                  0.5257311121191336,  0.8506508083520399],
+        [ 0.0,                  0.5257311121191336, -0.8506508083520399],
+        [ 0.0,                 -0.5257311121191336,  0.8506508083520399],
+        [ 0.0,                 -0.5257311121191336, -0.8506508083520399],
+        [ 0.5257311121191336,   0.8506508083520399,  0.0               ],
+        [ 0.5257311121191336,  -0.8506508083520399,  0.0               ],
+        [-0.5257311121191336,   0.8506508083520399,  0.0               ],
+        [-0.5257311121191336,  -0.8506508083520399,  0.0               ],
+        [ 0.8506508083520399,   0.0,                 0.5257311121191336],
+        [ 0.8506508083520399,   0.0,                -0.5257311121191336],
+        [-0.8506508083520399,   0.0,                 0.5257311121191336],
+        [-0.8506508083520399,   0.0,                -0.5257311121191336]
+      ],
+      "edges": [
+        [0, 1], [0, 5], [0, 7], [0, 9], [0, 11],
+        [1, 5], [1, 7], [1, 8], [1, 10],
+        [2, 3], [2, 4], [2, 6], [2, 9], [2, 11],
+        [3, 4], [3, 6], [3, 8], [3, 10],
+        [4, 5], [4, 10], [4, 11],
+        [5, 10], [5, 11],
+        [6, 7], [6, 8], [6, 9],
+        [7, 8], [7, 9],
+        [8, 10],
+        [9, 11]
+      ]
+    },
+    "greatStellatedDodecahedron": {
+      "technicalLabel": "Great Stellated Dodecahedron",
+      "userLabel": "20-vertex pentagram star (great stellated dodecahedron)",
+      "description": "Another Kepler-Poinsot regular star polyhedron. Vertices are the dodecahedron's 20, with edges connecting each vertex to its 3 pentagram-diagonal partners (d²≈3.491 in this layout). Twelve pentagram faces interpenetrate the dodecahedron's interior. Spikier than the small stellated dodecahedron because the underlying dodecahedron's vertex-3-fold-symmetry produces longer star spikes. Discovered by Kepler.",
+      "vertexCount": 20,
+      "vertices": [
+        [ 0.5773502691896258,  0.5773502691896258,  0.5773502691896258],
+        [ 0.5773502691896258,  0.5773502691896258, -0.5773502691896258],
+        [ 0.5773502691896258, -0.5773502691896258,  0.5773502691896258],
+        [ 0.5773502691896258, -0.5773502691896258, -0.5773502691896258],
+        [-0.5773502691896258,  0.5773502691896258,  0.5773502691896258],
+        [-0.5773502691896258,  0.5773502691896258, -0.5773502691896258],
+        [-0.5773502691896258, -0.5773502691896258,  0.5773502691896258],
+        [-0.5773502691896258, -0.5773502691896258, -0.5773502691896258],
+        [ 0.0,                 0.3568220897730899,  0.9341723589627158],
+        [ 0.0,                 0.3568220897730899, -0.9341723589627158],
+        [ 0.0,                -0.3568220897730899,  0.9341723589627158],
+        [ 0.0,                -0.3568220897730899, -0.9341723589627158],
+        [ 0.3568220897730899,  0.9341723589627158,  0.0               ],
+        [ 0.3568220897730899, -0.9341723589627158,  0.0               ],
+        [-0.3568220897730899,  0.9341723589627158,  0.0               ],
+        [-0.3568220897730899, -0.9341723589627158,  0.0               ],
+        [ 0.9341723589627158,  0.0,                 0.3568220897730899],
+        [ 0.9341723589627158,  0.0,                -0.3568220897730899],
+        [-0.9341723589627158,  0.0,                 0.3568220897730899],
+        [-0.9341723589627158,  0.0,                -0.3568220897730899]
+      ],
+      "edges": [
+        [0, 11], [0, 15], [0, 19],
+        [1, 10], [1, 15], [1, 18],
+        [2, 9], [2, 14], [2, 19],
+        [3, 8], [3, 14], [3, 18],
+        [4, 11], [4, 13], [4, 17],
+        [5, 10], [5, 13], [5, 16],
+        [6, 9], [6, 12], [6, 17],
+        [7, 8], [7, 12], [7, 16],
+        [8, 9], [10, 11], [12, 13], [14, 15], [16, 18], [17, 19]
+      ]
     },
     "stellaOctangula": {
       "technicalLabel": "Stella Octangula (Stellated Octahedron)",
