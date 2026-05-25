@@ -1742,6 +1742,17 @@
 <script src="geometry.js"></script>
 <script src="cities.js"></script>
 <script>
+// Disable the browser's default scroll-position restoration. With ?origin=...
+// or #origin=... URL params (shareable links), we want the page to land at the
+// top showing the maps, not at whatever scroll position the browser saved
+// from a previous session on this URL. Returning visitors restore their
+// last *location* via localStorage further down — scroll restoration isn't
+// doing useful work here and was causing reloads with origin params to land
+// the user mid-page below the maps.
+if (typeof history !== "undefined" && "scrollRestoration" in history) {
+  history.scrollRestoration = "manual";
+}
+
 // ============================================================
 //  CONFIG — paste your API keys here to unlock extra modules.
 //  All sections degrade gracefully if a key is missing.
@@ -4479,6 +4490,11 @@ const _last = _urlOrigin || loadLastLocation();
 if (_last) {
   activePresetName = _last.presetName || null;
   renderPresets();
+  // Belt-and-suspenders alongside history.scrollRestoration="manual" up top:
+  // when restoring from a shared URL, always start at the page top so the
+  // user sees the maps first. Otherwise some browsers (or Chrome's
+  // bfcache/prerender pipeline) can still land mid-page.
+  if (_urlOrigin) window.scrollTo(0, 0);
   // Slight delay so maps finish initializing layout before flyTo
   setTimeout(() => goTo(_last.lat, _last.lng), 250);
 }
