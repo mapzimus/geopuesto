@@ -104,12 +104,18 @@
           <option value="cuboctahedron" selected>Vector Equilibrium (cuboctahedron) &middot; 12 verts</option>
           <option value="truncatedIcosahedron">Soccer ball (truncated icosahedron) &middot; 60 verts</option>
           <option value="rhombicTriacontahedron">32-vertex grid (rhombic triacontahedron / Becker-Hagens) &middot; 32 verts</option>
+          <option value="fibonacciSphere">Golden-angle lattice (Fibonacci sphere) &middot; N verts</option>
         </select>
       </label>
     </div>
     <div class="control-row">
       <label style="flex: 1;">Spin: <span id="poly-spin-display">0&deg;</span>
         <input type="range" id="poly-spin-slider" min="0" max="360" value="0" step="1" style="width: 100%;">
+      </label>
+    </div>
+    <div class="control-row" id="poly-fibn-row" style="display:none;">
+      <label style="flex: 1;">Fibonacci N points: <span id="poly-fibn-display">100</span>
+        <input type="range" id="poly-fibn-slider" min="6" max="1000" value="100" step="2" style="width: 100%;">
       </label>
     </div>
     <div id="salem-map"></div>
@@ -220,7 +226,11 @@
         anchor: { lat: 42.5195, lon: -70.8967 },
         shape: 'cuboctahedron',
         spinDeg: 0,
+        fibN: 100,  // only used when shape === 'fibonacciSphere'
       };
+
+      // Shapes whose vertex count depends on params (the N slider applies).
+      const PARAMETRIC_SHAPES = new Set(['fibonacciSphere']);
 
       // ---------------------------------------------------------------
       // Two-Point readout
@@ -292,11 +302,16 @@
         polyLayers.edges.clearLayers();
         polyLayers.pins.clearLayers();
         document.getElementById('poly-spin-display').textContent = state.spinDeg + '°';
+        // Show the N slider only for parametric shapes; hide for fixed-vertex shapes.
+        const fibRow = document.getElementById('poly-fibn-row');
+        fibRow.style.display = PARAMETRIC_SHAPES.has(state.shape) ? '' : 'none';
+        document.getElementById('poly-fibn-display').textContent = state.fibN;
         if (!SE || !SE.ready) return;
         SE.ready.then(function () {
           let cfg;
           try {
-            cfg = SE.configure(state.shape, state.anchor, state.spinDeg * Math.PI / 180);
+            const params = PARAMETRIC_SHAPES.has(state.shape) ? { N: state.fibN } : undefined;
+            cfg = SE.configure(state.shape, state.anchor, state.spinDeg * Math.PI / 180, params);
           } catch (e) { return; }
           cfg.edgePolylines.forEach(function (poly) {
             L.polyline(poly, { color: '#00bfa5', weight: 1.5, opacity: 0.6 }).addTo(polyLayers.edges);
@@ -335,7 +350,8 @@
       }
 
       function currentExportBundle() {
-        const cfg = SE.configure(state.shape, state.anchor, state.spinDeg * Math.PI / 180);
+        const params = PARAMETRIC_SHAPES.has(state.shape) ? { N: state.fibN } : undefined;
+        const cfg = SE.configure(state.shape, state.anchor, state.spinDeg * Math.PI / 180, params);
         return {
           name: 'Geopuesto playground · ' + cfg.shape.technicalLabel + ' anchored at ' + fmtCoord(state.anchor),
           points: cfg.vertices.map(function (v, i) {
@@ -449,6 +465,10 @@
         });
         document.getElementById('poly-spin-slider').addEventListener('input', function (e) {
           state.spinDeg = parseInt(e.target.value, 10) || 0;
+          renderPolyhedra();
+        });
+        document.getElementById('poly-fibn-slider').addEventListener('input', function (e) {
+          state.fibN = Math.max(6, parseInt(e.target.value, 10) || 100);
           renderPolyhedra();
         });
       }

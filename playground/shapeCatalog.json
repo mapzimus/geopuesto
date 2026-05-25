@@ -4,7 +4,6 @@
   "deferred": {
     "keplerPoinsot": "shares Platonic vertex sets, different edges — needs explicit edges (Sprint B.3)",
     "geodesic": "icosahedral subdivision at frequency k → 10k²+2 vertices — parametric, needs generator",
-    "fibonacciSphere": "golden-angle quasi-uniform N points — parametric, needs generator",
     "nPrism": "2n vertices on two parallel small circles, parametric n ≥ 3 — needs generator"
   },
   "shapes": {
@@ -165,6 +164,15 @@
         [-0.9341723589627158,   0.0,                 0.3568220897730899],
         [-0.9341723589627158,   0.0,                -0.3568220897730899]
       ]
+    },
+    "fibonacciSphere": {
+      "technicalLabel": "Fibonacci Sphere",
+      "userLabel": "Golden-angle lattice (Fibonacci sphere, N points)",
+      "description": "N quasi-uniformly distributed points via the golden-angle (Vogel) spiral. Not vertex-transitive (no polyhedral structure), but the minimum-spacing variance stays small from ~10 points up. Used by graphics engines for sphere sampling, by physicists for the Thomson problem (electron-on-sphere equilibrium), and is the closest the catalog gets to 'arbitrary-N uniform point distribution.' Parametric: drag the N slider to change the point count without code edits.",
+      "vertexCount": 100,
+      "generator": "fibonacciSphere",
+      "generatorDefaults": { "N": 100 },
+      "edgeStrategy": "none"
     }
   }
 }
