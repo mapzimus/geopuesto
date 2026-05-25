@@ -57,11 +57,25 @@
 <body>
   <header>
     <div class="tagline">Geopuesto · Spherical Geometry Sandbox</div>
-    <h1>Two-Point Mode &amp; Polyhedra Suite</h1>
+    <h1>Click points. Spin shapes. See what's connected on a sphere.</h1>
+    <!-- TODO (Max): the H1 is the cold-load pitch. Rewrite in your voice if you want.
+         Options to consider:
+         · "Click points. Spin shapes. See what's connected on a sphere."  (terse, three verbs)
+         · "Spherical geometry you can poke at — points, paths, polyhedra, datasets."
+         · "What can you say with two points and a sphere?"
+         The audits flagged the previous H1 ("Two-Point Mode & Polyhedra Suite") as
+         developer-jargon for a brand-new visitor. -->
   </header>
 
   <section>
-    <h2>Two-Point Mode &middot; A &rarr; B</h2>
+    <h2>Two places on Earth</h2>
+    <!-- TODO (Max): plain-language section heading. Previous: "Two-Point Mode · A → B" -->
+    <div class="map-caption" style="margin-bottom: 12px;">
+      Pick two points A and B. See the great-circle path between them, the locus of
+      points equidistant from both, and the four "named" points that fall out of
+      this geometry: midpoint M, antipodal midpoint −M (the &ldquo;Geomate&rdquo;
+      pair), and the two poles n / −n of the A&ndash;B great circle.
+    </div>
     <div class="control-row">
       <label>A (origin):
         <input type="text" id="tp-a-input" value="42.3601,-71.0589" placeholder="lat, lon">
@@ -69,7 +83,6 @@
       <label>B (second point):
         <input type="text" id="tp-b-input" value="35.6895,139.6917" placeholder="lat, lon">
       </label>
-      <button id="tp-update">Update</button>
     </div>
     <div class="quick-picks">
       <span class="quick-picks-label">B quick-picks:</span>
@@ -89,7 +102,8 @@
   </section>
 
   <section>
-    <h2>Polyhedra Suite &middot; configurable</h2>
+    <h2>Spin a shape around the globe</h2>
+    <!-- TODO (Max): plain-language section heading. Previous: "Polyhedra Suite · configurable" -->
     <div class="control-row">
       <label>Anchor:
         <input type="text" id="poly-anchor-input" value="42.5195,-70.8967" placeholder="lat, lon">
@@ -149,7 +163,8 @@
   </section>
 
   <section>
-    <h2>Curves Suite &middot; loci on the sphere</h2>
+    <h2>Rings, spirals, and rhumb lines</h2>
+    <!-- TODO (Max): plain-language section heading. Previous: "Curves Suite · loci on the sphere" -->
     <div class="map-caption" style="margin-bottom: 10px;">
       Pick a center point P and a curve type. Each variant of the Curves Suite
       is &ldquo;from a point, draw this kind of line/curve.&rdquo; The unifying
@@ -185,7 +200,8 @@
   </section>
 
   <section>
-    <h2>Analysis Suite &middot; dataset overlays (v0)</h2>
+    <h2>Overlay real data &mdash; test the grid</h2>
+    <!-- TODO (Max): plain-language section heading. Previous: "Analysis Suite · dataset overlays (v0)" -->
     <div class="map-caption" style="margin-bottom: 10px;">
       Real geophysical data on the sphere. The basic ingredient for the
       Becker-Hagens spatial-statistics test in
@@ -221,18 +237,30 @@
         statistically unusual; ~0.5 &rArr; coincidence. Load a dataset above and
         pick a polyhedron in the Polyhedra Suite first.
       </div>
+      <div class="quick-picks" style="margin-bottom: 8px;">
+        <span class="quick-picks-label">quick-pick polyhedron:</span>
+        <button data-mc-shape="rhombicTriacontahedron">Becker-Hagens (32 verts)</button>
+        <button data-mc-shape="icosahedron">Icosahedron (12)</button>
+        <button data-mc-shape="cuboctahedron">Cuboctahedron (12)</button>
+        <button data-mc-shape="dodecahedron">Dodecahedron (20)</button>
+      </div>
+      <div id="mc-active-shape" class="map-caption" style="margin-bottom: 8px; font-style: italic;">
+        <!-- Live-updated in renderPolyhedra(): "Testing: [shape] · [N] verts · anchored …" -->
+        Pick a polyhedron above (Polyhedra Suite) first.
+      </div>
       <div class="control-row" id="mc-radius-row">
         <label style="flex: 1;">Search radius R: <span id="mc-radius-display">250</span> km
           <input type="range" id="mc-radius-slider" min="50" max="2000" value="250" step="25" style="width: 100%;">
         </label>
-        <button id="mc-run-btn" disabled style="opacity: 0.45; cursor: not-allowed;">Run Monte Carlo (1000 trials)</button>
+        <button id="mc-run-btn" disabled style="opacity: 0.45; cursor: not-allowed;" title="Load a dataset above first.">Run Monte Carlo (load a dataset first)</button>
       </div>
       <div id="mc-result" style="margin-top: 10px; font-family: var(--mono); font-size: 12px; line-height: 1.55; color: var(--fg); white-space: pre-wrap;"></div>
     </div>
   </section>
 
   <section>
-    <h2>Sprint C &middot; Share link &amp; export</h2>
+    <h2>Share &amp; export</h2>
+    <!-- TODO (Max): plain-language section heading. Previous: "Sprint C · Share link & export" -->
     <div class="map-caption" style="margin-bottom: 10px;">
       Share copies a URL that restores the current configuration (A, B, anchor, shape, spin). Open the URL in a new tab to verify restore. GeoJSON / KML downloads contain the current polyhedron's vertices + edge segments.
     </div>
@@ -388,10 +416,10 @@
         row(root, 'Bearings A→B (initial / final / delta)', formatBearings(p));
         row(root, 'Asymmetry', p.asymmetryDeg.toFixed(1) + '°' +
             (p.asymmetryDeg < 1 ? ' — path is a meridian or equator (constant heading)' : ''));
-        row(root, 'Midpoint M', fmtCoord(d.M));
-        row(root, 'Antipodal midpoint −M (Geomate)', fmtCoord(d.mAntipode));
-        row(root, 'Great-circle pole n', fmtCoord(d.n));
-        row(root, 'Antipodal pole −n', fmtCoord(d.nAntipode));
+        row(root, 'M — midpoint of the A→B great-circle path (halfway between A and B; equidistant from both)', fmtCoord(d.M));
+        row(root, '−M — Geomate, the antipode of M (also equidistant from A and B, but on the OTHER side of Earth)', fmtCoord(d.mAntipode));
+        row(root, 'n — north pole of the A–B great circle (every point on this circle is 90° from BOTH A and B)', fmtCoord(d.n));
+        row(root, '−n — south pole of the same great circle (90° from A and B on the opposite side)', fmtCoord(d.nAntipode));
       }
 
       // ---------------------------------------------------------------
@@ -484,6 +512,10 @@
           document.getElementById('poly-caption').textContent =
             cfg.shape.technicalLabel + ' · ' + cfg.vertices.length + ' vertices · ' +
             cfg.edges.length + ' edges · spin ' + state.spinDeg + '°';
+          // Echo the active polyhedron in the Monte Carlo box so the user
+          // knows what they're testing without scrolling between sections.
+          if (typeof updateMcActiveShape === 'function') updateMcActiveShape();
+          if (typeof updateMonteCarloButton === 'function') updateMonteCarloButton();
         });
       }
 
@@ -857,6 +889,26 @@
       function bindAnalysisInputs() {
         document.getElementById('analysis-load-btn').addEventListener('click', loadAnalysisDataset);
         document.getElementById('analysis-clear-btn').addEventListener('click', clearAnalysis);
+        // Monte Carlo quick-pick shapes: select the polyhedra dropdown +
+        // re-render. Surfaces the audit's #2 fix for Task 2 (Becker-Hagens
+        // is buried mid-dropdown; this gives a one-click entry).
+        document.querySelectorAll('[data-mc-shape]').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            const shapeId = btn.dataset.mcShape;
+            const sel = document.getElementById('poly-shape-select');
+            if (sel) {
+              sel.value = shapeId;
+              state.shape = shapeId;
+              renderPolyhedra();
+              // Smooth-scroll the polyhedra map into view so the user sees
+              // the shape they just selected.
+              const pmap = document.getElementById('salem-map');
+              if (pmap && pmap.scrollIntoView) {
+                pmap.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }
+            }
+          });
+        });
         const mcBtn = document.getElementById('mc-run-btn');
         if (mcBtn) mcBtn.addEventListener('click', runMonteCarlo);
         const mcSlider = document.getElementById('mc-radius-slider');
@@ -888,10 +940,46 @@
       function updateMonteCarloButton() {
         const btn = document.getElementById('mc-run-btn');
         if (!btn) return;
-        const ready = !!lastDatasetFeatures && lastDatasetFeatures.length > 0;
+        const hasDataset = !!lastDatasetFeatures && lastDatasetFeatures.length > 0;
+        const hasShape = !!state.shape;
+        const ready = hasDataset && hasShape;
         btn.disabled = !ready;
         btn.style.opacity = ready ? '1' : '0.45';
         btn.style.cursor = ready ? 'pointer' : 'not-allowed';
+        // Inline reason — surface WHY the button is disabled in its own label,
+        // not just by dimming. (UX audit flagged silent disabled-state as a
+        // top-5 friction point: "user clicks, gets a console error, no idea why".)
+        if (!ready) {
+          if (!hasDataset && !hasShape) {
+            btn.textContent = 'Run Monte Carlo (load a dataset + pick a shape first)';
+          } else if (!hasDataset) {
+            btn.textContent = 'Run Monte Carlo (load a dataset first)';
+          } else {
+            btn.textContent = 'Run Monte Carlo (pick a polyhedron first)';
+          }
+        } else {
+          btn.textContent = 'Run Monte Carlo (1000 trials)';
+        }
+      }
+
+      // Live "active shape" echo so the user knows WHAT polyhedron Monte
+      // Carlo will test — the audits flagged that the polyhedron lives ~600
+      // lines up in a different section.
+      function updateMcActiveShape() {
+        const el = document.getElementById('mc-active-shape');
+        if (!el) return;
+        if (!state.shape || !shapeEngineReady) {
+          el.textContent = 'Pick a polyhedron above (Polyhedra Suite) first.';
+          return;
+        }
+        const paramCfg = PARAMETRIC_SHAPES[state.shape];
+        const paramTxt = paramCfg ? ', ' + paramCfg.param + '=' + state[paramCfg.stateKey] : '';
+        const shapes = window.ShapeEngine.listShapes();
+        const meta = shapes.find(function (s) { return s.id === state.shape; });
+        const label = meta ? meta.technicalLabel : state.shape;
+        el.textContent = 'Testing: ' + label + ' (' + state.shape + paramTxt +
+          ') · anchored ' + state.anchor.lat.toFixed(2) + '°, ' + state.anchor.lon.toFixed(2) +
+          '° · spin ' + state.spinDeg + '°';
       }
 
       function llToXyz(lat, lon) {
@@ -1037,12 +1125,29 @@
       // Sprint C — Share + Export from current state
       // ---------------------------------------------------------------
       function currentShareConfig() {
+        // Captures EVERYTHING a user might want to share: the Polyhedra anchor +
+        // shape + spin, the Two-Point A and B (which the audit flagged as
+        // missing — `state.anchor` is Polyhedra-only), test point P, the active
+        // curve type + params, the active dataset selection, and Monte Carlo R.
+        // shareLink.js's serializer ignores fields it doesn't recognize, so
+        // additions here are safe even before serializer support catches up.
         return {
           mode: 'polyhedra',
           A: state.anchor,
           B: state.B,
+          tpA: state.A,
+          P: state.P,
           shape: state.shape,
           spinDeg: state.spinDeg,
+          curveType: state.curveType,
+          curveDistKm: state.curveDistKm,
+          curveBearingDeg: state.curveBearingDeg,
+          curveP: state.curveP,
+          mcRadiusKm: state.mcRadiusKm,
+          analysisSource: (function () {
+            const el = document.getElementById('analysis-source');
+            return el ? el.value : null;
+          })(),
         };
       }
 
@@ -1128,7 +1233,10 @@
           renderTwoPoint();
           renderCrossTrack();
         }
-        document.getElementById('tp-update').addEventListener('click', applyAB);
+        // Auto-render on input change. The previous explicit "Update" button
+        // was redundant — every other text input on the page auto-renders, and
+        // a dedicated button for Two-Point alone was an inconsistency the audits
+        // flagged. Removed.
         document.getElementById('tp-a-input').addEventListener('change', applyAB);
         document.getElementById('tp-b-input').addEventListener('change', applyAB);
 
