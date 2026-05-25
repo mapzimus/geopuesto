@@ -197,8 +197,10 @@
     <div class="control-row">
       <label>Dataset:
         <select id="analysis-source">
-          <option value="usgs-25-week" selected>USGS earthquakes (M ≥ 2.5, last 7 days)</option>
-          <option value="usgs-45-month" disabled>USGS earthquakes (M ≥ 4.5, last 30 days &mdash; coming next)</option>
+          <option value="usgs-all-day">USGS earthquakes — every M (last 24 hr, ~300 events)</option>
+          <option value="usgs-25-week" selected>USGS earthquakes (M ≥ 2.5, last 7 days, ~700 events)</option>
+          <option value="usgs-45-month">USGS earthquakes (M ≥ 4.5, last 30 days, the big ones)</option>
+          <option value="usgs-significant-month">USGS significant quakes (last 30 days)</option>
           <option value="volcanoes" disabled>Smithsonian active volcanoes (coming next)</option>
         </select>
       </label>
@@ -764,10 +766,16 @@
         ensureAnalysisMap();
         analysisLayer.clearLayers();
         caption.textContent = 'Fetching ' + source + '…';
-        let url;
-        if (source === 'usgs-25-week') {
-          url = 'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_week.geojson';
-        } else {
+        // Map each dropdown value to its USGS GeoJSON feed URL. All feeds are
+        // public CORS-friendly endpoints under earthquake.usgs.gov.
+        const USGS_FEEDS = {
+          'usgs-all-day':            'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson',
+          'usgs-25-week':            'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_week.geojson',
+          'usgs-45-month':           'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/4.5_month.geojson',
+          'usgs-significant-month':  'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/significant_month.geojson',
+        };
+        const url = USGS_FEEDS[source];
+        if (!url) {
           caption.textContent = 'Unknown dataset ' + source;
           return;
         }
