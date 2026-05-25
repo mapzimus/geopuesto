@@ -139,6 +139,12 @@
     <div class="map-caption" id="poly-caption">
       Vertex 0 anchored at the input above. Spin rotates the polyhedron around that axis.
     </div>
+    <div class="sprintc-buttons" style="margin-top: 14px;">
+      <button id="poly-enrich-btn">Enrich vertices (nearest GeoNames city &middot; pop ≥ 50k)</button>
+      <button id="poly-enrich-clear" style="border-color: var(--border);">Clear enrichment</button>
+      <span id="poly-enrich-status" class="map-caption" style="margin-left: 8px;"></span>
+    </div>
+    <div id="poly-vertex-list" style="margin-top: 12px; display: none; max-height: 280px; overflow-y: auto; border: 1px solid var(--border); border-radius: 4px; padding: 10px 14px; font-family: var(--mono); font-size: 12px; line-height: 1.7;"></div>
   </section>
 
   <section>
@@ -202,7 +208,14 @@
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
           integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script>
+    // Tell cities.js where to find the dataset. The default fetch path is
+    // relative to the page URL; from playground/ we need to go up one level
+    // to reach the repo root's data/.
+    window.GeopuestoCitiesDataPath = '../data/cities1000.json';
+  </script>
   <script src="../geometry.js"></script>
+  <script src="../cities.js"></script>
   <script src="twoPoint.js"></script>
   <script src="bearings.js"></script>
   <script src="rotation.js"></script>
@@ -423,6 +436,112 @@
             cfg.shape.technicalLabel + ' · ' + cfg.vertices.length + ' vertices · ' +
             cfg.edges.length + ' edges · spin ' + state.spinDeg + '°';
         });
+      }
+
+      // ---------------------------------------------------------------
+      // Vertex enrichment (Sprint B Stage 2 polish, deferred from initial
+      // ship). Click "Enrich" → for each polyhedron vertex find the nearest
+      // city in the loaded GeoNames cities1000 dataset (population ≥ 50k
+      // filter for variety), render a list below the map. Cached per-
+      // vertex so subsequent enrichment of the same vertex is instant.
+      // No external API calls — uses already-loaded data via cities.js.
+      // ---------------------------------------------------------------
+      const ENRICH_MIN_POP = 50000;
+
+      function findNearestCity(vertex, cities, minPop) {
+        if (!cities || !cities.length) return null;
+        const target = window.Geometry.latLonToXYZ(vertex.lat, vertex.lon);
+        let bestCos = -2;
+        let best = null;
+        for (let i = 0; i < cities.length; i++) {
+          const c = cities[i];
+          if (c.population < minPop) continue;
+          const cVec = window.Geometry.latLonToXYZ(c.lat, c.lon);
+          // dot product on unit sphere = cos(angular distance). Max cos = min arc.
+          const cos = target[0]*cVec[0] + target[1]*cVec[1] + target[2]*cVec[2];
+          if (cos > bestCos) { bestCos = cos; best = c; }
+        }
+        if (!best) return null;
+        const arcRad = Math.acos(Math.max(-1, Math.min(1, bestCos)));
+        return {
+          name: best.name,
+          country: best.country,
+          population: best.population,
+          lat: best.lat,
+          lon: best.lon,
+          distanceKm: arcRad * window.Geometry.EARTH_R_KM,
+        };
+      }
+
+      function enrichVertices() {
+        const statusEl = document.getElementById('poly-enrich-status');
+        const listEl = document.getElementById('poly-vertex-list');
+        const cities = window.GeopuestoCitiesResolved;
+        if (!cities) {
+          statusEl.textContent = 'cities dataset still loading… try again in a moment.';
+          return;
+        }
+        if (!window.ShapeEngine || !window.ShapeEngine.ready) {
+          statusEl.textContent = 'shape engine not ready.';
+          return;
+        }
+        window.ShapeEngine.ready.then(function () {
+          const paramCfg = PARAMETRIC_SHAPES[state.shape];
+          let params;
+          if (paramCfg) { params = {}; params[paramCfg.param] = state[paramCfg.stateKey]; }
+          let cfg;
+          try {
+            cfg = window.ShapeEngine.configure(state.shape, state.anchor, state.spinDeg * Math.PI / 180, params);
+          } catch (e) { statusEl.textContent = 'shape configure failed: ' + e.message; return; }
+
+          const t0 = performance.now();
+          const results = cfg.vertices.map(function (v, i) {
+            // Check vertex cache first (3-decimal key from V3_VISION's API tier scheme)
+            let r = window.VertexCache.get('nearestCity50k', v);
+            if (!r) {
+              r = findNearestCity(v, cities, ENRICH_MIN_POP);
+              if (r) window.VertexCache.set('nearestCity50k', v, r);
+            }
+            return { index: i, vertex: v, city: r };
+          });
+          const ms = performance.now() - t0;
+
+          // Render the list. Each row: vertex N — nearest city + distance.
+          // Anchor (vertex 0) gets a distinctive orange tag; far cities get
+          // a muted note.
+          listEl.style.display = '';
+          listEl.textContent = '';
+          for (const r of results) {
+            const row = document.createElement('div');
+            const v = r.vertex;
+            const tag = (r.index === 0) ? '⬤ V0 (anchor)' : 'V' + r.index;
+            const head = document.createElement('span');
+            head.style.color = r.index === 0 ? 'var(--accent)' : 'var(--muted)';
+            head.textContent = tag.padEnd(12) + ' ';
+            const body = document.createElement('span');
+            if (r.city) {
+              body.textContent = r.city.name + ', ' + r.city.country +
+                ' — ' + Math.round(r.city.distanceKm).toLocaleString() + ' km' +
+                ' (pop ' + Math.round(r.city.population / 1000).toLocaleString() + 'k)';
+              if (r.city.distanceKm > 1500) {
+                body.style.opacity = '0.55';
+              }
+            } else {
+              body.textContent = 'no city found within population threshold';
+              body.style.opacity = '0.5';
+            }
+            row.appendChild(head);
+            row.appendChild(body);
+            listEl.appendChild(row);
+          }
+          statusEl.textContent = results.length + ' vertices enriched in ' + Math.round(ms) + ' ms.';
+        });
+      }
+
+      function clearEnrichment() {
+        document.getElementById('poly-vertex-list').style.display = 'none';
+        document.getElementById('poly-vertex-list').textContent = '';
+        document.getElementById('poly-enrich-status').textContent = '';
       }
 
       // ---------------------------------------------------------------
@@ -741,6 +860,8 @@
           state.polyN = Math.max(3, parseInt(e.target.value, 10) || 6);
           renderPolyhedra();
         });
+        document.getElementById('poly-enrich-btn').addEventListener('click', enrichVertices);
+        document.getElementById('poly-enrich-clear').addEventListener('click', clearEnrichment);
       }
 
       // ---------------------------------------------------------------

@@ -44,7 +44,12 @@
     return;
   }
 
-  window.GeopuestoCities = fetch('data/cities1000.json')
+  // Path-override hook: pages in subdirectories (e.g. playground/) can set
+  //   window.GeopuestoCitiesDataPath = '../data/cities1000.json'
+  // BEFORE loading this script. Falls through to the relative default that
+  // works from the antipodal app at the repo root.
+  const _citiesPath = window.GeopuestoCitiesDataPath || 'data/cities1000.json';
+  window.GeopuestoCities = fetch(_citiesPath)
     .then(function (r) {
       if (!r.ok) {
         throw new Error('cities1000.json HTTP ' + r.status);
