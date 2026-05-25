@@ -3744,7 +3744,9 @@ function renderInfo(lat, lng, data, nearby, wikiSummary, photos, sun, weather, c
         <div class="module-body" style="padding:0;border-top:1px solid var(--border);">${aisMap}</div>
       </div>`;
   } else if (ships === null && CONFIG.aisstreamToken) {
-    vesselsModule = `<div class="module full"><div class="module-header"><span>Vessels Nearby</span></div><div class="module-body"><div class="loading">Listening to AIS stream</div></div><div class="module-body" style="padding:0;border-top:1px solid var(--border);">${aisMap}</div></div>`;
+    // Vessels still loading via the AIS WebSocket — leave module empty until
+    // ships resolve (per "no card unless it loads something" UX directive).
+    vesselsModule = "";
   } else {
     // No token — still show the map
     vesselsModule = `
@@ -3824,15 +3826,12 @@ function renderInfo(lat, lng, data, nearby, wikiSummary, photos, sun, weather, c
   }
 
   // ============ Module: Now Playing at the Antipode (radio-browser) ============
+  // Per "no card unless it loads something" UX directive: only render this
+  // module when radio.length > 0. If the antipode's country has no registered
+  // internet-radio stations (or the antipode is in international waters),
+  // the card stays hidden rather than showing an "empty" placeholder.
   let radioModule = "";
-  if (isLand && Array.isArray(radio) && radio.length === 0) {
-    const ctry = addr.country ? ` in ${escapeHtml(addr.country)}` : "";
-    radioModule = `
-      <div class="module full">
-        <div class="module-header"><span>Now Playing at the Antipode</span><span class="meta">radio-browser.info</span></div>
-        <div class="module-body padded"><div style="font-family:'IBM Plex Mono',monospace;font-size:0.78rem;color:var(--dim);">No internet-radio stations registered${ctry}.</div></div>
-      </div>`;
-  } else if (isLand && Array.isArray(radio) && radio.length > 0) {
+  if (isLand && Array.isArray(radio) && radio.length > 0) {
     const top = radio[0];
     const alts = radio.slice(1, 6);
     const tagStr = (s) => (s.tags || "").split(",").filter(Boolean).slice(0, 2).join(" · ");
@@ -3905,14 +3904,12 @@ function renderInfo(lat, lng, data, nearby, wikiSummary, photos, sun, weather, c
   }
 
   // ============ Module: What's at This Exact Spot (Overpass POIs) ============
+  // Per "no card unless it loads something" UX directive: render only when
+  // pois has at least one entry. Empty-state ("no POIs within 2 km") is
+  // hidden so antipodes with no nearby Overpass features don't show a
+  // bare card.
   let poiModule = "";
-  if (Array.isArray(pois) && pois.length === 0) {
-    poiModule = `
-      <div class="module full">
-        <div class="module-header"><span>What's at This Exact Spot</span><span class="meta">OpenStreetMap · Overpass · 2 km</span></div>
-        <div class="module-body padded"><div style="font-family:'IBM Plex Mono',monospace;font-size:0.78rem;color:var(--dim);">No notable points of interest within 2 km. (Try zooming the map to scan for unmapped features.)</div></div>
-      </div>`;
-  } else if (Array.isArray(pois) && pois.length > 0) {
+  if (Array.isArray(pois) && pois.length > 0) {
     const cells = [tcell("POIs within 2 km", `${pois.length}`, "big")];
     pois.slice(0, 8).forEach(p => {
       const brg = compass(bearing(lat, lng, p.lat, p.lng));
@@ -3944,14 +3941,10 @@ function renderInfo(lat, lng, data, nearby, wikiSummary, photos, sun, weather, c
   }
 
   // ============ Module: Live Webcam Near Target (Windy) ============
+  // Per "no card unless it loads something" UX directive: render only when
+  // there's at least one webcam within the 250 km search radius.
   let webcamModule = "";
-  if (Array.isArray(webcams) && webcams.length === 0) {
-    webcamModule = `
-      <div class="module full">
-        <div class="module-header"><span>Live Webcam Near Target</span><span class="meta">Windy.com · 250 km radius</span></div>
-        <div class="module-body padded"><div style="font-family:'IBM Plex Mono',monospace;font-size:0.78rem;color:var(--dim);">No public webcams found within 250 km of the antipode.</div></div>
-      </div>`;
-  } else if (Array.isArray(webcams) && webcams.length > 0) {
+  if (Array.isArray(webcams) && webcams.length > 0) {
     const top = webcams[0];
     const alts = webcams.slice(1, 6);
     const distLabel = top.distKm != null ? `${Math.round(top.distKm)} km from antipode` : "";
@@ -3996,14 +3989,11 @@ function renderInfo(lat, lng, data, nearby, wikiSummary, photos, sun, weather, c
   }
 
   // ============ Module: 24-Hour Forecast (Windy Point Forecast) ============
+  // Per "no card unless it loads something" UX directive: render only when
+  // the Windy API actually returned forecast data. API hiccups / quota
+  // exhaustion no longer show a "forecast unavailable" placeholder.
   let forecastModule = "";
-  if (windyForecast === null) {
-    forecastModule = `
-      <div class="module full">
-        <div class="module-header teal"><span>24-Hour Forecast</span><span class="meta">Windy Point Forecast · GFS</span></div>
-        <div class="module-body padded"><div style="font-family:'IBM Plex Mono',monospace;font-size:0.78rem;color:var(--dim);">Forecast unavailable. (Windy API hiccup or daily quota.)</div></div>
-      </div>`;
-  } else if (windyForecast && Array.isArray(windyForecast.ts) && windyForecast.ts.length) {
+  if (windyForecast && Array.isArray(windyForecast.ts) && windyForecast.ts.length) {
     const ts = windyForecast.ts;
     const temps = windyForecast["temp-surface"];
     const windU = windyForecast["wind_u-surface"];
@@ -4096,9 +4086,9 @@ function renderInfo(lat, lng, data, nearby, wikiSummary, photos, sun, weather, c
           </div>
         </div>
       </div>`;
-  } else if (nearby.wikipedia && !wikiSummary) {
-    wikiModule = `<div class="module full"><div class="module-header orange"><span>About This Place</span></div><div class="module-body"><div class="loading">Loading Wikipedia summary</div></div></div>`;
   }
+  // Per "no card unless it loads something" UX directive: drop the loading
+  // placeholder. The card simply appears once the Wikipedia summary resolves.
 
   // ============ Module: Photos ============
   let photoModule = "";
@@ -4112,9 +4102,9 @@ function renderInfo(lat, lng, data, nearby, wikiSummary, photos, sun, weather, c
           </div>
         </div>
       </div>`;
-  } else if (nearby.commonsTitles && nearby.commonsTitles.length && photos === null) {
-    photoModule = `<div class="module full"><div class="module-header"><span>Geotagged Photos</span></div><div class="module-body"><div class="loading">Loading nearby photos</div></div></div>`;
   }
+  // Per "no card unless it loads something" UX directive: drop the loading
+  // placeholder. The card appears once the Commons photos resolve.
 
   // ============ Module: Visual feeds ============
   const satEmbed = isLand ? `
@@ -4125,29 +4115,27 @@ function renderInfo(lat, lng, data, nearby, wikiSummary, photos, sun, weather, c
       </div>
     </div>` : "";
 
+  // Per "no card unless it loads something" UX directive: only render when
+  // we have BOTH a land antipode AND a Google API key. Otherwise no card.
+  // (The previous "add a Google Maps key" config-hint card has been removed.)
   const sv = isLand && CONFIG.googleMapsApiKey ? `
     <div class="module full">
       <div class="module-header"><span>Street View</span><span class="meta">Google Maps Embed API</span></div>
       <div class="module-body">
         <iframe class="embed-frame" src="https://www.google.com/maps/embed/v1/streetview?key=${CONFIG.googleMapsApiKey}&location=${lat},${lng}&heading=0&pitch=0&fov=90" allowfullscreen referrerpolicy="no-referrer-when-downgrade"></iframe>
       </div>
-    </div>` : (isLand ? `
-    <div class="module full">
-      <div class="module-header"><span>Street View</span></div>
-      <div class="module-body"><div class="config-hint">Add a Google Maps Embed API key to <code>CONFIG.googleMapsApiKey</code> to enable.</div></div>
-    </div>` : "");
+    </div>` : "";
 
+  // Per "no card unless it loads something" UX directive: only render when
+  // we have a Mapillary token AND a nearby image. The "add a Mapillary
+  // token" config-hint card has been removed.
   const mp = CONFIG.mapillaryToken && mapillary && mapillary.id ? `
     <div class="module full">
       <div class="module-header"><span>Mapillary · Community Photos</span><span class="meta">${mapillary.distKm ? Math.round(mapillary.distKm).toLocaleString() + " km from antipode" : ""}${mapillary.captured_at ? " · " + new Date(mapillary.captured_at).toISOString().slice(0,10) : ""}</span></div>
       <div class="module-body">
         <iframe class="embed-frame" src="https://www.mapillary.com/embed?image_key=${mapillary.id}&style=photo" allowfullscreen></iframe>
       </div>
-    </div>` : (!CONFIG.mapillaryToken ? `
-    <div class="module full">
-      <div class="module-header"><span>Mapillary</span></div>
-      <div class="module-body"><div class="config-hint">Add a Mapillary token to <code>CONFIG.mapillaryToken</code> to enable community photos.</div></div>
-    </div>` : "");
+    </div>` : "";
 
   const windyOverlay = isLand ? "wind" : "waves";
   const windy = `
