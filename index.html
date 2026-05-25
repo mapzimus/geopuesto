@@ -150,6 +150,42 @@
     letter-spacing: 0.05em;
   }
 
+  /* ============ Lab Banner (CTA to /playground/) ============ */
+  /* Sticky pill under the console header inviting users to the geometry
+     sandbox. Matches the brand's orange→teal pivot (same gradient as
+     `.brand .pivot`). Subtle by default; orange hover state. */
+  .lab-banner {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 7px 20px;
+    background: linear-gradient(90deg, var(--orange-soft) 0%, var(--teal-soft) 100%);
+    border-bottom: 1px solid var(--orange-dim);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--text);
+    text-decoration: none;
+    line-height: 1.4;
+    transition: background 0.15s ease;
+  }
+  .lab-banner:hover { background: linear-gradient(90deg, var(--orange-dim) 0%, var(--teal-dim) 100%); }
+  .lab-banner:focus-visible { outline: 2px solid var(--orange); outline-offset: -2px; }
+  .lab-banner .lab-tag {
+    color: var(--orange);
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    font-size: 0.7rem;
+  }
+  .lab-banner .lab-msg { color: var(--text); flex: 1; }
+  .lab-banner .lab-msg em { color: var(--text-bright); font-style: normal; font-weight: 600; }
+  .lab-banner .lab-arrow { color: var(--teal); font-size: 1rem; transition: transform 0.15s ease; }
+  .lab-banner:hover .lab-arrow { transform: translateX(3px); color: var(--orange); }
+  .lab-banner .lab-sub { color: var(--dim); font-size: 0.7rem; }
+  @media (max-width: 720px) {
+    .lab-banner .lab-sub { display: none; }
+  }
+
   /* ============ Map Viewports ============ */
   .viewport-row {
     display: grid;
@@ -1669,6 +1705,13 @@
   </div>
 </header>
 
+<a href="./playground/" class="lab-banner" aria-label="Open the spherical-geometry playground">
+  <span class="lab-tag">▣ Lab</span>
+  <span class="lab-msg">Explore the <em>mind-bending geometry</em> behind any point (or points) on Earth</span>
+  <span class="lab-sub">polyhedra · curves · Monte Carlo</span>
+  <span class="lab-arrow" aria-hidden="true">→</span>
+</a>
+
 <div class="viewport-row">
   <div class="viewport origin">
     <div class="viewport-header origin">Origin</div>
@@ -1735,7 +1778,7 @@
 </main>
 
 <footer>
-  Geopuesto · Open data: OSM · Nominatim · Wikipedia · Wikimedia Commons · Open-Meteo · REST Countries · sunrise-sunset · wheretheiss.at · USGS · NOAA · radio-browser · Overpass · CARTO · Esri · OpenSky · AISStream · Mapillary · Google Maps · <a href="https://www.geonames.org/" target="_blank" rel="noopener">GeoNames</a> (CC BY 4.0)
+  Geopuesto · Open data: OSM · Nominatim · Wikipedia · Wikimedia Commons · Open-Meteo · REST Countries · sunrise-sunset · wheretheiss.at · USGS · NOAA · radio-browser · Overpass · CARTO · Esri · OpenSky · AISStream · Mapillary · Google Maps · <a href="https://www.geonames.org/" target="_blank" rel="noopener">GeoNames</a> (CC BY 4.0) · <a href="./playground/">Spherical-geometry playground →</a>
 </footer>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
