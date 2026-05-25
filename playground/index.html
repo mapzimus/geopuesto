@@ -524,10 +524,15 @@
           for (let i = 0; i < 32; i++) {
             const beta = (i * 360 / 32);
             const ray = Geometry.sampleLoxodrome(state.curveP, beta, state.curveDistKm, 120);
-            const raySegs = Geometry.antimeridianSplit(ray);
-            for (const seg of raySegs) {
-              L.polyline(seg, rayHalo).addTo(curvesLayer.polyline);
-              L.polyline(seg, rayLine).addTo(curvesLayer.polyline);
+            // Split at antimeridian, then clip at |lat|<=85 so polar-bound rays
+            // don't smear as horizontal stripes across the top/bottom of
+            // Mercator — same fix pattern as renderPersonalEquator in the
+            // consumer app. Web Mercator can't represent |lat|>85.05°.
+            for (const seg of Geometry.antimeridianSplit(ray)) {
+              for (const clipped of Geometry.clipPolylineToLat(seg, 85)) {
+                L.polyline(clipped, rayHalo).addTo(curvesLayer.polyline);
+                L.polyline(clipped, rayLine).addTo(curvesLayer.polyline);
+              }
             }
           }
           // Skip the unified samples → segments → polyline render below.
@@ -543,7 +548,18 @@
           return;
         }
 
-        const segments = Geometry.antimeridianSplit(samples);
+        // Two-stage cleanup: antimeridianSplit handles ±180° wraps; clip at
+        // |lat|<=85 prevents the Mercator polar-stripe artifact when the
+        // curve crosses into the projection's clipped polar caps (small
+        // circles near a pole, loxodromes spiraling toward one, isoazimuthal
+        // rings touching one). Same fix shape as the consumer app's
+        // renderPersonalEquator.
+        const segments = [];
+        for (const seg of Geometry.antimeridianSplit(samples)) {
+          for (const clipped of Geometry.clipPolylineToLat(seg, 85)) {
+            segments.push(clipped);
+          }
+        }
         for (const seg of segments) {
           L.polyline(seg, halo).addTo(curvesLayer.polyline);
           L.polyline(seg, line).addTo(curvesLayer.polyline);
