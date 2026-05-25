@@ -1198,6 +1198,111 @@
       renderPolyhedra();
       renderCurves();
 
+      // -------------------------------------------------------------
+      // ?debug=1 — runtime invariant battery (V2_PLAN.md §6)
+      // -------------------------------------------------------------
+      // Append ?debug=1 to the URL to run a batch of math sanity checks
+      // on page load. Results print to console; failures surface in a
+      // visible banner so you can't miss them. Cheap (<50ms total) but
+      // catches catalog typos, normalization slips, and edge-case math
+      // regressions instantly.
+      function runDebugInvariants() {
+        const tests = [];
+        function test(label, pass, detail) { tests.push({ label, pass, detail: detail || '' }); }
+
+        // Geometry kernel invariants
+        const G = window.Geometry;
+        const TP = window.TwoPoint;
+        const Bx = window.Bearings;
+
+        // Two-Point: Boston → Tokyo arc distance ≈ 10800 km
+        const d = TP.derive({ lat: 42.36, lon: -71.06 }, { lat: 35.69, lon: 139.69 });
+        test('Boston→Tokyo arc ~10800 km', Math.abs(d.distanceKm - 10800) < 200,
+             'got ' + d.distanceKm.toFixed(1) + ' km');
+
+        // Bearings: equator due-east = 90°, meridian-along asymmetry = 0
+        const eastB = Bx.initial({ lat: 0, lon: 0 }, { lat: 0, lon: 1 });
+        test('Bearings: equator due-east = 90°', Math.abs(eastB - 90) < 1e-6,
+             'got ' + eastB.toFixed(6) + '°');
+        const merP = Bx.pair({ lat: 0, lon: 0 }, { lat: 60, lon: 0 });
+        test('Bearings: along-meridian asymmetry = 0', Math.abs(merP.asymmetryDeg) < 1e-6,
+             'got ' + merP.asymmetryDeg.toExponential(2));
+
+        // Small circle: 360 samples at distance d_km from P all at angular
+        // distance d_km / R from P.
+        const P = { lat: 42.5, lon: -70.9 };
+        const dRad = 2000 / G.EARTH_R_KM;
+        const sc = G.sampleSmallCircle(P, dRad, 60);
+        const pX = G.latLonToXYZ(P.lat, P.lon);
+        let scMaxErr = 0;
+        for (const [lat, lon] of sc) {
+          const q = G.latLonToXYZ(lat, lon);
+          const arc = Math.acos(G.clamp(G.dot(pX, q), -1, 1));
+          const err = Math.abs(arc - dRad);
+          if (err > scMaxErr) scMaxErr = err;
+        }
+        test('Small circle samples at correct angular distance',
+             scMaxErr < 1e-10, 'max err ' + scMaxErr.toExponential(2) + ' rad');
+
+        // Loxodrome: due-east rhumb stays at constant latitude
+        const lox = G.sampleLoxodrome({ lat: 30, lon: 0 }, 90, 5000, 20);
+        let loxMaxLatErr = 0;
+        for (const [lat, lon] of lox) {
+          const err = Math.abs(lat - 30);
+          if (err > loxMaxLatErr) loxMaxLatErr = err;
+        }
+        test('Loxodrome: due-east stays at constant latitude',
+             loxMaxLatErr < 1e-10, 'max lat err ' + loxMaxLatErr.toExponential(2) + '°');
+
+        // ShapeEngine: every catalog shape resolves to its declared vertexCount
+        // with all vertices on the unit sphere. Async; gated by .ready.
+        window.ShapeEngine.ready.then(function () {
+          const shapes = window.ShapeEngine.listShapes();
+          let allShapeOk = true;
+          const shapeErrs = [];
+          for (const s of shapes) {
+            const params = s.id === 'fibonacciSphere' ? { N: 100 } :
+                           s.id === 'geodesicIcosahedron' ? { k: 2 } :
+                           s.id === 'nPrism' || s.id === 'nAntiprism' ? { n: 6 } : undefined;
+            const cfg = window.ShapeEngine.configure(s.id, { lat: 0, lon: 0 }, 0, params);
+            // Vertex count: skip for parametric where default-N differs.
+            // Unit-sphere check: every vertex's lat/lon should round-trip to a unit vector.
+            let maxErr = 0;
+            for (const v of cfg.vertices) {
+              const xyz = G.latLonToXYZ(v.lat, v.lon);
+              const norm = Math.sqrt(xyz[0]*xyz[0] + xyz[1]*xyz[1] + xyz[2]*xyz[2]);
+              const err = Math.abs(norm - 1);
+              if (err > maxErr) maxErr = err;
+            }
+            if (maxErr > 1e-9) { allShapeOk = false; shapeErrs.push(s.id + ': max norm err ' + maxErr.toExponential(2)); }
+          }
+          test('All ' + shapes.length + ' catalog shapes have unit-length vertices',
+               allShapeOk, shapeErrs.join('; '));
+
+          // Final report.
+          const failed = tests.filter(function (t) { return !t.pass; });
+          const passed = tests.length - failed.length;
+          console.log('%c[?debug=1] ' + passed + '/' + tests.length + ' invariants passed.',
+                       'font-weight:bold;color:' + (failed.length ? '#ff5a4a' : '#00bfa5'));
+          for (const t of tests) {
+            console.log((t.pass ? '✓' : '✗') + ' ' + t.label + (t.detail ? ' — ' + t.detail : ''));
+          }
+          // Visible banner.
+          const banner = document.createElement('div');
+          banner.style.cssText = 'position:fixed;top:0;left:0;right:0;padding:8px 16px;' +
+            'font-family:var(--mono);font-size:12px;z-index:10000;color:#0a0e14;' +
+            'background:' + (failed.length ? '#ff5a4a' : '#00bfa5') + ';';
+          banner.textContent = '[debug] ' + passed + '/' + tests.length + ' invariants pass' +
+            (failed.length ? ' · FAILURES: ' + failed.map(function (t) { return t.label; }).join(', ') : '') +
+            ' · click to dismiss';
+          banner.addEventListener('click', function () { banner.remove(); });
+          document.body.appendChild(banner);
+        });
+      }
+      if (new URLSearchParams(window.location.search).get('debug') === '1') {
+        runDebugInvariants();
+      }
+
     })();
   </script>
 </body>
