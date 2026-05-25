@@ -1,14 +1,15 @@
 # Geopuesto
 
-Single-file web app that shows what's on the exact opposite side of Earth from any location. Mission Control aesthetic — IBM Plex Mono, console title bar, instrument-cluster modules.
+Antipodal observation system. Shows what's on the exact opposite side of Earth from any location, plus "Your Personal Equator" — the great circle perpendicular to your antipodal axis with every GeoNames city along it. Mission Control aesthetic — IBM Plex Mono, console title bar, instrument-cluster modules.
+
+This is the consumer app at the repo root. Sibling research-geometry sandbox lives at [`playground/`](playground/) (Two-Point Mode, Geomates, Polyhedra Suite, Curves Suite).
 
 ## Stack
 
-- Plain HTML/CSS/JS in one file (`index.html`)
+- Plain HTML/CSS/JS — `index.html` plus the shared spherical-geometry kernel at top level (`geometry.js`, `cities.js`) used by both this app and `playground/`. No build step, no package.json, no node_modules.
 - Leaflet 1.9.4 from CDN for the two side-by-side maps
 - Esri Dark Gray Canvas + Reference labels (keyless tiles)
 - IBM Plex Mono + IBM Plex Sans via Google Fonts
-- No build step, no package.json, no node_modules
 
 ## How to run locally
 
@@ -124,12 +125,13 @@ Hero photo cascades: Wikipedia thumb → Commons photo → Mapillary image → g
 
 ## Deploy
 
-GitHub Pages at `maxwellhowegis.com/geopuesto/`:
-1. Clone the existing `maxwellhowegis.com` repo
-2. Create a `geopuesto/` subfolder at the repo root
-3. Copy `index.html` into it
-4. Commit and push to `main` (or `master`)
-5. GitHub Pages serves it at `https://maxwellhowegis.com/geopuesto/`
+Lives at `https://maxwellhowegis.com/geopuesto/`. This repo (`mapzimus/geopuesto`) is referenced as a git submodule by the parent portfolio repo `mapzimus/maxwellhowegis`. The portfolio's GitHub Pages workflow checks out submodules recursively, so the deploy flow is:
+
+1. Commit + push changes to `mapzimus/geopuesto` `main`.
+2. In the parent `maxwellhowegis` repo: `git submodule update --remote geopuesto`, then commit the bumped pointer and push.
+3. The Pages workflow on `mapzimus/maxwellhowegis` fires automatically and re-deploys the whole site (fast — the build is just file copy plus submodule fetch).
+
+Promotion from subfolder to standalone repo followed the `ma-atlas` precedent: `git filter-repo --subdirectory-filter geopuesto` against a clone of `maxwellhowegis`, push to a new GitHub repo, replace the subfolder with `git submodule add`. The 14 commits of pre-promotion history are preserved.
 
 ## Known limitations
 
