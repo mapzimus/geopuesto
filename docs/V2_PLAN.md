@@ -1,7 +1,7 @@
 # Geopuesto v2 — Implementation Plan
 
 **Status:** Phase 3 (Antipodal Ring) shipped 2026-05-24 through sub-phases 3a → 3b.9. Phases 5–6 (general equidistant ring + Geomates) now equivalent to V3_VISION.md's "Two-Point Mode" and tracked in [`../../.claude/plans/cozy-crunching-mist.md`](../../.claude/plans/cozy-crunching-mist.md).
-**Companion files:** [`geopuesto_master_spec.md`](geopuesto_master_spec.md) (full math + ambition), [`equidistant_geometry_demo.jsx`](equidistant_geometry_demo.jsx) (Three.js visualization reference), [`V3_VISION.md`](V3_VISION.md) (forward-looking spherical-geometry playground architecture — items beyond this plan's scope are tracked there).
+**Companion files:** [`geopuesto_master_spec.md`](geopuesto_master_spec.md) (full math + ambition), [`equidistant_geometry_demo.jsx`](equidistant_geometry_demo.jsx) (Three.js visualization reference), [`V3_VISION.md`](V3_VISION.md) (forward-looking spherical-geometry playground architecture — items beyond this plan's scope are tracked there), [`V3_ADDITIONS_2026-05-24.md`](V3_ADDITIONS_2026-05-24.md) (followup notes — geodesics on ellipsoid, isoazimuthal curves, portolan windroses, deep-math reading list, open "Curves Suite" architectural question).
 **Parent CLAUDE.md:** [`../CLAUDE.md`](../CLAUDE.md).
 
 This document captures the **strategic decisions** that scope v2 down from the full master spec, and the **phased plan** to ship it. The master spec is the math + research bible; this is the build plan.
