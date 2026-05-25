@@ -177,6 +177,45 @@
     ];
   }
 
+  /**
+   * Generate a uniformly random rotation on SO(3) via the Shoemake 1992
+   * quaternion method. Three independent uniform [0,1] inputs produce a
+   * unit quaternion whose distribution is the Haar measure on SO(3) —
+   * the genuinely uniform "pick a random orientation" distribution.
+   *
+   * Why not uniform Euler angles? They oversample orientations near gimbal-
+   * lock poles. Why not random axis + random angle? Same problem unless you
+   * use the right marginal distributions. Shoemake's is the closed-form
+   * answer that gets uniformity right with three uniforms and minimal trig.
+   *
+   * Used by the Monte Carlo null-hypothesis test in the Analysis Suite:
+   * thousands of random rotations of a polyhedron to estimate the null
+   * distribution of vertex-vs-dataset proximity statistics.
+   *
+   * @returns {number[]} 9-element row-major rotation matrix
+   */
+  function randomMatrix() {
+    const u1 = Math.random();
+    const u2 = Math.random();
+    const u3 = Math.random();
+    const sqrt1mU1 = Math.sqrt(1 - u1);
+    const sqrtU1 = Math.sqrt(u1);
+    // Shoemake quaternion (x, y, z, w):
+    const x = sqrt1mU1 * Math.sin(2 * Math.PI * u2);
+    const y = sqrt1mU1 * Math.cos(2 * Math.PI * u2);
+    const z = sqrtU1   * Math.sin(2 * Math.PI * u3);
+    const w = sqrtU1   * Math.cos(2 * Math.PI * u3);
+    // Convert unit quaternion → 3×3 row-major rotation matrix:
+    const xx = x*x, yy = y*y, zz = z*z;
+    const xy = x*y, xz = x*z, yz = y*z;
+    const xw = x*w, yw = y*w, zw = z*w;
+    return [
+      1 - 2*(yy + zz),    2*(xy - zw),        2*(xz + yw),
+      2*(xy + zw),        1 - 2*(xx + zz),    2*(yz - xw),
+      2*(xz - yw),        2*(yz + xw),        1 - 2*(xx + yy),
+    ];
+  }
+
   // ---------------------------------------------------------------------------
   // Attach
   // ---------------------------------------------------------------------------
@@ -188,6 +227,7 @@
     apply: apply,
     compose: compose,
     slerp: slerp,
+    randomMatrix: randomMatrix,
   };
 
 })(window);

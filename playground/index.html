@@ -209,6 +209,25 @@
     </div>
     <div id="analysis-map"></div>
     <div class="map-caption" id="analysis-caption">Click &ldquo;Load + render&rdquo; to fetch the dataset. Markers are sized + colored by magnitude (gray ≤ 4, orange 4-5, red ≥ 5).</div>
+
+    <div style="margin-top: 18px; padding: 14px; background: rgba(242, 101, 34, 0.05); border: 1px solid var(--border); border-radius: 4px;">
+      <div style="font-family: var(--mono); font-size: 12px; color: var(--accent); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 8px;">Monte Carlo null-hypothesis test</div>
+      <div class="map-caption" style="margin-bottom: 12px;">
+        Counts how many dataset points fall within R km of any polyhedron vertex
+        (the "observed" statistic), then compares against 1000 uniformly-random
+        rotations of the SAME polyhedron. The p-value is the fraction of random
+        rotations that matched or beat the observed count. Small p &rArr;
+        statistically unusual; ~0.5 &rArr; coincidence. Load a dataset above and
+        pick a polyhedron in the Polyhedra Suite first.
+      </div>
+      <div class="control-row" id="mc-radius-row">
+        <label style="flex: 1;">Search radius R: <span id="mc-radius-display">250</span> km
+          <input type="range" id="mc-radius-slider" min="50" max="2000" value="250" step="25" style="width: 100%;">
+        </label>
+        <button id="mc-run-btn" disabled style="opacity: 0.45; cursor: not-allowed;">Run Monte Carlo (1000 trials)</button>
+      </div>
+      <div id="mc-result" style="margin-top: 10px; font-family: var(--mono); font-size: 12px; line-height: 1.55; color: var(--fg); white-space: pre-wrap;"></div>
+    </div>
   </section>
 
   <section>
@@ -327,6 +346,7 @@
         curveType: 'smallCircle',
         curveDistKm: 2000,
         curveBearingDeg: 45,
+        mcRadiusKm: 250,  // Monte Carlo search radius (km) for vertex-vs-dataset proximity test
       };
 
       // Per-curve-type config: which control rows to show + which math fn to call.
@@ -749,6 +769,9 @@
       // ---------------------------------------------------------------
       let analysisMap = null;
       const analysisLayer = L.layerGroup();
+      // Raw dataset retained for Monte Carlo (loadAnalysisDataset populates this
+      // alongside the visual layer). Each entry is { lat, lon, mag, place }.
+      let lastDatasetFeatures = null;
 
       function ensureAnalysisMap() {
         if (analysisMap) return analysisMap;
@@ -784,6 +807,7 @@
           if (!r.ok) throw new Error('HTTP ' + r.status);
           const j = await r.json();
           const features = j.features || [];
+          const retained = [];  // populate as we iterate, retain for Monte Carlo
           let minMag = Infinity, maxMag = -Infinity;
           for (const f of features) {
             const coords = (f.geometry && f.geometry.coordinates) || null;
@@ -791,6 +815,7 @@
             // GeoJSON stores coordinates as [lon, lat, depth].
             const lon = coords[0], lat = coords[1];
             const mag = f.properties.mag != null ? f.properties.mag : 0;
+            retained.push({ lat: lat, lon: lon, mag: mag, place: f.properties.place || '' });
             if (mag < minMag) minMag = mag;
             if (mag > maxMag) maxMag = mag;
             const place = f.properties.place || '(unknown location)';
@@ -810,10 +835,12 @@
               { direction: 'top' }
             ).addTo(analysisLayer);
           }
+          lastDatasetFeatures = retained;  // keep alive for Monte Carlo
           caption.textContent = features.length + ' earthquakes rendered (M ' +
             (isFinite(minMag) ? minMag.toFixed(1) : '?') + '–' +
             (isFinite(maxMag) ? maxMag.toFixed(1) : '?') + ', USGS GeoJSON feed). ' +
             'Compare against polyhedron configurations above — the Becker-Hagens grid (rhombic triacontahedron, 32 verts) is the classic claim to test.';
+          updateMonteCarloButton();
         } catch (e) {
           caption.textContent = 'Failed to fetch USGS feed: ' + e.message;
         }
@@ -821,12 +848,188 @@
 
       function clearAnalysis() {
         if (analysisLayer) analysisLayer.clearLayers();
+        lastDatasetFeatures = null;
         document.getElementById('analysis-caption').textContent = 'Cleared. Click "Load + render" to fetch again.';
+        updateMonteCarloButton();
       }
 
       function bindAnalysisInputs() {
         document.getElementById('analysis-load-btn').addEventListener('click', loadAnalysisDataset);
         document.getElementById('analysis-clear-btn').addEventListener('click', clearAnalysis);
+        const mcBtn = document.getElementById('mc-run-btn');
+        if (mcBtn) mcBtn.addEventListener('click', runMonteCarlo);
+        const mcSlider = document.getElementById('mc-radius-slider');
+        if (mcSlider) mcSlider.addEventListener('input', function (e) {
+          const km = Math.max(50, Math.min(5000, parseInt(e.target.value, 10) || 250));
+          document.getElementById('mc-radius-display').textContent = km;
+          state.mcRadiusKm = km;
+        });
+        updateMonteCarloButton();
+      }
+
+      // ---------------------------------------------------------------
+      // Monte Carlo null-hypothesis test (V3_VISION Phase 4 marquee feature).
+      //
+      // Given the currently configured polyhedron + the loaded analysis
+      // dataset, count how many dataset points fall within R km of ANY
+      // polyhedron vertex (the "observed" statistic). Then generate
+      // N_TRIALS uniformly-random rotations of the polyhedron and
+      // recompute the same statistic for each — that's the null
+      // distribution. p-value = fraction of null trials ≥ observed.
+      //
+      // Small p → "this grid coincidence is statistically unusual."
+      // ~0.5 p → "this is what you'd expect by chance."
+      //
+      // Robust because the SAME polyhedron is rotated for both observed
+      // and null — only the orientation varies. Reduces bias from
+      // polyhedron-specific peculiarities like vertex count.
+      // ---------------------------------------------------------------
+      function updateMonteCarloButton() {
+        const btn = document.getElementById('mc-run-btn');
+        if (!btn) return;
+        const ready = !!lastDatasetFeatures && lastDatasetFeatures.length > 0;
+        btn.disabled = !ready;
+        btn.style.opacity = ready ? '1' : '0.45';
+        btn.style.cursor = ready ? 'pointer' : 'not-allowed';
+      }
+
+      function llToXyz(lat, lon) {
+        const phi = lat * Math.PI / 180;
+        const lam = lon * Math.PI / 180;
+        const c = Math.cos(phi);
+        return [c * Math.cos(lam), c * Math.sin(lam), Math.sin(phi)];
+      }
+
+      // Count dataset points within angular distance acos(cosThreshold) of
+      // ANY vertex. Early-exit per dataset point — typical case (most points
+      // far from all vertices) is O(M·N) with tight constant, fast.
+      function countPointsNearVertices(datasetXyz, vertsXyz, cosThreshold) {
+        let count = 0;
+        for (let i = 0; i < datasetXyz.length; i++) {
+          const p = datasetXyz[i];
+          for (let j = 0; j < vertsXyz.length; j++) {
+            const v = vertsXyz[j];
+            const cosAng = p[0]*v[0] + p[1]*v[1] + p[2]*v[2];
+            if (cosAng >= cosThreshold) { count++; break; }
+          }
+        }
+        return count;
+      }
+
+      async function runMonteCarlo() {
+        const resultEl = document.getElementById('mc-result');
+        while (resultEl.firstChild) resultEl.removeChild(resultEl.firstChild);
+
+        function appendLine(text) {
+          const div = document.createElement('div');
+          div.textContent = text;
+          resultEl.appendChild(div);
+        }
+
+        if (!lastDatasetFeatures || lastDatasetFeatures.length === 0) {
+          appendLine('No dataset loaded yet. Click "Load + render" above first.');
+          return;
+        }
+        if (!state.shape) {
+          appendLine('No polyhedron selected. Pick one from the Polyhedra Suite dropdown above.');
+          return;
+        }
+        if (!shapeEngineReady) {
+          appendLine('Shape catalog still loading — try again in a moment.');
+          return;
+        }
+        const R_KM = state.mcRadiusKm || 250;
+        const EARTH_R = window.Geometry.EARTH_R_KM;
+        const cosThreshold = Math.cos(R_KM / EARTH_R);
+        const N_TRIALS = 1000;
+
+        const datasetXyz = lastDatasetFeatures.map(function (f) { return llToXyz(f.lat, f.lon); });
+
+        // Resolve canonical (unit-sphere) vertices of the chosen polyhedron.
+        const paramCfg = PARAMETRIC_SHAPES[state.shape];
+        const params = paramCfg ? {} : undefined;
+        if (paramCfg) params[paramCfg.param] = state[paramCfg.stateKey];
+        let canonicalVerts;
+        if (window.ShapeEngine.canonicalVertices) {
+          canonicalVerts = window.ShapeEngine.canonicalVertices(state.shape, params);
+        } else {
+          const cfg = window.ShapeEngine.configure(state.shape, { lat: 0, lon: 0 }, 0, params);
+          canonicalVerts = cfg.vertices.map(function (v) { return llToXyz(v.lat, v.lon); });
+        }
+        const nV = canonicalVerts.length;
+
+        // OBSERVED: polyhedron as currently configured (anchor + spin).
+        const anchorXyz = llToXyz(state.anchor.lat, state.anchor.lon);
+        const v0 = canonicalVerts[0];
+        const alignM = window.Rotation.alignMatrix(v0, anchorXyz);
+        const spinM = window.Rotation.axisAngleMatrix(anchorXyz, state.spinDeg * Math.PI / 180);
+        const fullM = window.Rotation.compose(spinM, alignM);
+        const observedVerts = canonicalVerts.map(function (v) { return window.Rotation.apply(fullM, v); });
+        const observed = countPointsNearVertices(datasetXyz, observedVerts, cosThreshold);
+
+        appendLine('Running ' + N_TRIALS + ' trials…');
+        await new Promise(function (r) { setTimeout(r, 0); });
+
+        // NULL distribution.
+        const nullCounts = new Int32Array(N_TRIALS);
+        const t0 = performance.now();
+        const tmpVerts = new Array(nV);
+        for (let trial = 0; trial < N_TRIALS; trial++) {
+          const M = window.Rotation.randomMatrix();
+          for (let i = 0; i < nV; i++) {
+            tmpVerts[i] = window.Rotation.apply(M, canonicalVerts[i]);
+          }
+          nullCounts[trial] = countPointsNearVertices(datasetXyz, tmpVerts, cosThreshold);
+        }
+        const t1 = performance.now();
+
+        let sum = 0, atOrAbove = 0;
+        let minC = Infinity, maxC = -Infinity;
+        for (let i = 0; i < N_TRIALS; i++) {
+          const c = nullCounts[i];
+          sum += c;
+          if (c >= observed) atOrAbove++;
+          if (c < minC) minC = c;
+          if (c > maxC) maxC = c;
+        }
+        const mean = sum / N_TRIALS;
+        const sorted = Array.from(nullCounts).sort(function (a, b) { return a - b; });
+        const median = sorted[Math.floor(N_TRIALS / 2)];
+        const p025 = sorted[Math.floor(N_TRIALS * 0.025)];
+        const p975 = sorted[Math.floor(N_TRIALS * 0.975)];
+        const pValue = atOrAbove / N_TRIALS;
+
+        // === USER CONTRIBUTION POINT (Verdict phrasing) ===
+        // TODO (Max): edit the three branches below — this is the most
+        // user-facing string in the whole feature. The math is fixed; the
+        // wording isn't. Some options to consider:
+        //   "STATISTICALLY UNUSUAL — only N/1000 random rotations matched or beat this"
+        //   "Random rotations rarely match this — p = 0.0XX"
+        //   "12 out of 1000 random orientations did at least as well"
+        // ===
+        let verdict;
+        if (pValue < 0.05) {
+          verdict = 'STATISTICALLY UNUSUAL — the observed match beat ' + (100 - 100 * pValue).toFixed(1) + '% of random rotations (p = ' + pValue.toFixed(3) + ').';
+        } else if (pValue < 0.20) {
+          verdict = 'MARGINALLY UNUSUAL — observed beats ' + (100 - 100 * pValue).toFixed(0) + '% of random rotations (p = ' + pValue.toFixed(3) + '). Not strong evidence either way.';
+        } else {
+          verdict = 'TYPICAL — this is what you would expect by chance (p = ' + pValue.toFixed(3) + ').';
+        }
+
+        while (resultEl.firstChild) resultEl.removeChild(resultEl.firstChild);
+        appendLine('Polyhedron: ' + state.shape + ' (' + nV + ' vertices) anchored at ' + state.anchor.lat.toFixed(2) + ', ' + state.anchor.lon.toFixed(2) + ', spin ' + state.spinDeg + '°');
+        appendLine('Dataset: ' + lastDatasetFeatures.length + ' points');
+        appendLine('Radius: ' + R_KM + ' km (' + (R_KM / EARTH_R * 180 / Math.PI).toFixed(2) + '° of arc)');
+        appendLine('');
+        appendLine('OBSERVED: ' + observed + ' dataset points within ' + R_KM + ' km of any vertex');
+        appendLine('NULL DISTRIBUTION (' + N_TRIALS + ' random rotations):');
+        appendLine('  min ' + minC + ' · median ' + median + ' · mean ' + mean.toFixed(1) + ' · max ' + maxC);
+        appendLine('  middle 95% ≈ [' + p025 + ', ' + p975 + ']');
+        appendLine('p-value: ' + pValue.toFixed(3) + '  (' + (pValue * N_TRIALS) + ' of ' + N_TRIALS + ' random rotations matched or exceeded the observed count)');
+        appendLine('');
+        appendLine(verdict);
+        appendLine('');
+        appendLine('Compute time: ' + (t1 - t0).toFixed(0) + ' ms');
       }
 
       // ---------------------------------------------------------------
