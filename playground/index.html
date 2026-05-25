@@ -153,8 +153,8 @@
         <select id="curve-type-select">
           <option value="smallCircle" selected>Small circle at distance d</option>
           <option value="loxodrome">Loxodrome / rhumb line (constant bearing)</option>
+          <option value="windrose">Portolan windrose (32 rhumb lines from center)</option>
           <option value="isoazimuthal" disabled>Isoazimuthal heading ring (coming next)</option>
-          <option value="windrose" disabled>Portolan windrose (32 rhumb lines)</option>
         </select>
       </label>
     </div>
@@ -500,6 +500,30 @@
             ? ' — path clipped near the pole (rhumb lines spiral infinitely into a pole; truncated at ±89.5°)'
             : '';
           caption = 'Loxodrome at constant bearing ' + state.curveBearingDeg + '° (' + card + ') for ' + state.curveDistKm + ' km. Constant compass course — straight line on a Mercator map.' + polarNote;
+        } else if (state.curveType === 'windrose') {
+          // 32 rhumb lines from P at evenly-spaced bearings (every 11.25°).
+          // This is the navigational pattern in pre-Mercator portolan charts.
+          // Render each as its own polyline so antimeridian-splits work per ray.
+          // Light haloed strokes — 32 lines overlapping the center could get
+          // visually heavy otherwise.
+          const rayHalo = { color: '#000', weight: 3, opacity: 0.4, interactive: false };
+          const rayLine = { color: '#00bfa5', weight: 1.5, opacity: 0.75, interactive: false };
+          for (let i = 0; i < 32; i++) {
+            const beta = (i * 360 / 32);
+            const ray = Geometry.sampleLoxodrome(state.curveP, beta, state.curveDistKm, 120);
+            const raySegs = Geometry.antimeridianSplit(ray);
+            for (const seg of raySegs) {
+              L.polyline(seg, rayHalo).addTo(curvesLayer.polyline);
+              L.polyline(seg, rayLine).addTo(curvesLayer.polyline);
+            }
+          }
+          // Skip the unified samples → segments → polyline render below.
+          document.getElementById('curve-caption').textContent =
+            '32-ray portolan windrose from P, each ray a rhumb line at ' + state.curveDistKm +
+            ' km. Bearings every 11.25° (360°/32). Pre-Mercator navigators plotted courses ' +
+            'as straight chord-paths between intersecting windroses; this is one node of ' +
+            'such a chart.';
+          return;
         } else {
           document.getElementById('curve-caption').textContent =
             'The "' + typeCfg.label + '" variant is not yet implemented. Try "Small circle at distance d" or "Loxodrome".';
