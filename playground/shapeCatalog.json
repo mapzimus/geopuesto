@@ -197,6 +197,26 @@
       "vertexCount": 12,
       "generator": "nAntiprism",
       "generatorDefaults": { "n": 6 }
+    },
+    "stellaOctangula": {
+      "technicalLabel": "Stella Octangula (Stellated Octahedron)",
+      "userLabel": "Stella Octangula (two interpenetrating tetrahedra)",
+      "description": "Two regular tetrahedra interpenetrating to form an 8-pointed star. Vertices coincide with the cube's 8 corners; the two tetrahedra partition the cube vertices by sign(x·y·z). Discovered/named by Kepler. First entry in the catalog using explicit edges — the auto-detector would find the 12 cube edges, but we want the 12 stella tetrahedra edges (face diagonals of the cube, in two interleaved sets).",
+      "vertexCount": 8,
+      "vertices": [
+        [-0.5773502691896258, -0.5773502691896258, -0.5773502691896258],
+        [ 0.5773502691896258, -0.5773502691896258, -0.5773502691896258],
+        [-0.5773502691896258,  0.5773502691896258, -0.5773502691896258],
+        [ 0.5773502691896258,  0.5773502691896258, -0.5773502691896258],
+        [-0.5773502691896258, -0.5773502691896258,  0.5773502691896258],
+        [ 0.5773502691896258, -0.5773502691896258,  0.5773502691896258],
+        [-0.5773502691896258,  0.5773502691896258,  0.5773502691896258],
+        [ 0.5773502691896258,  0.5773502691896258,  0.5773502691896258]
+      ],
+      "edges": [
+        [1, 2], [1, 4], [1, 7], [2, 4], [2, 7], [4, 7],
+        [0, 3], [0, 5], [0, 6], [3, 5], [3, 6], [5, 6]
+      ]
     }
   }
 }
