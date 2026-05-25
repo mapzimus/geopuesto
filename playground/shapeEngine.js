@@ -409,7 +409,14 @@
     } else if (shape.edges) {
       computed = shape.edges;
     } else {
-      computed = computeEdges(shape.vertices);
+      // Use the `vertices` parameter (the resolved/generated array) rather
+      // than `shape.vertices`, which is undefined for parametric shapes with
+      // a `generator` field (Fibonacci sphere, geodesic, n-prism/antiprism).
+      // For non-parametric shapes the two are the same array, so this is a
+      // bug-fix-only change for parametric edge auto-detection — caught by
+      // the ?debug=1 invariant battery throwing on shapes with no explicit
+      // edges and no shape.vertices array.
+      computed = computeEdges(vertices);
     }
     edgeCache[shapeId] = computed;
     return computed;
