@@ -2025,32 +2025,58 @@ const PIN_HARD_CAP = 4000;
 function pickPinsForOverview(matches) {
   if (!matches || matches.length === 0) return matches || [];
   if (matches.length <= PIN_HARD_CAP) return matches;
-  // Cap exceeded — three-pass split-budget strategy (Phase 3b.11):
-  //   Pass 1: First 75% of cap goes to the closest cities, no other criteria.
-  //           Guarantees small-town coverage near the ring (Saint Johnsbury VT
-  //           at 124 km, all NE coastal towns, etc).
-  //   Pass 2: Remaining 25% fills first with famous cities (>=25k pop) NOT
-  //           already in pass 1. Catches iconic far-from-ring cities like
-  //           NYC/Albany/Montreal at the edge of wide-tolerance filters.
-  //   Pass 3: If budget STILL has room (narrow filter with few famous
-  //           candidates), fill with next-closest non-famous. Stops the
-  //           cap from being partially-used; every promised slot delivers.
+  // Cap exceeded — bearing-bucket pre-pass + three global passes (Phase 3b.12):
   //
-  // History: an earlier "famous-first then closest" version caused widening
-  // tolerance to REMOVE coverage for sparse regions (more famous candidates
-  // ate the budget). The three-pass version is monotonic: widening never
-  // removes a previously-shown city.
-  const CLOSEST_BUDGET = Math.floor(PIN_HARD_CAP * 0.75);
+  //   Pre-pass: divide the ring into BUCKET_COUNT bearing buckets (10° each).
+  //     Take up to BUCKET_CAP closest cities per bucket. This guarantees every
+  //     geographic segment of the ring gets representation regardless of how
+  //     dense other segments are. Sparse regions (Alaska, Patagonia) that only
+  //     occupy 2-3 buckets get all their cities; dense bands (Nigeria, India)
+  //     are capped per-bucket so they can't eat the whole budget.
+  //   Pass 1: remaining budget → globally closest cities not already picked.
+  //   Pass 2: remaining budget → famous (≥25k pop) not already picked.
+  //   Pass 3: fill any leftover slots with next-closest. Ensures cap is fully used.
+  //
+  // History:
+  //   3b.10 dropped bearing stratification (3b.7/3b.9) because it hid notable
+  //         far-from-ring cities. The pre-pass approach here avoids that: global
+  //         passes still run after, so far-but-famous cities still get in.
+  //   3b.11 raised cap 2000→4000 after VT small-town gap report. Still fails at
+  //         ±500km/1k+ where global matches reach 29k (7× the cap). Dense bands
+  //         consume all 3000 closeness slots; sparse regions lose sub-25k cities.
+  //   3b.12 adds pre-pass bearing stratification as a floor, not a ceiling.
+  const BUCKET_COUNT = 36;   // 10° per bucket
+  const BUCKET_CAP   = 30;   // max pins per bucket in the pre-pass
   const picked = new Set();
-  for (let i = 0; i < Math.min(matches.length, CLOSEST_BUDGET); i++) picked.add(matches[i]);
+
+  // Pre-pass: route matches into bearing buckets (matches is already sorted by
+  // distanceFromCircleKm, so each bucket's cities arrive in closeness order).
+  const buckets = Array.from({ length: BUCKET_COUNT }, () => []);
   for (const c of matches) {
-    if (picked.size >= PIN_HARD_CAP) break;
-    if ((c.population || 0) >= PIN_AUTO_INCLUDE_POP) picked.add(c);
+    const b = Math.min(Math.floor(c.bearingAlongCircleDeg / (360 / BUCKET_COUNT)), BUCKET_COUNT - 1);
+    buckets[b].push(c);
   }
+  for (const bucket of buckets) {
+    const take = Math.min(bucket.length, BUCKET_CAP);
+    for (let i = 0; i < take; i++) picked.add(bucket[i]);
+  }
+
+  // Pass 1: globally closest
   for (const c of matches) {
     if (picked.size >= PIN_HARD_CAP) break;
     picked.add(c);
   }
+  // Pass 2: famous not yet picked
+  for (const c of matches) {
+    if (picked.size >= PIN_HARD_CAP) break;
+    if ((c.population || 0) >= PIN_AUTO_INCLUDE_POP) picked.add(c);
+  }
+  // Pass 3: fill remaining
+  for (const c of matches) {
+    if (picked.size >= PIN_HARD_CAP) break;
+    picked.add(c);
+  }
+
   return Array.from(picked).sort((a, b) => a.distanceFromCircleKm - b.distanceFromCircleKm);
 }
 
