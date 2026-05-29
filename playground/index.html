@@ -37,6 +37,14 @@
     .readout.warn { background: rgba(255, 90, 74, 0.08); border-left-color: var(--fail); }
     .readout.warn .value { color: var(--fail); }
     #tp-map, #salem-map, #curves-map, #analysis-map { height: 360px; margin-top: 8px; border: 1px solid var(--border); border-radius: 4px; }
+    /* 3D globe view. Black background, no Earth texture by default — the
+       polyhedron geometry reads cleaner against pure black than against a
+       blue marble. User can toggle the texture (TODO comment marks the
+       stylistic decision point). Fixed 520px height — a bit taller than
+       the Leaflet maps so the globe doesn't get cropped on first paint. */
+    #globe-container { height: 520px; margin-top: 8px; background: #000; border: 1px solid var(--border); border-radius: 4px; position: relative; overflow: hidden; }
+    #globe-overlay { position: absolute; top: 10px; left: 10px; padding: 6px 10px; background: rgba(10, 14, 20, 0.7); border: 1px solid var(--border); border-radius: 3px; font-family: var(--mono); font-size: 11px; color: var(--fg); pointer-events: none; max-width: 260px; line-height: 1.5; }
+    #globe-overlay .lbl { color: var(--muted); }
     .map-caption { color: var(--muted); font-family: var(--mono); font-size: 11px; margin-top: 6px; }
     .control-row { display: flex; gap: 12px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; font-family: var(--mono); font-size: 12px; }
     .control-row label { display: flex; flex-direction: column; gap: 4px; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; }
@@ -88,6 +96,19 @@
          The audits flagged the previous H1 ("Two-Point Mode & Polyhedra Suite") as
          developer-jargon for a brand-new visitor. -->
   </header>
+
+  <section>
+    <h2>3D globe</h2>
+    <div class="map-caption" style="margin-bottom: 10px;">
+      Drag to rotate, scroll to zoom. The globe mirrors the polyhedron + Two-Point
+      state from the sections below — change anything down there and the globe
+      follows. Vertices are dots; edges are great-circle arcs on the sphere
+      surface.
+    </div>
+    <div id="globe-container">
+      <div id="globe-overlay"><span class="lbl">Loading globe…</span></div>
+    </div>
+  </section>
 
   <section>
     <h2>Two places on Earth</h2>
@@ -326,6 +347,8 @@
     <a href="docs/geopuesto_master_spec.md">master_spec</a>.
   </footer>
 
+  <!-- Globe.gl bundles Three.js internally — single script tag, no peer-dep dance. -->
+  <script src="https://unpkg.com/globe.gl@2.30.0/dist/globe.gl.min.js"></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
           integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script>
@@ -537,6 +560,9 @@
             radius: 6, color: pt.color, weight: 2, fillColor: pt.color, fillOpacity: 0.85,
           }).bindTooltip(pt.label + ' · ' + pt.desc + '<br>' + pt.p.lat.toFixed(2) + ', ' + pt.p.lon.toFixed(2), { direction: 'top' }).addTo(tpLayers.pins);
         }
+
+        // Paired update: same state, both rendered onto the 3D globe up top.
+        renderGlobeTwoPoint();
       }
 
       // ---------------------------------------------------------------
@@ -578,6 +604,172 @@
         polyLayers.edges = L.layerGroup().addTo(polyMap);
         polyLayers.pins = L.layerGroup().addTo(polyMap);
         return polyMap;
+      }
+
+      // ---------------------------------------------------------------
+      // 3D globe (Globe.gl). The globe mirrors BOTH the Polyhedra Suite
+      // state and the Two-Point Mode state, sharing a single sphere so
+      // you can see both at once. Two render slots write into a shared
+      // cache; globeApply() merges and pushes to Globe.gl.
+      //
+      // Render slot         Drives                       Render function
+      // -----------         ------                       ---------------
+      // poly{Points,Arcs}   Polyhedra Suite              renderGlobePolyhedron
+      // tp{Points,Paths}    Two-Point Mode               renderGlobeTwoPoint
+      // ---------------------------------------------------------------
+      let globeViz = null;
+      const globeCache = {
+        polyPoints: [], polyArcs: [],
+        tpPoints: [], tpPaths: [],
+        polyCaption: '', tpCaption: '',
+      };
+
+      function ensureGlobe() {
+        if (globeViz) return globeViz;
+        if (typeof Globe !== 'function') return null; // script still loading
+        const host = document.getElementById('globe-container');
+        if (!host) return null;
+        // TODO(stylistic): texture. Currently no Earth texture — pure black
+        //   sphere so the geometry reads cleanest. Swap in one of these to
+        //   add an Earth backdrop:
+        //     '//unpkg.com/three-globe/example/img/earth-night.jpg' (city lights)
+        //     '//unpkg.com/three-globe/example/img/earth-dark.jpg'  (muted)
+        //     '//unpkg.com/three-globe/example/img/earth-blue-marble.jpg'
+        // TODO(stylistic): atmosphere. `.showAtmosphere(true)` adds a subtle
+        //   teal halo; `false` keeps the silhouette crisp against the panel.
+        // TODO(stylistic): initial altitude. Lower (1.5–2.0) = closer-in;
+        //   higher (2.8+) = more of the sphere visible at once.
+        globeViz = Globe()(host)
+          .backgroundColor('#000000')
+          .globeImageUrl('')
+          .showAtmosphere(false)
+          // Points (used for both polyhedron vertices and Two-Point pins)
+          .pointAltitude(0.012)
+          .pointRadius('size')
+          .pointColor('color')
+          .pointLabel('label')
+          // Arcs (polyhedron edges)
+          .arcColor(function () { return '#00bfa5'; })
+          .arcStroke(0.45)
+          .arcAltitude(0)
+          .arcsTransitionDuration(0)
+          // Paths (Two-Point Mode great circles — orthodrome + bisector)
+          .pathPoints(function (d) { return d.coords; })
+          .pathPointLat(function (p) { return p[0]; })
+          .pathPointLng(function (p) { return p[1]; })
+          .pathColor(function (d) { return [d.color, d.color]; })
+          .pathStroke(2)
+          .pathTransitionDuration(0);
+
+        // Aim the camera at the anchor on first paint.
+        globeViz.pointOfView(
+          { lat: state.anchor.lat, lng: state.anchor.lon, altitude: 2.2 },
+          0
+        );
+        return globeViz;
+      }
+
+      // Merge the two render slots and push to Globe.gl. Cheap — runs on
+      // every Polyhedra or Two-Point change.
+      function globeApply() {
+        const g = ensureGlobe();
+        if (!g) return;
+        g.pointsData(globeCache.polyPoints.concat(globeCache.tpPoints));
+        g.arcsData(globeCache.polyArcs);
+        g.pathsData(globeCache.tpPaths);
+
+        const overlay = document.getElementById('globe-overlay');
+        if (overlay) {
+          while (overlay.firstChild) overlay.removeChild(overlay.firstChild);
+          if (globeCache.polyCaption) {
+            const t = document.createElement('div');
+            t.textContent = globeCache.polyCaption;
+            overlay.appendChild(t);
+          }
+          if (globeCache.tpCaption) {
+            const t = document.createElement('div');
+            t.className = 'lbl';
+            t.textContent = globeCache.tpCaption;
+            overlay.appendChild(t);
+          }
+        }
+      }
+
+      function renderGlobePolyhedron(cfg) {
+        if (!cfg) return;
+        // Vertices → points. Anchor (index 0) gets the orange accent so it
+        // stays readable against the off-white "regular" vertex dots.
+        globeCache.polyPoints = cfg.vertices.map(function (v, i) {
+          const isAnchor = (i === 0);
+          return {
+            lat: v.lat,
+            lng: v.lon,
+            color: isAnchor ? '#f26522' : '#e8e4d8',
+            size: isAnchor ? 0.85 : 0.5,
+            label: 'V' + i + (isAnchor ? ' (anchor)' : '') +
+                   '<br/>' + v.lat.toFixed(2) + ', ' + v.lon.toFixed(2),
+          };
+        });
+        // Edges → arcs. Globe.gl draws the shorter great-circle between
+        // each pair automatically — no antimeridian split needed because
+        // the sphere wraps.
+        const verts = cfg.vertices;
+        globeCache.polyArcs = cfg.edges.map(function (e) {
+          return {
+            startLat: verts[e[0]].lat, startLng: verts[e[0]].lon,
+            endLat:   verts[e[1]].lat, endLng:   verts[e[1]].lon,
+          };
+        });
+        globeCache.polyCaption = cfg.shape.technicalLabel + ' · ' +
+          cfg.vertices.length + ' verts · ' + cfg.edges.length + ' edges';
+        globeApply();
+      }
+
+      function renderGlobeTwoPoint() {
+        const G = window.Geometry;
+        if (!G || !TP) return;
+        // Always draw A and B even in the degenerate case.
+        const basePoints = [
+          { lat: state.A.lat, lng: state.A.lon, color: '#f26522', size: 0.9,
+            label: 'A · ' + state.A.lat.toFixed(2) + ', ' + state.A.lon.toFixed(2) },
+          { lat: state.B.lat, lng: state.B.lon, color: '#00bfa5', size: 0.9,
+            label: 'B · ' + state.B.lat.toFixed(2) + ', ' + state.B.lon.toFixed(2) },
+        ];
+        const d = TP.derive(state.A, state.B);
+        if (d.degenerate) {
+          globeCache.tpPoints = basePoints;
+          globeCache.tpPaths = [];
+          globeCache.tpCaption = 'A = B (or A = −B) — paths undefined';
+          globeApply();
+          return;
+        }
+        // Named-point pins — same color code as the flat map for continuity.
+        const named = [
+          { p: d.M,         label: 'M (midpoint)',         color: '#3b82f6' },
+          { p: d.mAntipode, label: '−M (Geomate)',         color: '#3b82f6' },
+          { p: d.n,         label: 'n (great-circle pole)', color: '#fbbf24' },
+          { p: d.nAntipode, label: '−n',                    color: '#fbbf24' },
+        ];
+        globeCache.tpPoints = basePoints.concat(named.map(function (x) {
+          return { lat: x.p.lat, lng: x.p.lon, color: x.color, size: 0.55, label: x.label };
+        }));
+
+        // Great-circle paths: orthodrome (A→B) in orange, perpendicular
+        // bisector (locus equidistant from A and B) in teal.
+        const a = G.latLonToXYZ(state.A.lat, state.A.lon);
+        const b = G.latLonToXYZ(state.B.lat, state.B.lon);
+        const orthoPole    = G.normalize(G.cross(a, b));
+        const bisectorPole = G.normalize(G.sub(a, b));
+        // sampleGreatCircle returns [[lat, lon], ...] — exactly the shape
+        // our pathPointLat/Lng accessors expect.
+        const orthoSamples    = G.sampleGreatCircle(orthoPole, 360);
+        const bisectorSamples = G.sampleGreatCircle(bisectorPole, 360);
+        globeCache.tpPaths = [
+          { coords: orthoSamples,    color: '#f26522' },
+          { coords: bisectorSamples, color: '#00bfa5' },
+        ];
+        globeCache.tpCaption = 'A→B great-circle (orange) · equidistant locus (teal)';
+        globeApply();
       }
 
       function renderPolyhedra() {
@@ -633,6 +825,10 @@
           // knows what they're testing without scrolling between sections.
           if (typeof updateMcActiveShape === 'function') updateMcActiveShape();
           if (typeof updateMonteCarloButton === 'function') updateMonteCarloButton();
+          // Mirror the same cfg onto the 3D globe at the top of the page.
+          // Cheap (just .pointsData / .arcsData updates), so we do it on
+          // every render — no debounce needed.
+          renderGlobePolyhedron(cfg);
         });
       }
 
