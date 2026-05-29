@@ -1,0 +1,20 @@
+# Cloudflare Worker config for the geopuesto live-feeds proxy.
+# Deploy steps + secret setup are in README.md (this folder).
+
+name = "geopuesto-live-feeds"
+main = "worker.js"
+compatibility_date = "2026-05-01"
+
+# Secrets are intentionally NOT stored in this file (it is committed to a public
+# repo). Set them once, after the first deploy, with wrangler:
+#
+#   wrangler secret put N2YO_API_KEY        # satellites overhead
+#   wrangler secret put WINDY_WEBCAMS_KEY   # live webcams
+#
+# OpenSky (flights) is anonymous and needs no secret.
+#
+# The Worker reads these via env.N2YO_API_KEY / env.WINDY_WEBCAMS_KEY at runtime.
+
+# Workers.dev gives you a free <name>.<subdomain>.workers.dev URL on deploy.
+# Leave this on unless you wire a custom route/domain.
+workers_dev = true

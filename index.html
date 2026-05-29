@@ -1801,6 +1801,14 @@ if (typeof history !== "undefined" && "scrollRestoration" in history) {
 //  All sections degrade gracefully if a key is missing.
 // ============================================================
 const CONFIG = {
+  // Live-feeds proxy base URL — a deployed Cloudflare Worker (see proxy/README.md).
+  // Three feeds (live webcams, flights overhead, satellites overhead) can't be called
+  // from a browser: OpenSky's CORS header is locked to its own domain, and N2YO + Windy
+  // send no CORS header AND need secret keys. The Worker relays them server-side with the
+  // keys injected from Worker secrets. Leave "" and those three modules simply stay hidden;
+  // set it to your deployed Worker URL (no trailing slash) to light them up.
+  proxyBase: "",
+
   // Google Maps Embed API key (for reliable Street View).
   // https://console.cloud.google.com/apis/credentials  · enable "Maps Embed API"
   googleMapsApiKey: "AIzaSyBjC4lYi3UHjoeYr2dSQhtvCP_-65NElcM",
@@ -1809,18 +1817,15 @@ const CONFIG = {
   // https://www.mapillary.com/dashboard/developers
   mapillaryToken: "MLY|26686666157666050|9060300fb68512109843dad9c092dcaa",
 
-  // N2YO API key (free, satellites/debris overhead).
-  // https://www.n2yo.com/api/
-  n2yoApiKey: "JNVZKT-6ZE2PS-EJ9LMS-5QO1",
-
-  // AISStream.io API key (free, live ship positions via WebSocket).
+  // AISStream.io API key (free, live ship positions via WebSocket — WebSockets aren't
+  // subject to CORS, so this one works straight from the browser).
   // https://aisstream.io/
   aisstreamToken: "c28d9568988eead5b9bc3055bfe2d1956e1d896a",
 
-  // Windy.com Webcams API key (free tier, live webcam thumbnails/embeds near antipode).
-  // https://api.windy.com/  · scope: Webcams API v3
-  // RESTRICT THIS KEY to HTTP referrer `maxwellhowegis.com/*` + `localhost/*` in the Windy dashboard.
-  windyWebcamsKey: "doXjGHqNId1n4ATkKcoyRF7p75X5ql60",
+  // NOTE: n2yoApiKey (satellites) and windyWebcamsKey (webcams) USED to live here, but
+  // their feeds are CORS-blocked in the browser. They now live as secrets on the proxy
+  // Worker (proxy/README.md) and are reached via `proxyBase` above — never shipped to the
+  // client. Rotate the old values: they're in this repo's git history.
 
   // Windy.com Map Forecast API key — programmatic access to weather tiles + extended embed config.
   // https://api.windy.com/  · scope: Map Forecast API
@@ -3000,6 +3005,15 @@ async function fetchISS() {
   } catch { return null; }
 }
 
+// Resolve a proxy route against CONFIG.proxyBase, or null when no proxy is configured
+// (pre-deploy / local dev). The live-feeds Worker (see proxy/README.md) reaches the
+// CORS-blocked, key-gated upstreams server-side and relays raw JSON back. Until proxyBase
+// is set these three modules return null/[] and stay hidden ("no card unless it loads").
+function proxyUrl(path) {
+  const base = (CONFIG.proxyBase || "").replace(/\/+$/, "");
+  return base ? base + path : null;
+}
+
 async function fetchOpenSkyFlights(lat, lng) {
   // ~200km bounding box
   const dLat = 200 / 111;
@@ -3008,8 +3022,11 @@ async function fetchOpenSkyFlights(lat, lng) {
   const lamax = Math.min(90, lat + dLat);
   const lomin = lng - dLng;
   const lomax = lng + dLng;
+  // OpenSky's CORS header is pinned to its own domain → unreadable in-browser. Via proxy.
+  const u = proxyUrl(`/flights?lamin=${lamin}&lomin=${lomin}&lamax=${lamax}&lomax=${lomax}`);
+  if (!u) return null;
   try {
-    const r = await fetch(`https://opensky-network.org/api/states/all?lamin=${lamin}&lomin=${lomin}&lamax=${lamax}&lomax=${lomax}`);
+    const r = await fetch(u);
     if (!r.ok) return null;
     const d = await r.json();
     if (!d.states) return [];
@@ -3094,10 +3111,12 @@ function compass(deg) {
 }
 
 async function fetchSatellitesAbove(lat, lng) {
-  if (!CONFIG.n2yoApiKey) return null;
+  // N2YO sends no CORS header and needs a secret apiKey — both handled by the proxy
+  // Worker, which injects the key server-side and returns N2YO's raw JSON unchanged.
+  const u = proxyUrl(`/satellites?lat=${lat}&lng=${lng}`);
+  if (!u) return null;
   try {
-    const url = `https://api.n2yo.com/rest/v1/satellite/above/${lat}/${lng}/0/70/0/&apiKey=${CONFIG.n2yoApiKey}`;
-    const r = await fetch(url);
+    const r = await fetch(u);
     if (!r.ok) return null;
     return await r.json();
   } catch { return null; }
@@ -3238,10 +3257,12 @@ function pickZoom(geoData) {
 
 // Windy Webcams API v3 — nearby live webcams (image + embed iframe URL)
 async function fetchWindyWebcams(lat, lng) {
-  if (!CONFIG.windyWebcamsKey) return null;
+  // Windy Webcams sends no CORS header and needs a secret x-windy-key — both handled by
+  // the proxy Worker, which injects the header server-side and relays Windy's raw JSON.
+  const u = proxyUrl(`/webcams?lat=${lat}&lng=${lng}`);
+  if (!u) return null;
   try {
-    const url = `https://api.windy.com/webcams/api/v3/webcams?nearby=${lat},${lng},250&limit=10&include=images,location,player`;
-    const r = await fetch(url, { headers: { "x-windy-key": CONFIG.windyWebcamsKey } });
+    const r = await fetch(u);
     if (!r.ok) return null;
     const d = await r.json();
     const list = Array.isArray(d.webcams) ? d.webcams : [];
@@ -3706,17 +3727,20 @@ function renderInfo(lat, lng, data, nearby, wikiSummary, photos, sun, weather, c
     overheadCells.push(tcell("ISS altitude", `${Math.round(iss.altitude)} km`));
     overheadCells.push(tcell("ISS speed", `${Math.round(iss.velocity).toLocaleString()} km/h`));
   }
+  let satsLoaded = false;
   if (sats && sats.info && Array.isArray(sats.above)) {
+    satsLoaded = true;
     overheadCells.push(tcell("Tracked above", `${sats.info.satcount}`, "big"));
     const top = sats.above.slice(0, 6).map(s => s.satname).join(", ");
     if (top) overheadCells.push(tcell("Examples", top, "text"));
   }
+  // Credit N2YO only when its data actually came through the proxy; ISS (wheretheiss.at)
+  // always works browser-side, so the module shows with just ISS when sats are absent.
   const overheadModule = overheadCells.length ? `
     <div class="module full">
-      <div class="module-header teal"><span>Overhead Right Now</span><span class="meta">wheretheiss.at${CONFIG.n2yoApiKey ? " · N2YO" : ""}</span></div>
+      <div class="module-header teal"><span>Overhead Right Now</span><span class="meta">wheretheiss.at${satsLoaded ? " · N2YO" : ""}</span></div>
       <div class="module-body">
         <div class="telemetry">${overheadCells.join("")}</div>
-        ${!CONFIG.n2yoApiKey ? `<div class="config-hint">Add an N2YO key to <code>CONFIG.n2yoApiKey</code> for live satellite & debris counts.</div>` : ""}
       </div>
     </div>` : "";
 
