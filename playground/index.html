@@ -60,6 +60,17 @@
     .quick-picks-label { color: var(--muted); }
     .quick-picks button { padding: 4px 10px; background: transparent; border: 1px solid var(--border); color: var(--fg); cursor: pointer; font-family: var(--mono); font-size: 11px; border-radius: 4px; }
     .quick-picks button:hover { border-color: var(--accent); color: var(--accent); }
+    /* City search autocomplete. The dropdown is absolutely positioned to a
+       wrapper around each coordinate input, so it floats over whatever is
+       below without pushing the layout around. */
+    .geo-search-wrap { position: relative; display: block; }
+    .geo-search-results { position: absolute; top: calc(100% + 2px); left: 0; min-width: 220px; width: max-content; max-width: 340px; z-index: 2000; background: #0d1119; border: 1px solid var(--border); border-radius: 4px; max-height: 244px; overflow-y: auto; box-shadow: 0 8px 22px rgba(0,0,0,0.55); }
+    .geo-search-item { padding: 6px 10px; cursor: pointer; display: flex; justify-content: space-between; align-items: baseline; gap: 14px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .geo-search-item:last-child { border-bottom: none; }
+    .geo-search-item.active, .geo-search-item:hover { background: rgba(242, 101, 34, 0.18); }
+    .geo-search-item .gs-name { font-family: var(--mono); font-size: 13px; color: var(--fg); }
+    .geo-search-item .gs-meta { font-family: var(--mono); font-size: 10px; color: var(--muted); white-space: nowrap; text-transform: uppercase; letter-spacing: 0.04em; }
+    .geo-search-empty { padding: 7px 10px; font-family: var(--mono); font-size: 11px; color: var(--muted); }
     #poly-spin-display { color: var(--accent); font-weight: 600; }
     .sprintc-buttons { margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; }
     .sprintc-buttons button { background: transparent; color: var(--fg); border: 1px solid var(--accent); padding: 8px 14px; font-family: var(--mono); font-size: 12px; cursor: pointer; border-radius: 4px; transition: background 0.15s; }
@@ -1639,6 +1650,185 @@
       }
 
       // ---------------------------------------------------------------
+      // City search (keyless geocoder). Nobody arrives knowing "42.36,
+      // -71.06" — they know "Boston." The GeoNames cities1000 dataset is
+      // ALREADY loaded for vertex enrichment, so we reuse it as an instant
+      // offline geocoder. No API, no key, no extra network. Type a name,
+      // pick from the dropdown, the coordinate field fills in and fires its
+      // existing change handler — every input keeps working untouched.
+      // ---------------------------------------------------------------
+
+      // Fold case + strip diacritics so "sao paulo" matches "São Paulo".
+      // The combining-marks range (U+0300–U+036F) is built from an ASCII
+      // string via new RegExp so no raw combining characters live in source
+      // (those get mangled by editors/git/copy-paste).
+      const DIACRITICS_RE = new RegExp('[\\u0300-\\u036f]', 'g');
+      function normForSearch(s) {
+        return (s || '').toLowerCase().normalize('NFD').replace(DIACRITICS_RE, '');
+      }
+
+      // Compact population: 12300000 → "12M", 654000 → "654k".
+      function fmtPop(n) {
+        if (!n) return '';
+        if (n >= 1e6) return (n / 1e6).toFixed(n >= 1e7 ? 0 : 1) + 'M';
+        if (n >= 1e3) return Math.round(n / 1e3) + 'k';
+        return '' + n;
+      }
+
+      // Precompute normalized names once (169k entries) so each keystroke is
+      // a cheap indexOf scan rather than 169k re-normalizations. Rebuilt only
+      // if the underlying cities array identity changes.
+      let _cityIndex = null;
+      function ensureCityIndex() {
+        const cities = window.GeopuestoCitiesResolved;
+        if (!cities) return null;                       // dataset still loading
+        if (_cityIndex && _cityIndex.cities === cities) return _cityIndex;
+        const names = new Array(cities.length);
+        for (let i = 0; i < cities.length; i++) names[i] = normForSearch(cities[i].name);
+        _cityIndex = { cities: cities, names: names };
+        return _cityIndex;
+      }
+
+      // Returns: null = dataset not ready; [] = ready but no match; [...] hits.
+      // Ranking: prefix matches first (so "bos" → Boston, not Strasbourg),
+      // each group sorted by population (so the famous one wins ties).
+      function searchCities(query, limit) {
+        const idx = ensureCityIndex();
+        if (!idx) return null;
+        const q = normForSearch(query.trim());
+        if (q.length < 2) return [];
+        const pre = [], sub = [];
+        const names = idx.names, cities = idx.cities;
+        for (let i = 0; i < names.length; i++) {
+          const pos = names[i].indexOf(q);
+          if (pos === 0) pre.push(cities[i]);
+          else if (pos > 0) sub.push(cities[i]);
+        }
+        const byPop = function (a, b) { return (b.population || 0) - (a.population || 0); };
+        pre.sort(byPop);
+        sub.sort(byPop);
+        return pre.concat(sub).slice(0, limit || 8);
+      }
+
+      function debounce(fn, ms) {
+        let t = null;
+        return function () {
+          const args = arguments, self = this;
+          clearTimeout(t);
+          t = setTimeout(function () { fn.apply(self, args); }, ms);
+        };
+      }
+
+      // Wire an autocomplete dropdown onto an existing coordinate <input>.
+      // On pick we write "lat,lon" back into the box and dispatch a synthetic
+      // 'change' so the input's own handler runs. Keeping coordinates visible
+      // is deliberate — this is a geometry sandbox, the numbers ARE the point.
+      function attachCitySearch(input) {
+        if (!input || input.dataset.citySearch) return;
+        input.dataset.citySearch = '1';
+        input.setAttribute('autocomplete', 'off');
+        input.setAttribute('placeholder', 'Type a city — or "lat, lon"');
+
+        const wrap = document.createElement('span');
+        wrap.className = 'geo-search-wrap';
+        input.parentNode.insertBefore(wrap, input);
+        wrap.appendChild(input);
+
+        const menu = document.createElement('div');
+        menu.className = 'geo-search-results';
+        menu.hidden = true;
+        wrap.appendChild(menu);
+
+        let matches = [];
+        let active = -1;
+
+        function close() { menu.hidden = true; active = -1; }
+
+        function clearMenu() { while (menu.firstChild) menu.removeChild(menu.firstChild); }
+
+        function note(text) {
+          clearMenu();
+          const n = document.createElement('div');
+          n.className = 'geo-search-empty';
+          n.textContent = text;
+          menu.appendChild(n);
+          menu.hidden = false;
+        }
+
+        function choose(city) {
+          // TODO(stylistic): what to show after a pick. Currently the raw
+          //   coordinates ("42.3601,-71.0589"). Alternatives if you'd rather
+          //   keep it friendly:
+          //     a) the city name, storing coords on input.dataset (needs the
+          //        handlers to read dataset instead of parsing the value), or
+          //     b) "Boston (42.36, -71.06)" — pretty but parseLatLon would
+          //        need to tolerate the prefix.
+          //   Coords-only keeps every existing handler working with zero edits.
+          input.value = city.lat.toFixed(4) + ',' + city.lon.toFixed(4);
+          input.dispatchEvent(new Event('change', { bubbles: true }));
+          close();
+        }
+
+        function render() {
+          clearMenu();
+          if (!matches.length) { close(); return; }
+          matches.forEach(function (c, i) {
+            const item = document.createElement('div');
+            item.className = 'geo-search-item' + (i === active ? ' active' : '');
+            const name = document.createElement('span');
+            name.className = 'gs-name';
+            name.textContent = c.name;
+            const meta = document.createElement('span');
+            meta.className = 'gs-meta';
+            meta.textContent = (c.country || '') + (c.population ? ' · ' + fmtPop(c.population) : '');
+            item.appendChild(name);
+            item.appendChild(meta);
+            // mousedown (not click) fires before the input's blur closes us.
+            item.addEventListener('mousedown', function (e) { e.preventDefault(); choose(c); });
+            menu.appendChild(item);
+          });
+          menu.hidden = false;
+        }
+
+        function update() {
+          const v = input.value;
+          // No letters → user is typing coordinates; stay out of the way.
+          if (!/[a-z]/i.test(v)) { close(); return; }
+          const res = searchCities(v, 8);
+          if (res === null) { note('Loading city database…'); return; }
+          matches = res;
+          active = res.length ? 0 : -1;
+          if (!res.length) { note('No match — try fewer letters, or type "lat, lon".'); return; }
+          render();
+        }
+
+        input.addEventListener('input', debounce(update, 80));
+        input.addEventListener('focus', function () {
+          if (/[a-z]/i.test(input.value)) update();
+        });
+        input.addEventListener('blur', function () { setTimeout(close, 120); });
+        input.addEventListener('keydown', function (e) {
+          if (menu.hidden || !matches.length) return;
+          if (e.key === 'ArrowDown') { e.preventDefault(); active = Math.min(active + 1, matches.length - 1); render(); }
+          else if (e.key === 'ArrowUp') { e.preventDefault(); active = Math.max(active - 1, 0); render(); }
+          else if (e.key === 'Enter') { if (matches[active]) { e.preventDefault(); choose(matches[active]); } }
+          else if (e.key === 'Escape') { close(); }
+        });
+      }
+
+      function wireCitySearch() {
+        ['tp-a-input', 'tp-b-input', 'tp-p-input', 'poly-anchor-input', 'curve-p-input']
+          .forEach(function (id) { attachCitySearch(document.getElementById(id)); });
+        // Build the search index as soon as the dataset is in memory so the
+        // first keystroke is instant rather than paying the 169k-name cost.
+        if (window.GeopuestoCitiesResolved) {
+          ensureCityIndex();
+        } else {
+          window.addEventListener('geopuesto:cities-ready', function () { ensureCityIndex(); }, { once: true });
+        }
+      }
+
+      // ---------------------------------------------------------------
       // Boot
       // ---------------------------------------------------------------
       wireSprintC();
@@ -1646,6 +1836,7 @@
       bindPolyhedraInputs();
       bindCurvesInputs();
       bindAnalysisInputs();
+      wireCitySearch();
       renderTwoPoint();
       renderCrossTrack();
       renderPolyhedra();
