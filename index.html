@@ -1822,11 +1822,6 @@ const CONFIG = {
   // RESTRICT THIS KEY to HTTP referrer `maxwellhowegis.com/*` + `localhost/*` in the Windy dashboard.
   windyWebcamsKey: "doXjGHqNId1n4ATkKcoyRF7p75X5ql60",
 
-  // Windy.com Point Forecast API key — hourly forecast for next 8-10 days from GFS / ECMWF.
-  // https://api.windy.com/  · scope: Point Forecast API v2
-  // Used by "24-Hour Forecast" module to augment the now-only Open-Meteo card.
-  windyPointForecastKey: "gZF78v9TS6ahoC39om4EdL8fp2KKZ0HD",
-
   // Windy.com Map Forecast API key — programmatic access to weather tiles + extended embed config.
   // https://api.windy.com/  · scope: Map Forecast API
   // Currently held in reserve — wiring a custom Windy weather tile overlay on the Leaflet maps
@@ -2962,24 +2957,38 @@ function nearestLandmark(lat, lng) {
   return best;
 }
 
-async function fetchGoogleTimezone(lat, lng) {
-  if (!CONFIG.googleMapsApiKey) return null;
+// Local time at the antipode. Open-Meteo carries the IANA timezone + UTC offset when
+// timezone=auto is requested — keyless and CORS-enabled, unlike Google's Timezone REST
+// API (a server-side "web service" that sends no Access-Control-Allow-Origin header).
+// Adapted to the Google-Timezone field shape the readout already consumes. Open-Meteo
+// folds DST into utc_offset_seconds, so dstOffset stays 0 and rawOffset carries it all.
+async function fetchTimezone(lat, lng) {
   try {
-    const ts = Math.floor(Date.now() / 1000);
-    const r = await fetch(`https://maps.googleapis.com/maps/api/timezone/json?location=${lat},${lng}&timestamp=${ts}&key=${CONFIG.googleMapsApiKey}`);
+    const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m&timezone=auto`);
     if (!r.ok) return null;
     const d = await r.json();
-    return d.status === "OK" ? d : null;
+    if (typeof d.utc_offset_seconds !== "number") return null;
+    return {
+      timeZoneId: d.timezone || "",
+      timeZoneName: d.timezone_abbreviation || d.timezone || "",
+      rawOffset: d.utc_offset_seconds,
+      dstOffset: 0,
+    };
   } catch { return null; }
 }
 
-async function fetchGoogleElevation(lat, lng) {
-  if (!CONFIG.googleMapsApiKey) return null;
+// Open-Meteo Elevation API — keyless and CORS-enabled. Google's Elevation REST service is
+// a server-side web service with no Access-Control-Allow-Origin header, so the browser
+// blocks it. Same provider family as the weather + air-quality modules. Open-Meteo returns
+// { elevation: [<metres>] }; we reshape to { elevation: <metres> } so the readout strip's
+// existing gelev.elevation access keeps working unchanged.
+async function fetchElevation(lat, lng) {
   try {
-    const r = await fetch(`https://maps.googleapis.com/maps/api/elevation/json?locations=${lat},${lng}&key=${CONFIG.googleMapsApiKey}`);
+    const r = await fetch(`https://api.open-meteo.com/v1/elevation?latitude=${lat}&longitude=${lng}`);
     if (!r.ok) return null;
     const d = await r.json();
-    return (d.status === "OK" && d.results && d.results[0]) ? d.results[0] : null;
+    const e = Array.isArray(d.elevation) ? d.elevation[0] : d.elevation;
+    return (typeof e === "number") ? { elevation: e } : null;
   } catch { return null; }
 }
 
@@ -3169,24 +3178,39 @@ function sentinelWmsUrl(lat, lng) {
   return `https://sh.dataspace.copernicus.eu/ogc/wms/${CONFIG.cdseInstanceId}?${params.toString()}`;
 }
 
-// Windy Point Forecast API v2 — hourly forecast (POST request)
-async function fetchWindyForecast(lat, lng) {
-  if (!CONFIG.windyPointForecastKey) return null;
+// Hourly forecast via Open-Meteo — keyless, CORS-enabled, GFS-backed. Windy's Point
+// Forecast v2 is a POST web service with no CORS headers (the browser rejected it with a
+// 400 before the body even mattered). We reshape Open-Meteo's columnar hourly output into
+// the exact Windy field names the readout already samples: ts[] in ms, temp-surface in
+// Kelvin, wind_u/v-surface in m/s, past3hprecip-surface in mm. Open-Meteo gives a single
+// scalar wind speed (no vector components), so we load it into wind_u and leave wind_v at
+// 0 — the renderer takes the magnitude hypot(u,v), which recovers the original speed.
+async function fetchHourlyForecast(lat, lng) {
   try {
-    const r = await fetch("https://api.windy.com/api/point-forecast/v2", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        lat, lon: lng,
-        model: "gfs",
-        parameters: ["temp", "wind", "precip"],
-        levels: ["surface"],
-        key: CONFIG.windyPointForecastKey,
-      }),
-    });
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}`
+      + `&hourly=temperature_2m,wind_speed_10m,precipitation`
+      + `&wind_speed_unit=ms&timeformat=unixtime&forecast_days=2`;
+    const r = await fetch(url);
     if (!r.ok) return null;
     const d = await r.json();
-    return (d && Array.isArray(d.ts)) ? d : null;
+    const h = d && d.hourly;
+    if (!h || !Array.isArray(h.time) || !h.time.length) return null;
+    const nowSec = Math.floor(Date.now() / 1000);
+    let startIdx = h.time.findIndex(t => t >= nowSec);
+    if (startIdx < 0) startIdx = 0;
+    const slice = (arr) => Array.isArray(arr) ? arr.slice(startIdx, startIdx + 30) : [];
+    const times = slice(h.time);
+    const tempsC = slice(h.temperature_2m);
+    const windMs = slice(h.wind_speed_10m);
+    const precip = slice(h.precipitation);
+    if (!times.length) return null;
+    return {
+      ts: times.map(t => t * 1000),
+      "temp-surface": tempsC.map(c => (c == null ? null : c + 273.15)),
+      "wind_u-surface": windMs,
+      "wind_v-surface": windMs.map(() => 0),
+      "past3hprecip-surface": precip,
+    };
   } catch { return null; }
 }
 
@@ -3561,15 +3585,15 @@ async function goTo(lat, lng, opts) {
     fetchISS(),
     fetchSatellitesAbove(anti.lat, anti.lng),
     fetchOpenSkyFlights(anti.lat, anti.lng),
-    fetchGoogleTimezone(anti.lat, anti.lng),
-    fetchGoogleElevation(anti.lat, anti.lng),
+    fetchTimezone(anti.lat, anti.lng),
+    fetchElevation(anti.lat, anti.lng),
     fetchEarthquakes(anti.lat, anti.lng),
     fetchAirQuality(anti.lat, anti.lng),
     fetchKpIndex(),
     fetchMagDeclination(anti.lat, anti.lng),
     fetchOverpassPOIs(anti.lat, anti.lng),
     fetchWindyWebcams(anti.lat, anti.lng),
-    fetchWindyForecast(anti.lat, anti.lng),
+    fetchHourlyForecast(anti.lat, anti.lng),
   ]);
 
   // Smart-zoom both maps based on what's at each end
@@ -3988,10 +4012,10 @@ function renderInfo(lat, lng, data, nearby, wikiSummary, photos, sun, weather, c
       </div>`;
   }
 
-  // ============ Module: 24-Hour Forecast (Windy Point Forecast) ============
+  // ============ Module: 24-Hour Forecast (Open-Meteo) ============
   // Per "no card unless it loads something" UX directive: render only when
-  // the Windy API actually returned forecast data. API hiccups / quota
-  // exhaustion no longer show a "forecast unavailable" placeholder.
+  // the forecast API actually returned data. API hiccups / outages no longer
+  // show a "forecast unavailable" placeholder.
   let forecastModule = "";
   if (windyForecast && Array.isArray(windyForecast.ts) && windyForecast.ts.length) {
     const ts = windyForecast.ts;
@@ -4030,7 +4054,7 @@ function renderInfo(lat, lng, data, nearby, wikiSummary, photos, sun, weather, c
     }
     forecastModule = `
       <div class="module full">
-        <div class="module-header teal"><span>24-Hour Forecast</span><span class="meta">Windy Point Forecast · GFS model · UTC</span></div>
+        <div class="module-header teal"><span>24-Hour Forecast</span><span class="meta">Open-Meteo · GFS model · UTC</span></div>
         <div class="module-body"><div class="telemetry">${cells.join("")}</div></div>
       </div>`;
   }
