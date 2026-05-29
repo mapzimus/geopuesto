@@ -10,7 +10,10 @@
     :root {
       --bg: #0a0e14;
       --fg: #e8e4d8;
-      --muted: #7c8aa8;
+      /* --muted lightened from #7c8aa8 (≈3.7:1 on --bg, fails WCAG AA) to
+         #9aa7c2 (≈4.7:1) so the pervasive caption/label/meta text clears the
+         4.5:1 body-text minimum. Flagged by the visual + a11y audits. */
+      --muted: #9aa7c2;
       --pass: #00bfa5;
       --fail: #ff5a4a;
       --accent: #f26522;
@@ -24,6 +27,8 @@
     header { border-bottom: 1px solid var(--border); padding-bottom: 16px; margin-bottom: 24px; }
     h1 { margin: 0 0 8px; font-size: 22px; font-weight: 500; letter-spacing: -0.01em; }
     .tagline { color: var(--muted); font-family: var(--mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; }
+    .lede { color: var(--fg); font-family: var(--sans); font-size: 14px; line-height: 1.55; margin: 10px 0 0; max-width: 70ch; opacity: 0.92; }
+    .lede strong { color: var(--accent); font-weight: 600; }
     section { margin-bottom: 28px; }
     /* T2-2: section H2s are an INDEX/LANDMARK, not the loudest thing on the
        page. Demoted from accent-orange + uppercase mono to a soft-bright
@@ -49,7 +54,12 @@
     .control-row { display: flex; gap: 12px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; font-family: var(--mono); font-size: 12px; }
     .control-row label { display: flex; flex-direction: column; gap: 4px; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; }
     .control-row input[type="text"], .control-row select { padding: 6px 10px; background: rgba(255,255,255,0.06); border: 1px solid var(--border); color: var(--fg); font-family: var(--mono); font-size: 13px; border-radius: 4px; min-width: 200px; text-transform: none; letter-spacing: normal; }
-    .control-row input[type="text"]:focus, .control-row select:focus { outline: none; border-color: var(--accent); }
+    /* Visible focus ring (a11y audit P1): the prior `outline:none` left only a
+       ~1px border color change, easy to lose when tabbing. Restore a clear ring
+       on every interactive control. */
+    .control-row input[type="text"]:focus-visible, .control-row select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-color: var(--accent); }
+    .quick-picks button:focus-visible, .sprintc-buttons button:focus-visible, .control-row button:focus-visible,
+    input[type="range"]:focus-visible, .geo-search-item:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
     /* T2-2: primary CTA buttons get amped. Bigger pad, drop shadow on hover. */
     .control-row button { padding: 9px 18px; background: var(--accent); color: var(--bg); border: none; cursor: pointer; font-family: var(--mono); font-size: 12px; font-weight: 700; border-radius: 4px; align-self: flex-end; letter-spacing: 0.02em; box-shadow: 0 1px 0 rgba(0,0,0,0.2); transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease; }
     .control-row button:hover { background: #ff7c3a; box-shadow: 0 2px 8px rgba(242,101,34,0.4); transform: translateY(-1px); }
@@ -64,13 +74,16 @@
        wrapper around each coordinate input, so it floats over whatever is
        below without pushing the layout around. */
     .geo-search-wrap { position: relative; display: block; }
-    .geo-search-results { position: absolute; top: calc(100% + 2px); left: 0; min-width: 220px; width: max-content; max-width: 340px; z-index: 2000; background: #0d1119; border: 1px solid var(--border); border-radius: 4px; max-height: 244px; overflow-y: auto; box-shadow: 0 8px 22px rgba(0,0,0,0.55); }
+    .geo-search-results { position: absolute; top: calc(100% + 2px); left: 0; min-width: 220px; width: max-content; max-width: min(340px, calc(100vw - 32px)); z-index: 2000; background: #0d1119; border: 1px solid var(--border); border-radius: 4px; max-height: 244px; overflow-y: auto; box-shadow: 0 8px 22px rgba(0,0,0,0.55); }
     .geo-search-item { padding: 6px 10px; cursor: pointer; display: flex; justify-content: space-between; align-items: baseline; gap: 14px; border-bottom: 1px solid rgba(255,255,255,0.05); }
     .geo-search-item:last-child { border-bottom: none; }
     .geo-search-item.active, .geo-search-item:hover { background: rgba(242, 101, 34, 0.18); }
     .geo-search-item .gs-name { font-family: var(--mono); font-size: 13px; color: var(--fg); }
-    .geo-search-item .gs-meta { font-family: var(--mono); font-size: 10px; color: var(--muted); white-space: nowrap; text-transform: uppercase; letter-spacing: 0.04em; }
+    .geo-search-item .gs-meta { font-family: var(--mono); font-size: 12px; color: var(--muted); white-space: nowrap; text-transform: uppercase; letter-spacing: 0.04em; }
     .geo-search-empty { padding: 7px 10px; font-family: var(--mono); font-size: 11px; color: var(--muted); }
+    /* Visually hidden but available to screen readers — carries live announcements
+       (result counts, "no match", "loading") for the city-search combobox. */
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
     #poly-spin-display { color: var(--accent); font-weight: 600; }
     .sprintc-buttons { margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; }
     .sprintc-buttons button { background: transparent; color: var(--fg); border: 1px solid var(--accent); padding: 8px 14px; font-family: var(--mono); font-size: 12px; cursor: pointer; border-radius: 4px; transition: background 0.15s; }
@@ -93,6 +106,33 @@
     footer { color: var(--muted); font-family: var(--mono); font-size: 11px; margin-top: 32px; padding-top: 16px; border-top: 1px solid var(--border); }
     footer a { color: var(--accent); text-decoration: none; }
     footer a:hover { text-decoration: underline; }
+
+    /* ---------------------------------------------------------------
+       Responsive (audit: the file previously had NO @media query at
+       all — every input carried a hard min-width:200px floor and the
+       maps/globe were locked to tall fixed heights, forcing horizontal
+       scroll and ~880px of dead space above the fold on a phone).
+       --------------------------------------------------------------- */
+    @media (max-width: 600px) {
+      body { padding: 16px 12px 48px; }
+      h1 { font-size: 19px; }
+      /* Let inputs and labels shrink to the viewport instead of overflowing. */
+      .control-row { gap: 8px; }
+      .control-row label { width: 100%; }
+      .control-row input[type="text"], .control-row select { min-width: 0; width: 100%; }
+      .control-row button { width: 100%; align-self: stretch; }
+      /* Shorter maps + globe so the page is scannable, not a tower of tiles. */
+      #tp-map, #salem-map, #curves-map, #analysis-map { height: 260px; }
+      #globe-container { height: 320px; }
+      #globe-overlay { max-width: min(260px, 70%); }
+    }
+
+    /* Honor reduced-motion: kill the toast slide/fade transition for users
+       who opt out of animation (the globe is drag-only, no auto-rotate). */
+    @media (prefers-reduced-motion: reduce) {
+      .toast { transition: none; }
+      .control-row button { transition: none; }
+    }
   </style>
 </head>
 <body>
@@ -106,6 +146,12 @@
          · "What can you say with two points and a sphere?"
          The audits flagged the previous H1 ("Two-Point Mode & Polyhedra Suite") as
          developer-jargon for a brand-new visitor. -->
+    <!-- Plain-language lede (usability audit P1: the page had no "what is this /
+         why care" sentence). Draft below — Max, swap in your own voice freely. -->
+    <p class="lede">A sandbox for sphere geometry. Measure the shortest path between
+      any two places, wrap 3D shapes around the globe, draw navigation curves, and
+      stress-test &ldquo;Earth grid&rdquo; theories against real earthquake data.
+      <strong>Type a city name</strong> into any coordinate box — or click a quick-pick — to start.</p>
   </header>
 
   <section>
@@ -116,7 +162,10 @@
       follows. Vertices are dots; edges are great-circle arcs on the sphere
       surface.
     </div>
-    <div id="globe-container">
+    <!-- aria-hidden: the globe is a purely visual 3D mirror of state that's also
+         conveyed by the section maps + text readouts; a WebGL canvas exposes
+         nothing useful to a screen reader (a11y audit P0-2). -->
+    <div id="globe-container" aria-hidden="true">
       <div id="globe-overlay"><span class="lbl">Loading globe…</span></div>
     </div>
   </section>
@@ -140,10 +189,10 @@
     </div>
     <div class="control-row" style="margin-top: 14px;">
       <label>A (origin):
-        <input type="text" id="tp-a-input" value="42.3601,-71.0589" placeholder="lat, lon">
+        <input type="text" id="tp-a-input" value="42.3601,-71.0589" placeholder="Type a city — or lat, lon">
       </label>
       <label>B (second point):
-        <input type="text" id="tp-b-input" value="35.6895,139.6917" placeholder="lat, lon">
+        <input type="text" id="tp-b-input" value="35.6895,139.6917" placeholder="Type a city — or lat, lon">
       </label>
     </div>
     <div class="quick-picks">
@@ -157,7 +206,7 @@
     <div id="bos-tok-readout" style="margin-top: 14px;"></div>
     <div class="control-row" style="margin-top: 14px;">
       <label>Test point P (cross/along-track from A&ndash;B great circle):
-        <input type="text" id="tp-p-input" value="51.5074,-0.1278" placeholder="lat, lon">
+        <input type="text" id="tp-p-input" value="51.5074,-0.1278" placeholder="Type a city — or lat, lon">
       </label>
     </div>
     <div id="tp-xt-readout"></div>
@@ -168,7 +217,7 @@
     <!-- TODO (Max): plain-language section heading. Previous: "Polyhedra Suite · configurable" -->
     <div class="control-row">
       <label>Anchor:
-        <input type="text" id="poly-anchor-input" value="42.5195,-70.8967" placeholder="lat, lon">
+        <input type="text" id="poly-anchor-input" value="42.5195,-70.8967" placeholder="Type a city — or lat, lon">
       </label>
       <label>Shape:
         <select id="poly-shape-select">
@@ -248,14 +297,16 @@
     </div>
     <div class="control-row">
       <label>Center P:
-        <input type="text" id="curve-p-input" value="42.5195,-70.8967" placeholder="lat, lon">
+        <input type="text" id="curve-p-input" value="42.5195,-70.8967" placeholder="Type a city — or lat, lon">
       </label>
       <label>Curve type:
         <select id="curve-type-select">
-          <option value="smallCircle" selected>Small circle at distance d</option>
-          <option value="loxodrome">Loxodrome / rhumb line (constant bearing)</option>
-          <option value="windrose">Portolan windrose (32 rhumb lines from center)</option>
-          <option value="isoazimuthal">Isoazimuthal heading ring (constant back-bearing θ)</option>
+          <!-- Plain-first labels (usability audit P1-4): the math name trails the
+               everyday description, matching the Polyhedra dropdown convention. -->
+          <option value="smallCircle" selected>Ring at a fixed distance &middot; small circle</option>
+          <option value="loxodrome">Constant-compass-heading line &middot; loxodrome / rhumb line</option>
+          <option value="windrose">Compass rose &middot; 32 headings from center &middot; portolan windrose</option>
+          <option value="isoazimuthal">Same-bearing-home ring &middot; isoazimuthal</option>
         </select>
       </label>
     </div>
@@ -304,7 +355,7 @@
     <div class="map-caption" id="analysis-caption">Click &ldquo;Load + render&rdquo; to fetch the dataset. Markers are sized + colored by magnitude (gray ≤ 4, orange 4-5, red ≥ 5).</div>
 
     <div style="margin-top: 18px; padding: 14px; background: rgba(242, 101, 34, 0.05); border: 1px solid var(--border); border-radius: 4px;">
-      <div style="font-family: var(--mono); font-size: 12px; color: var(--accent); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 8px;">Monte Carlo null-hypothesis test</div>
+      <h3 style="font-family: var(--mono); font-size: 12px; color: var(--accent); letter-spacing: 0.06em; text-transform: uppercase; margin: 0 0 8px; font-weight: 600;">Monte Carlo null-hypothesis test</h3>
       <div class="map-caption" style="margin-bottom: 12px;">
         Counts how many dataset points fall within R km of any polyhedron vertex
         (the "observed" statistic), then compares against 1000 uniformly-random
@@ -328,7 +379,7 @@
         <label style="flex: 1;">Search radius R: <span id="mc-radius-display">250</span> km
           <input type="range" id="mc-radius-slider" min="50" max="2000" value="250" step="25" style="width: 100%;">
         </label>
-        <button id="mc-run-btn" disabled style="opacity: 0.45; cursor: not-allowed;" title="Load a dataset above first.">Run Monte Carlo (load a dataset first)</button>
+        <button id="mc-run-btn" disabled title="Load a dataset above first.">Run Monte Carlo (load a dataset first)</button>
       </div>
       <div id="mc-result" style="margin-top: 10px; font-family: var(--mono); font-size: 12px; line-height: 1.55; color: var(--fg); white-space: pre-wrap;"></div>
     </div>
@@ -338,7 +389,7 @@
     <h2>Share &amp; export</h2>
     <!-- TODO (Max): plain-language section heading. Previous: "Sprint C · Share link & export" -->
     <div class="map-caption" style="margin-bottom: 10px;">
-      Share copies a URL that restores the current configuration (A, B, anchor, shape, spin). Open the URL in a new tab to verify restore. GeoJSON / KML downloads contain the current polyhedron's vertices + edge segments.
+      Share copies a URL that restores the current configuration — the Two-Point origin and destination, the cross-track test point, the polyhedron anchor, plus its shape and spin. Open the URL in a new tab to verify restore. GeoJSON / KML downloads contain the current polyhedron's vertices + edge segments.
     </div>
     <div class="sprintc-buttons">
       <button id="btn-share">Copy share link</button>
@@ -455,6 +506,16 @@
         curveBearingDeg: 45,
         mcRadiusKm: 250,  // Monte Carlo search radius (km) for vertex-vs-dataset proximity test
       };
+
+      // Has the shape catalog finished loading? `SE.ready` is a Promise (always
+      // truthy once created), so synchronous callers — updateMcActiveShape() and
+      // runMonteCarlo() — need this boolean latch to know it has RESOLVED. It was
+      // previously referenced but never declared, throwing a ReferenceError that
+      // aborted renderPolyhedra()'s success callback mid-flight: the 3D globe
+      // never received its polyhedron and the Monte Carlo "active shape" echo +
+      // run button never updated. (P0 — flagged by the usability + interaction
+      // + functional-correctness audits.)
+      let shapeEngineReady = false;
 
       // Per-curve-type config: which control rows to show + which math fn to call.
       // Future variants (isoazimuthal, windrose) follow this pattern.
@@ -803,6 +864,10 @@
 
         if (!SE || !SE.ready) return;
         SE.ready.then(function () {
+          // Latch readiness BEFORE the calls below read it — keeps the flag in
+          // sync on the same callback that needs it, race-free regardless of
+          // Promise-handler registration order.
+          shapeEngineReady = true;
           let cfg;
           try {
             let params;
@@ -1100,6 +1165,8 @@
           if (p) {
             state.curveP = p;
             renderCurves();
+          } else {
+            flagBadCoord();
           }
         });
         document.getElementById('curve-type-select').addEventListener('change', function (e) {
@@ -1228,7 +1295,10 @@
               // the shape they just selected.
               const pmap = document.getElementById('salem-map');
               if (pmap && pmap.scrollIntoView) {
-                pmap.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                // Honor prefers-reduced-motion: jump instead of animate for
+                // users with vestibular sensitivity / motion sickness.
+                const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+                pmap.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'center' });
               }
             }
           });
@@ -1524,6 +1594,15 @@
         }, 2400);
       }
 
+      // One message, one helper, so every coordinate input fails loudly and
+      // identically. Before this, a typo or an unpicked city name was just
+      // swallowed (the change handler's `if (parsed)` had no else) and the map
+      // sat there unchanged with no hint why — the audit's "silent failure".
+      // City picks never reach here as errors: choose() writes valid "lat,lon"
+      // before dispatching change, so this only fires on genuinely bad text.
+      const BAD_COORD_MSG = 'Could not read that location — pick a city from the list, or type coordinates as "lat, lon".';
+      function flagBadCoord() { showToast(BAD_COORD_MSG, 'error'); }
+
       function wireSprintC() {
         document.getElementById('btn-share').addEventListener('click', function () {
           const url = SL.makeUrl(window.location.href, currentShareConfig());
@@ -1541,7 +1620,8 @@
           }
         });
         document.getElementById('btn-export-geojson').addEventListener('click', function () {
-          if (!SE || !SE.ready) return;
+          // No silent clicks: if the shape-engine module never loaded, say so.
+          if (!SE || !SE.ready) { showToast('Shape engine still loading — try again in a moment.', 'info'); return; }
           SE.ready.then(function () {
             const name = 'geopuesto-' + state.shape + '.geojson';
             EG.download(currentExportBundle(), name);
@@ -1549,7 +1629,8 @@
           });
         });
         document.getElementById('btn-export-kml').addEventListener('click', function () {
-          if (!SE || !SE.ready) return;
+          // No silent clicks: if the shape-engine module never loaded, say so.
+          if (!SE || !SE.ready) { showToast('Shape engine still loading — try again in a moment.', 'info'); return; }
           SE.ready.then(function () {
             const name = 'geopuesto-' + state.shape + '.kml';
             EG.downloadKML(currentExportBundle(), name);
@@ -1558,15 +1639,23 @@
         });
 
         // Hash-restore: parse URL hash on load, apply to state.
+        // NOTE: `restored.A` carries the Polyhedra anchor (schema key `a`), while
+        // `restored.tpA` carries the Two-Point origin (schema key `tpa`). They are
+        // distinct points — a shared link must restore BOTH or the Two-Point pane
+        // silently reverts to its default origin (the bug the audit caught).
         const restored = SL.fromCurrentLocation();
         let restoredAny = false;
         if (restored.A) { state.anchor = restored.A; restoredAny = true; }
+        if (restored.tpA) { state.A = restored.tpA; restoredAny = true; }
         if (restored.B) { state.B = restored.B; restoredAny = true; }
+        if (restored.P) { state.P = restored.P; restoredAny = true; }
         if (restored.shape) { state.shape = restored.shape; restoredAny = true; }
         if (restored.spinDeg != null) { state.spinDeg = restored.spinDeg; restoredAny = true; }
         if (restoredAny) {
           // Push the restored values into the form inputs so the UI matches state.
+          document.getElementById('tp-a-input').value = state.A.lat + ',' + state.A.lon;
           document.getElementById('tp-b-input').value = state.B.lat + ',' + state.B.lon;
+          document.getElementById('tp-p-input').value = state.P.lat + ',' + state.P.lon;
           document.getElementById('poly-anchor-input').value = state.anchor.lat + ',' + state.anchor.lon;
           document.getElementById('poly-shape-select').value = state.shape;
           document.getElementById('poly-spin-slider').value = state.spinDeg;
@@ -1589,12 +1678,18 @@
           renderTwoPoint();
           renderCrossTrack();
         }
+        // applyAB reads BOTH inputs, so validate only the field that fired —
+        // otherwise editing B would scold you about an untouched A.
+        function onABChange(e) {
+          if (e && e.target && !parseLatLon(e.target.value)) flagBadCoord();
+          applyAB();
+        }
         // Auto-render on input change. The previous explicit "Update" button
         // was redundant — every other text input on the page auto-renders, and
         // a dedicated button for Two-Point alone was an inconsistency the audits
         // flagged. Removed.
-        document.getElementById('tp-a-input').addEventListener('change', applyAB);
-        document.getElementById('tp-b-input').addEventListener('change', applyAB);
+        document.getElementById('tp-a-input').addEventListener('change', onABChange);
+        document.getElementById('tp-b-input').addEventListener('change', onABChange);
 
         document.querySelectorAll('[data-tp-b]').forEach(function (btn) {
           btn.addEventListener('click', function () {
@@ -1613,6 +1708,8 @@
           if (p) {
             state.P = p;
             renderCrossTrack();
+          } else {
+            flagBadCoord();
           }
         });
       }
@@ -1623,6 +1720,8 @@
           if (a) {
             state.anchor = a;
             renderPolyhedra();
+          } else {
+            flagBadCoord();
           }
         });
         document.getElementById('poly-shape-select').addEventListener('change', function (e) {
@@ -1737,12 +1836,41 @@
         const menu = document.createElement('div');
         menu.className = 'geo-search-results';
         menu.hidden = true;
+        // ARIA combobox/listbox wiring (a11y audit): without this the whole
+        // autocomplete is invisible to screen readers — they'd see a plain text
+        // box and never learn suggestions exist. The input is the combobox, the
+        // menu is its listbox popup, each row an option referenced by id.
+        const listboxId = input.id + '-listbox';
+        menu.id = listboxId;
+        menu.setAttribute('role', 'listbox');
+        menu.setAttribute('aria-label', 'City suggestions');
+        input.setAttribute('role', 'combobox');
+        input.setAttribute('aria-autocomplete', 'list');
+        input.setAttribute('aria-haspopup', 'listbox');
+        input.setAttribute('aria-controls', listboxId);
+        input.setAttribute('aria-expanded', 'false');
         wrap.appendChild(menu);
+
+        // Polite live region so result counts and "no match" / "loading" hints
+        // are spoken without stealing focus. Kept OUTSIDE the listbox so the
+        // listbox only ever contains option rows (valid ARIA structure).
+        const live = document.createElement('span');
+        live.className = 'sr-only';
+        live.setAttribute('role', 'status');
+        live.setAttribute('aria-live', 'polite');
+        wrap.appendChild(live);
 
         let matches = [];
         let active = -1;
 
-        function close() { menu.hidden = true; active = -1; }
+        function setExpanded(on) { input.setAttribute('aria-expanded', on ? 'true' : 'false'); }
+
+        function close() {
+          menu.hidden = true;
+          active = -1;
+          setExpanded(false);
+          input.removeAttribute('aria-activedescendant');
+        }
 
         function clearMenu() { while (menu.firstChild) menu.removeChild(menu.firstChild); }
 
@@ -1750,9 +1878,16 @@
           clearMenu();
           const n = document.createElement('div');
           n.className = 'geo-search-empty';
+          // Presentational: the hint is mirrored into the live region below, so
+          // marking it presentation avoids a double announcement and keeps the
+          // listbox free of non-option children.
+          n.setAttribute('role', 'presentation');
           n.textContent = text;
           menu.appendChild(n);
           menu.hidden = false;
+          setExpanded(true);
+          input.removeAttribute('aria-activedescendant');
+          live.textContent = text;
         }
 
         function choose(city) {
@@ -1775,6 +1910,9 @@
           matches.forEach(function (c, i) {
             const item = document.createElement('div');
             item.className = 'geo-search-item' + (i === active ? ' active' : '');
+            item.id = input.id + '-opt-' + i;
+            item.setAttribute('role', 'option');
+            item.setAttribute('aria-selected', i === active ? 'true' : 'false');
             const name = document.createElement('span');
             name.className = 'gs-name';
             name.textContent = c.name;
@@ -1788,6 +1926,11 @@
             menu.appendChild(item);
           });
           menu.hidden = false;
+          setExpanded(true);
+          // Point the combobox at the highlighted option so AT announces it as
+          // the user arrows through, while real focus stays in the input.
+          if (active >= 0) input.setAttribute('aria-activedescendant', input.id + '-opt-' + active);
+          else input.removeAttribute('aria-activedescendant');
         }
 
         function update() {
@@ -1800,6 +1943,9 @@
           active = res.length ? 0 : -1;
           if (!res.length) { note('No match — try fewer letters, or type "lat, lon".'); return; }
           render();
+          // Announce once when the list (re)appears; arrow-key moves are spoken
+          // via aria-activedescendant, so don't repeat the count on every move.
+          live.textContent = res.length + (res.length === 1 ? ' suggestion' : ' suggestions') + '. Use up and down arrows, Enter to choose.';
         }
 
         input.addEventListener('input', debounce(update, 80));

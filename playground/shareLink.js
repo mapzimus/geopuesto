@@ -10,8 +10,10 @@
  *
  * Schema (all fields optional, omitted when null/unset):
  *   mode: 'antipodal' | 'twoPoint' | 'polyhedra'
- *   a:   "lat,lon" (3 decimals)         — origin / point A
+ *   a:   "lat,lon" (3 decimals)         — origin / point A (antipodal) or polyhedra anchor (playground)
  *   b:   "lat,lon" (3 decimals)         — second point (twoPoint only)
+ *   tpa: "lat,lon" (3 decimals)         — playground Two-Point origin A (distinct from `a`)
+ *   p:   "lat,lon" (3 decimals)         — playground cross/along-track test point P
  *   shape: catalog id                   — polyhedra only, e.g. "cuboctahedron"
  *   spin: int degrees [0, 360)          — polyhedra only
  *   tol: int km                         — tolerance ring width
@@ -81,6 +83,10 @@
     if (aEnc) params.push('a=' + aEnc);
     const bEnc = encodePoint(config.B);
     if (bEnc) params.push('b=' + bEnc);
+    const tpaEnc = encodePoint(config.tpA);
+    if (tpaEnc) params.push('tpa=' + tpaEnc);
+    const pEnc = encodePoint(config.P);
+    if (pEnc) params.push('p=' + pEnc);
     if (isValidShapeId(config.shape)) {
       params.push('shape=' + encodeURIComponent(config.shape));
     }
@@ -108,7 +114,7 @@
    */
   function parse(hash) {
     const out = {
-      mode: null, A: null, B: null, shape: null,
+      mode: null, A: null, B: null, tpA: null, P: null, shape: null,
       spinDeg: null, toleranceKm: null, minPop: null,
     };
     if (typeof hash !== 'string' || hash.length === 0) return out;
@@ -127,6 +133,8 @@
           break;
         case 'a': out.A = decodePoint(value); break;
         case 'b': out.B = decodePoint(value); break;
+        case 'tpa': out.tpA = decodePoint(value); break;
+        case 'p': out.P = decodePoint(value); break;
         case 'shape':
           if (isValidShapeId(value)) out.shape = value;
           break;
