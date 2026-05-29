@@ -2893,17 +2893,22 @@ async function fetchMapillaryImage(lat, lng) {
   // sessionStorage cache by 10km grid cell — avoids re-querying when user clicks adjacent presets
   const cached = getMapillaryCache(lat, lng);
   if (cached !== undefined) return cached;
-  // Tiered bbox search — 50 km, 250 km, 1000 km
-  const tiers = [50, 250, 1000];
-  for (const km of tiers) {
-    const dLat = km / 111;
-    const dLng = km / Math.max(0.1, 111 * Math.cos(lat * Math.PI / 180));
-    const minLng = lng - dLng;
-    const minLat = Math.max(-89, lat - dLat);
-    const maxLng = lng + dLng;
-    const maxLat = Math.min(89, lat + dLat);
+  // Mapillary's /images bbox endpoint enforces TWO limits the old 50/250/1000 km tiers
+  // ignored: (1) the query area must be <= 0.010 square degrees — those tiers were 80x to
+  // 10000x over, so EVERY call 500'd ("bounding box area is too large"); and (2) a separate
+  // "too much data" guard that rejects even a legal-area box when it holds too many images
+  // (dense cities). Fix: search SMALL boxes first (sized in DEGREES, not km — the cap is in
+  // square degrees, so cos-lat scaling would re-breach it near the poles) and widen only for
+  // sparse areas. Dense spots resolve on the first tier and return before reaching the wide
+  // one; the wide tier is hit only where coverage is thin, so it never trips limit (2).
+  const halfTiers = [0.01, 0.025, 0.045]; // deg -> 0.02/0.05/0.09 deg boxes, all < 0.010 sq deg
+  for (const half of halfTiers) {
+    const minLng = lng - half;
+    const minLat = Math.max(-89, lat - half);
+    const maxLng = lng + half;
+    const maxLat = Math.min(89, lat + half);
     try {
-      const url = `https://graph.mapillary.com/images?fields=id,thumb_2048_url,captured_at,geometry&bbox=${minLng},${minLat},${maxLng},${maxLat}&limit=15&access_token=${CONFIG.mapillaryToken}`;
+      const url = `https://graph.mapillary.com/images?fields=id,thumb_2048_url,captured_at,geometry&bbox=${minLng},${minLat},${maxLng},${maxLat}&limit=8&access_token=${CONFIG.mapillaryToken}`;
       const r = await fetch(url);
       if (!r.ok) continue;
       const d = await r.json();
