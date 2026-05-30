@@ -715,29 +715,37 @@
         if (typeof Globe !== 'function') return null; // script still loading
         const host = document.getElementById('globe-container');
         if (!host) return null;
-        // TODO(stylistic): texture. Currently no Earth texture — pure black
-        //   sphere so the geometry reads cleanest. Swap in one of these to
-        //   add an Earth backdrop:
-        //     '//unpkg.com/three-globe/example/img/earth-night.jpg' (city lights)
-        //     '//unpkg.com/three-globe/example/img/earth-dark.jpg'  (muted)
-        //     '//unpkg.com/three-globe/example/img/earth-blue-marble.jpg'
-        // TODO(stylistic): atmosphere. `.showAtmosphere(true)` adds a subtle
-        //   teal halo; `false` keeps the silhouette crisp against the panel.
+        // "Earth in space" treatment. All four textures are CDN images from the
+        //   three-globe example bundle (same package family as the Globe.gl
+        //   script the page already loads), so this stays backend-free. If the
+        //   CDN is unreachable the globe degrades to a plain dark sphere — the
+        //   geometry overlay still renders, so nothing breaks offline.
+        //     globeImageUrl  — NASA Blue Marble daytime surface
+        //     bumpImageUrl   — topology relief so mountains catch the light
+        //     backgroundImageUrl — starfield, sells the "floating in space" look
+        //     showAtmosphere — soft blue limb glow around the silhouette
+        //   NOTE: a bright Earth competes with the thin geometry arcs (teal edges
+        //   can vanish over tropical ocean). The overlay is re-tuned for contrast
+        //   below — arc stroke is heavier than it was against the old black sphere.
         // TODO(stylistic): initial altitude. Lower (1.5–2.0) = closer-in;
         //   higher (2.8+) = more of the sphere visible at once.
         globeViz = Globe()(host)
-          .backgroundColor('#000000')
-          .globeImageUrl('')
-          .showAtmosphere(false)
+          .backgroundColor('#01010a')
+          .backgroundImageUrl('//unpkg.com/three-globe/example/img/night-sky.png')
+          .globeImageUrl('//unpkg.com/three-globe/example/img/earth-blue-marble.jpg')
+          .bumpImageUrl('//unpkg.com/three-globe/example/img/earth-topology.png')
+          .showAtmosphere(true)
+          .atmosphereColor('#5aa9e6')
+          .atmosphereAltitude(0.18)
           // Points (used for both polyhedron vertices and Two-Point pins)
           .pointAltitude(0.012)
           .pointRadius('size')
           .pointColor('color')
           .pointLabel('label')
           // Arcs (polyhedron edges)
-          .arcColor(function () { return '#00bfa5'; })
-          .arcStroke(0.45)
-          .arcAltitude(0)
+          .arcColor(function () { return '#26ffe6'; })
+          .arcStroke(0.75)
+          .arcAltitude(0.005)
           .arcsTransitionDuration(0)
           // Paths (Two-Point Mode great circles — orthodrome + bisector)
           .pathPoints(function (d) { return d.coords; })
