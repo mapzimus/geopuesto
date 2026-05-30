@@ -155,22 +155,6 @@
   </header>
 
   <section>
-    <h2>3D globe</h2>
-    <div class="map-caption" style="margin-bottom: 10px;">
-      Drag to rotate, scroll to zoom. The globe mirrors the polyhedron + Two-Point
-      state from the sections below — change anything down there and the globe
-      follows. Vertices are dots; edges are great-circle arcs on the sphere
-      surface.
-    </div>
-    <!-- aria-hidden: the globe is a purely visual 3D mirror of state that's also
-         conveyed by the section maps + text readouts; a WebGL canvas exposes
-         nothing useful to a screen reader (a11y audit P0-2). -->
-    <div id="globe-container" aria-hidden="true">
-      <div id="globe-overlay"><span class="lbl">Loading globe…</span></div>
-    </div>
-  </section>
-
-  <section>
     <h2>Two places on Earth</h2>
     <!-- TODO (Max): plain-language section heading. Previous: "Two-Point Mode · A → B" -->
     <div class="map-caption" style="margin-bottom: 12px;">
@@ -210,6 +194,21 @@
       </label>
     </div>
     <div id="tp-xt-readout"></div>
+  </section>
+
+  <section>
+    <h2>3D globe</h2>
+    <div class="map-caption" style="margin-bottom: 10px;">
+      Drag to rotate, scroll to zoom. The globe mirrors your two points (above) and
+      the polyhedron you spin up (below) — change either and the globe follows.
+      Vertices are dots; edges are great-circle arcs on the sphere surface.
+    </div>
+    <!-- aria-hidden: the globe is a purely visual 3D mirror of state that's also
+         conveyed by the section maps + text readouts; a WebGL canvas exposes
+         nothing useful to a screen reader (a11y audit P0-2). -->
+    <div id="globe-container" aria-hidden="true">
+      <div id="globe-overlay"><span class="lbl">Loading globe…</span></div>
+    </div>
   </section>
 
   <section>
@@ -696,6 +695,21 @@
         polyCaption: '', tpCaption: '',
       };
 
+      // Globe.gl defaults its WebGL canvas to window.innerWidth x innerHeight --
+      // NOT the size of #globe-container. Left unset, the canvas overflows the
+      // fixed-height box (overflow:hidden then clips it), so the sphere renders
+      // off-center AND the drag raycaster maps pointer coords against the wrong
+      // canvas rect, which is why rotation felt broken. Pin the canvas to the
+      // container's measured size and keep it matched whenever the layout reflows.
+      function sizeGlobeToContainer() {
+        if (!globeViz) return;
+        const host = document.getElementById('globe-container');
+        if (!host) return;
+        const w = host.clientWidth || host.offsetWidth;
+        const h = host.clientHeight || host.offsetHeight;
+        if (w > 0 && h > 0) globeViz.width(w).height(h);
+      }
+
       function ensureGlobe() {
         if (globeViz) return globeViz;
         if (typeof Globe !== 'function') return null; // script still loading
@@ -732,6 +746,16 @@
           .pathColor(function (d) { return [d.color, d.color]; })
           .pathStroke(2)
           .pathTransitionDuration(0);
+
+        // Match the canvas to the container now, and keep it matched on reflow.
+        // ResizeObserver catches container-driven changes (e.g. the responsive
+        // height swap below 720px); the window listener is a fallback for UAs
+        // without ResizeObserver.
+        sizeGlobeToContainer();
+        if (typeof ResizeObserver === 'function') {
+          new ResizeObserver(sizeGlobeToContainer).observe(host);
+        }
+        window.addEventListener('resize', sizeGlobeToContainer);
 
         // Aim the camera at the anchor on first paint.
         globeViz.pointOfView(
