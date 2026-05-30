@@ -1,0 +1,12 @@
+# Cloudflare Wrangler local state + secrets (proxy/)
+.wrangler/
+.dev.vars
+.dev.vars.*
+
+# Node
+node_modules/
+
+# Logs / OS cruft
+*.log
+.DS_Store
+Thumbs.db
