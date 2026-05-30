@@ -1292,6 +1292,59 @@
     display: block;
   }
 
+  /* ============ Orthodrome → Playground CTA (embedded at the foot of the equator module) ============ */
+  /* Contextual hand-off: the orthodrome is one great circle; the playground lets
+     you explore the full 3D geometry (two-point arcs, polyhedra, curves) on a
+     globe. Same orange→teal brand language as .lab-banner, but a contained card
+     that sits directly under the orthodrome content instead of a sticky strip. */
+  .equator-playground-cta {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-top: 18px;
+    padding: 14px 18px;
+    background: linear-gradient(90deg, var(--orange-soft) 0%, var(--teal-soft) 100%);
+    border: 1px solid var(--orange-dim);
+    border-radius: 2px;
+    text-decoration: none;
+    color: var(--text);
+    transition: background 0.15s ease, border-color 0.15s ease;
+  }
+  .equator-playground-cta:hover {
+    background: linear-gradient(90deg, var(--orange-dim) 0%, var(--teal-dim) 100%);
+    border-color: var(--orange);
+  }
+  .equator-playground-cta:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
+  .equator-playground-cta .cta-icon {
+    font-size: 1.5rem;
+    line-height: 1;
+    color: var(--teal);
+    flex-shrink: 0;
+  }
+  .equator-playground-cta .cta-text { flex: 1; min-width: 0; }
+  .equator-playground-cta .cta-title {
+    display: block;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-bright);
+    margin-bottom: 2px;
+  }
+  .equator-playground-cta .cta-sub {
+    display: block;
+    font-size: 0.78rem;
+    color: var(--dim);
+    line-height: 1.45;
+  }
+  .equator-playground-cta .cta-sub em { color: var(--text); font-style: normal; font-weight: 600; }
+  .equator-playground-cta .cta-arrow {
+    font-size: 1.2rem;
+    color: var(--teal);
+    flex-shrink: 0;
+    transition: transform 0.15s ease, color 0.15s ease;
+  }
+  .equator-playground-cta:hover .cta-arrow { transform: translateX(4px); color: var(--orange); }
+
   /* ============ Sentinel-2 satellite image ============ */
   .sentinel2-img {
     width: 100%;
@@ -2562,6 +2615,14 @@ function buildEquatorModuleHtml(lat, lng, cities, filters) {
         ${headlineHtml}
         ${controlsHtml}
         ${listHtml}
+        <a href="./playground/" class="equator-playground-cta" aria-label="Open the spherical-geometry playground">
+          <span class="cta-icon" aria-hidden="true">&#9635;</span>
+          <span class="cta-text">
+            <span class="cta-title">Keep exploring in the playground</span>
+            <span class="cta-sub">Your orthodrome is just one great circle. Spin up the <em>full 3D geometry</em> on a globe — two-point arcs, polyhedra, and curves.</span>
+          </span>
+          <span class="cta-arrow" aria-hidden="true">&rarr;</span>
+        </a>
       </div>
     </div>`;
 }
