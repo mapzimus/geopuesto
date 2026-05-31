@@ -133,6 +133,19 @@
       .toast { transition: none; }
       .control-row button { transition: none; }
     }
+
+    /* Verdict badge pill. Colors mirror verdict.js tierOf() — JS also sets
+       background-color inline from result.color, so these class colors are a
+       fallback. Dark text reads on all four mid-bright backgrounds. */
+    .verdict-badge {
+      display: inline-block; padding: 4px 12px; border-radius: 999px;
+      font-family: var(--mono); font-size: 12px; font-weight: 700;
+      letter-spacing: 0.04em; color: #0a0e14; margin-bottom: 8px;
+    }
+    .verdict-coincidence { background: #3ea66a; }
+    .verdict-nothing     { background: #8a93a0; }
+    .verdict-mild        { background: #e0a83a; }
+    .verdict-striking    { background: #ff7a3d; }
   </style>
 </head>
 <body>
@@ -427,6 +440,7 @@
   <script src="vertexCache.js"></script>
   <script src="shareLink.js"></script>
   <script src="exportGeo.js"></script>
+  <script src="verdict.js"></script>
   <script>
     (function () {
       'use strict';
@@ -504,6 +518,10 @@
         curveDistKm: 2000,
         curveBearingDeg: 45,
         mcRadiusKm: 250,  // Monte Carlo search radius (km) for vertex-vs-dataset proximity test
+        // Honesty meter: one entry per completed run this session,
+        // { rawP, config }. Session-only — NOT serialized into share links;
+        // every visitor starts their own clean shot.
+        mcAttempts: [],
       };
 
       // Has the shape catalog finished loading? `SE.ready` is a Promise (always
@@ -1514,38 +1532,85 @@
         const p975 = sorted[Math.floor(N_TRIALS * 0.975)];
         const pValue = atOrAbove / N_TRIALS;
 
-        // === USER CONTRIBUTION POINT (Verdict phrasing) ===
-        // TODO (Max): edit the three branches below — this is the most
-        // user-facing string in the whole feature. The math is fixed; the
-        // wording isn't. Some options to consider:
-        //   "STATISTICALLY UNUSUAL — only N/1000 random rotations matched or beat this"
-        //   "Random rotations rarely match this — p = 0.0XX"
-        //   "12 out of 1000 random orientations did at least as well"
-        // ===
-        let verdict;
-        if (pValue < 0.05) {
-          verdict = 'STATISTICALLY UNUSUAL — the observed match beat ' + (100 - 100 * pValue).toFixed(1) + '% of random rotations (p = ' + pValue.toFixed(3) + ').';
-        } else if (pValue < 0.20) {
-          verdict = 'MARGINALLY UNUSUAL — observed beats ' + (100 - 100 * pValue).toFixed(0) + '% of random rotations (p = ' + pValue.toFixed(3) + '). Not strong evidence either way.';
-        } else {
-          verdict = 'TYPICAL — this is what you would expect by chance (p = ' + pValue.toFixed(3) + ').';
-        }
+        // --- Verdict & Honesty layer (spec docs/specs/2026-05-30-…) ---
+        // Build this run's config descriptor (spec §4.2 schema). Used by the
+        // honesty meter and the attempt log.
+        const sourceEl = document.getElementById('analysis-source');
+        const config = {
+          shape: state.shape,
+          anchorLat: state.anchor.lat,
+          anchorLon: state.anchor.lon,
+          spinDeg: state.spinDeg,
+          radiusKm: R_KM,
+          datasetId: sourceEl ? sourceEl.value : null,
+        };
+        // Every completed run is an attempt — switching dataset/shape and
+        // re-running is exactly the forking-paths behavior the meter surfaces.
+        state.mcAttempts.push({ rawP: pValue, config: config });
 
+        // Plain-English verdict (pure module, spec §4.1).
+        const verdict = window.Verdict.interpret({
+          observedCount: observed,
+          rawP: pValue,
+          nDataPoints: lastDatasetFeatures.length,
+          vertexCount: nV,
+          radiusKm: R_KM,
+          datasetNoun: datasetNoun(config.datasetId),
+        });
+
+        // --- Render the verdict card into #mc-result ---
         while (resultEl.firstChild) resultEl.removeChild(resultEl.firstChild);
-        appendLine('Polyhedron: ' + state.shape + ' (' + nV + ' vertices) anchored at ' + state.anchor.lat.toFixed(2) + ', ' + state.anchor.lon.toFixed(2) + ', spin ' + state.spinDeg + '°');
-        appendLine('Dataset: ' + lastDatasetFeatures.length + ' points');
-        appendLine('Radius: ' + R_KM + ' km (' + (R_KM / EARTH_R * 180 / Math.PI).toFixed(2) + '° of arc)');
-        appendLine('');
-        appendLine('OBSERVED: ' + observed + ' dataset points within ' + R_KM + ' km of any vertex');
-        appendLine('NULL DISTRIBUTION (' + N_TRIALS + ' random rotations):');
-        appendLine('  min ' + minC + ' · median ' + median + ' · mean ' + mean.toFixed(1) + ' · max ' + maxC);
-        appendLine('  middle 95% ≈ [' + p025 + ', ' + p975 + ']');
-        appendLine('p-value: ' + pValue.toFixed(3) + '  (' + (pValue * N_TRIALS) + ' of ' + N_TRIALS + ' random rotations matched or exceeded the observed count)');
-        appendLine('');
-        appendLine(verdict);
-        appendLine('');
-        appendLine('Compute time: ' + (t1 - t0).toFixed(0) + ' ms');
+
+        const badge = document.createElement('div');
+        badge.className = 'verdict-badge verdict-' + verdict.tier;
+        badge.style.backgroundColor = verdict.color;  // spec §5: background = result.color
+        badge.textContent = verdict.badge;
+        resultEl.appendChild(badge);
+
+        const sentenceEl = document.createElement('p');
+        sentenceEl.style.margin = '0 0 10px';
+        sentenceEl.textContent = verdict.sentence;
+        resultEl.appendChild(sentenceEl);
+
+        // Diagnostics, demoted into a collapsed expander — nothing is lost.
+        const details = document.createElement('details');
+        details.style.whiteSpace = 'pre-wrap';  // preserve the indented number lines
+        const summaryEl = document.createElement('summary');
+        summaryEl.textContent = 'What does this mean?';
+        summaryEl.style.cursor = 'pointer';
+        details.appendChild(summaryEl);
+        function diag(text) {
+          const d = document.createElement('div');
+          d.textContent = text;
+          details.appendChild(d);
+        }
+        diag('Polyhedron: ' + state.shape + ' (' + nV + ' vertices) anchored at ' + state.anchor.lat.toFixed(2) + ', ' + state.anchor.lon.toFixed(2) + ', spin ' + state.spinDeg + '°');
+        diag('Dataset: ' + lastDatasetFeatures.length + ' points');
+        diag('Radius: ' + R_KM + ' km (' + (R_KM / EARTH_R * 180 / Math.PI).toFixed(2) + '° of arc)');
+        diag('');
+        diag('OBSERVED: ' + observed + ' dataset points within ' + R_KM + ' km of any vertex');
+        diag('NULL DISTRIBUTION (' + N_TRIALS + ' random rotations):');
+        diag('  min ' + minC + ' · median ' + median + ' · mean ' + mean.toFixed(1) + ' · max ' + maxC);
+        diag('  middle 95% ≈ [' + p025 + ', ' + p975 + ']');
+        diag(window.Verdict.formatP(pValue) + '  (' + atOrAbove + ' of ' + N_TRIALS + ' random rotations matched or exceeded the observed count)');
+        diag('');
+        diag('Compute time: ' + (t1 - t0).toFixed(0) + ' ms');
+        resultEl.appendChild(details);
+
+        // Honesty meter (Task 4 fills this in).
+        renderHonestyMeter();
       }
+
+      // Human plural noun for the active dataset, used in verdict copy.
+      // All current options are USGS earthquakes; volcanoes is the planned next.
+      function datasetNoun(sourceValue) {
+        if (sourceValue && sourceValue.indexOf('volcano') !== -1) return 'volcanoes';
+        return 'earthquakes';
+      }
+
+      // Renders the session honesty meter into #mc-honesty. Fully implemented
+      // in Task 4; this stub keeps runMonteCarlo() working in the meantime.
+      function renderHonestyMeter() { /* Task 4 */ }
 
       // ---------------------------------------------------------------
       // Sprint C — Share + Export from current state
