@@ -64,6 +64,7 @@
   </footer>
 
   <script src="geometry.js"></script>
+  <script src="playground/verdict.js"></script>
   <script>
     (function () {
       'use strict';
@@ -512,6 +513,67 @@
           : 'got ' + results.length + ' result(s): ' +
             results.map(function (r) { return r.name; }).join(', ');
         isTrue('exactly the synthetic on-ring city is returned', sec, ok, detail);
+      })();
+
+      // ---------------------------------------------------------------------
+      // Verdict module — interpret() tier boundaries + color guard (spec §10)
+      // ---------------------------------------------------------------------
+      (function verdictInterpret() {
+        const sec = 'Verdict · interpret() tiers';
+        const V = window.Verdict;
+        // Defensive: if verdict.js failed to load, record one clean red row
+        // instead of throwing (which would abort the summary update below).
+        if (!V || typeof V.interpret !== 'function') {
+          isTrue('verdict.js loaded and exposes interpret()', sec, false,
+                 'window.Verdict.interpret missing');
+          return;
+        }
+
+        function tierAt(rawP) {
+          return V.interpret({ observedCount: 1, rawP: rawP, nDataPoints: 10,
+                               vertexCount: 12, radiusKm: 250 }).tier;
+        }
+        // Half-open bands: [0.20,∞)=coincidence, [0.05,0.20)=nothing,
+        // [0.01,0.05)=mild, [0,0.01)=striking.
+        const cases = [
+          [0.25, 'coincidence'], [0.20, 'coincidence'],
+          [0.19, 'nothing'],     [0.05, 'nothing'],
+          [0.049, 'mild'],       [0.01, 'mild'],
+          [0.009, 'striking'],   [0, 'striking'],
+        ];
+        for (const c of cases) {
+          const got = tierAt(c[0]);
+          isTrue('rawP ' + c[0] + ' → ' + c[1], sec, got === c[1], 'got "' + got + '"');
+        }
+
+        // Color guard: striking must NOT be the reassuring green of coincidence.
+        const striking = V.interpret({ observedCount: 1, rawP: 0.001, nDataPoints: 10,
+                                       vertexCount: 12, radiusKm: 250 });
+        const coincidence = V.interpret({ observedCount: 1, rawP: 0.5, nDataPoints: 10,
+                                          vertexCount: 12, radiusKm: 250 });
+        isTrue('striking color ≠ coincidence color', sec,
+               striking.color !== coincidence.color,
+               'striking=' + striking.color + ' coincidence=' + coincidence.color);
+        isTrue('striking color is the orange token', sec,
+               striking.color === '#ff7a3d', 'got ' + striking.color);
+        isTrue('striking badge says "read why"', sec,
+               /read why/i.test(striking.badge), 'got "' + striking.badge + '"');
+
+        // datasetNoun: default vs provided.
+        const def = V.interpret({ observedCount: 3, rawP: 0.5, nDataPoints: 700,
+                                  vertexCount: 32, radiusKm: 250 });
+        isTrue('sentence uses default noun "data points"', sec,
+               def.sentence.indexOf('data points') !== -1, def.sentence);
+        const quake = V.interpret({ observedCount: 3, rawP: 0.5, nDataPoints: 700,
+                                    vertexCount: 32, radiusKm: 250, datasetNoun: 'earthquakes' });
+        isTrue('sentence uses provided noun "earthquakes"', sec,
+               quake.sentence.indexOf('700 earthquakes') !== -1, quake.sentence);
+
+        // formatP clamp (spec §4.1 / §8): 0 → "p < 0.001".
+        isTrue('formatP(0) clamps to "p < 0.001"', sec,
+               V.formatP(0) === 'p < 0.001', 'got "' + V.formatP(0) + '"');
+        isTrue('formatP(0.123) → "p = 0.123"', sec,
+               V.formatP(0.123) === 'p = 0.123', 'got "' + V.formatP(0.123) + '"');
       })();
 
       // ---------------------------------------------------------------------
