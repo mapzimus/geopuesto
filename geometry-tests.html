@@ -638,6 +638,15 @@
         isTrue('bestConfig is the min\'s config (B)', sec,
                !!mixed.bestConfig && mixed.bestConfig.shape === 'B',
                'got ' + (mixed.bestConfig && mixed.bestConfig.shape));
+
+        // Empty session → safe "no data" sentinel, NOT a NaN that tierOf()
+        // would mis-bucket as the alarming 'striking' tier.
+        const empty = V.correctForAttempts([]);
+        isTrue('n = 0 for empty session', sec, empty.n === 0, 'got ' + empty.n);
+        isTrue('correctedP is null (not NaN)', sec, empty.correctedP === null,
+               'got ' + empty.correctedP);
+        isTrue('sessionTier is null (not "striking")', sec,
+               empty.sessionTier === null, 'got ' + empty.sessionTier);
       })();
 
       // ---------------------------------------------------------------------

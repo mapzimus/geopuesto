@@ -108,6 +108,15 @@
    */
   function correctForAttempts(attempts) {
     const n = attempts.length;
+    // Empty session: nothing to correct, so return an explicit "no data"
+    // sentinel instead of computing. Without this guard bestRawP stays Infinity
+    // and correctedP becomes Math.min(Infinity * 0, 1.0) === NaN; tierOf(NaN)
+    // then falls through every band to 'striking' — the most alarming tier,
+    // exactly backwards for a debunking tool. The UI already guards n === 0
+    // before calling, but this keeps the public window.Verdict API honest too.
+    if (n === 0) {
+      return { n: 0, bestRawP: null, bestConfig: null, correctedP: null, sessionTier: null };
+    }
     let bestRawP = Infinity;
     let bestConfig = null;
     for (let i = 0; i < n; i++) {

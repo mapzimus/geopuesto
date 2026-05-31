@@ -59,7 +59,7 @@
        on every interactive control. */
     .control-row input[type="text"]:focus-visible, .control-row select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-color: var(--accent); }
     .quick-picks button:focus-visible, .sprintc-buttons button:focus-visible, .control-row button:focus-visible,
-    input[type="range"]:focus-visible, .geo-search-item:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    input[type="range"]:focus-visible, .geo-search-item:focus-visible, #mc-reset-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
     /* T2-2: primary CTA buttons get amped. Bigger pad, drop shadow on hover. */
     .control-row button { padding: 9px 18px; background: var(--accent); color: var(--bg); border: none; cursor: pointer; font-family: var(--mono); font-size: 12px; font-weight: 700; border-radius: 4px; align-self: flex-end; letter-spacing: 0.02em; box-shadow: 0 1px 0 rgba(0,0,0,0.2); transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease; }
     .control-row button:hover { background: #ff7c3a; box-shadow: 0 2px 8px rgba(242,101,34,0.4); transform: translateY(-1px); }
@@ -88,6 +88,13 @@
     .sprintc-buttons { margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; }
     .sprintc-buttons button { background: transparent; color: var(--fg); border: 1px solid var(--accent); padding: 8px 14px; font-family: var(--mono); font-size: 12px; cursor: pointer; border-radius: 4px; transition: background 0.15s; }
     .sprintc-buttons button:hover { background: rgba(242, 101, 34, 0.15); }
+    /* Honesty-meter "Reset session" — a secondary action, styled like the
+       Sprint-C secondary buttons (transparent + accent outline) so it doesn't
+       compete with the primary "Run Monte Carlo" CTA. Its show/hide stays on
+       the inline display + the JS toggle in renderHonestyMeter(), so this rule
+       deliberately sets no `display`. */
+    #mc-reset-btn { background: transparent; color: var(--fg); border: 1px solid var(--accent); padding: 8px 14px; font-family: var(--mono); font-size: 12px; cursor: pointer; border-radius: 4px; transition: background 0.15s; }
+    #mc-reset-btn:hover { background: rgba(242, 101, 34, 0.15); }
     .share-url { margin-top: 8px; padding: 8px 12px; background: rgba(0, 191, 165, 0.06); border: 1px solid var(--border); border-radius: 4px; font-family: var(--mono); font-size: 11px; word-break: break-all; color: var(--fg); }
     .share-url .copied { color: var(--pass); margin-left: 8px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; }
 
@@ -1697,7 +1704,7 @@
         const foot = document.createElement('p');
         foot.style.margin = '8px 0 0';
         foot.style.fontSize = '11px';
-        foot.style.color = 'var(--muted, #7c8aa8)';
+        foot.style.color = 'var(--muted, #9aa7c2)';
         foot.textContent =
           'Footnote: Bonferroni assumes your tries were independent. They aren\'t quite — a cube ' +
           'and a cuboctahedron share structure, so some "tries" overlap, which means this ' +
