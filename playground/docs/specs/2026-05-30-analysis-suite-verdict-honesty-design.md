@@ -53,7 +53,7 @@ unchanged.
   onward, with a narrative explaining forking paths / pre-registration.
 - Keep all interpretation logic in a **pure, testable module** (`verdict.js`)
   with zero DOM and zero globals — DOM wiring stays in `index.html`.
-- Add unit assertions to `v2-tests.html`.
+- Add unit assertions to `geometry-tests.html` (repo root).
 
 **Non-goals (explicitly out of scope — see §9)**
 
@@ -76,7 +76,7 @@ playground/index.html   (MODIFIED)
    └─ runMonteCarlo() tail        replace lines ~1516–1547 with:
         push attempt → render verdict card → render honesty meter
 
-playground/v2-tests.html (MODIFIED)
+geometry-tests.html (repo root, MODIFIED)
    └─ assertions for interpret() thresholds + correctForAttempts() math
 ```
 
@@ -84,7 +84,7 @@ playground/v2-tests.html (MODIFIED)
 `<script>` (not an ES module) that attaches a single global, like `window.Rotation`
 and `window.ShapeEngine` do. Both functions are **pure and deterministic** — same
 input, same output, no `Date.now()`, no DOM reads — which is what makes them
-unit-testable in `v2-tests.html`.
+unit-testable in `geometry-tests.html`.
 
 ## 4. `verdict.js` — the pure module
 
@@ -264,7 +264,7 @@ personal session honesty state, not part of the configuration.
 - **New datasets.**
 - **Cross-reload persistence of attempts.**
 
-## 10. Testing (`v2-tests.html`)
+## 10. Testing (`geometry-tests.html`)
 
 Add a `Verdict` test group:
 
@@ -300,4 +300,4 @@ accidental swap.
 **Modify:**
 - `playground/index.html` (script tag, state field, `#mc-honesty` markup, Reset
   handler, `runMonteCarlo()` tail, four badge CSS classes)
-- `playground/v2-tests.html` (Verdict test group)
+- `geometry-tests.html` (repo root, Verdict test group)
