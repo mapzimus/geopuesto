@@ -596,6 +596,51 @@
       })();
 
       // ---------------------------------------------------------------------
+      // Verdict module — correctForAttempts() Bonferroni math (spec §10)
+      // ---------------------------------------------------------------------
+      (function verdictCorrect() {
+        const sec = 'Verdict · correctForAttempts()';
+        const V = window.Verdict;
+        if (!V || typeof V.correctForAttempts !== 'function') {
+          isTrue('verdict.js exposes correctForAttempts()', sec, false,
+                 'window.Verdict.correctForAttempts missing');
+          return;
+        }
+
+        function mk(rawP, tag) { return { rawP: rawP, config: { shape: tag } }; }
+
+        // 14 attempts each 0.02 → best 0.02, corrected 0.02 * 14 = 0.28.
+        const a14 = [];
+        for (let i = 0; i < 14; i++) a14.push(mk(0.02, 's' + i));
+        const r14 = V.correctForAttempts(a14);
+        isTrue('n = 14', sec, r14.n === 14, 'got ' + r14.n);
+        near('bestRawP = 0.02', sec, r14.bestRawP, 0.02, 1e-12);
+        near('correctedP = 0.28', sec, r14.correctedP, 0.28, 1e-12);
+        isTrue('sessionTier(0.28) = coincidence', sec,
+               r14.sessionTier === 'coincidence', 'got ' + r14.sessionTier);
+
+        // 60 attempts each 0.02 → 1.2, capped at 1.0.
+        const a60 = [];
+        for (let i = 0; i < 60; i++) a60.push(mk(0.02, 'x'));
+        const r60 = V.correctForAttempts(a60);
+        near('correctedP capped at 1.0', sec, r60.correctedP, 1.0, 1e-12);
+
+        // 1 attempt 0.03 → no correction; corrected === best.
+        const r1 = V.correctForAttempts([mk(0.03, 'solo')]);
+        isTrue('n = 1', sec, r1.n === 1, 'got ' + r1.n);
+        near('correctedP === bestRawP (no correction)', sec, r1.correctedP, 0.03, 1e-12);
+        isTrue('sessionTier(0.03) = mild', sec, r1.sessionTier === 'mild',
+               'got ' + r1.sessionTier);
+
+        // Mixed values → bestRawP is the min and bestConfig is its config.
+        const mixed = V.correctForAttempts([mk(0.4, 'A'), mk(0.05, 'B'), mk(0.2, 'C')]);
+        near('bestRawP is the min (0.05)', sec, mixed.bestRawP, 0.05, 1e-12);
+        isTrue('bestConfig is the min\'s config (B)', sec,
+               !!mixed.bestConfig && mixed.bestConfig.shape === 'B',
+               'got ' + (mixed.bestConfig && mixed.bestConfig.shape));
+      })();
+
+      // ---------------------------------------------------------------------
       // Update header summary
       // ---------------------------------------------------------------------
       document.getElementById('chip-pass').textContent  = passCount + ' passed';
