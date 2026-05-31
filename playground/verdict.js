@@ -70,16 +70,27 @@
 
     const t = tierOf(rawP);
 
+    // Honest percentage. Never render "0%" when at least some random rotations
+    // matched — "0% of the time" reads as "never" and contradicts the
+    // "p < 0.001" / "p = 0.00x" shown in the badge and diagnostics. Two
+    // resolution floors govern the wording: 1000 trials can't resolve below
+    // 0.1% (rawP < 0.001, mirroring formatP's clamp), and integer rounding
+    // can't show a clean value between 0 and 1%. Both collapse to a plain-
+    // English "less than" rather than a misleading rounded zero.
+    let pctStr;
+    if (rawP < 0.001) pctStr = 'less than 0.1';
+    else if (rawP < 0.01) pctStr = 'less than 1';
+    else pctStr = String(Math.round(rawP * 100));
+
     // === USER CONTRIBUTION POINT (Verdict phrasing) ===
     // The tier math above is fixed; this sentence is the most user-facing
     // string in the feature. Keep the skeptical, non-triumphant tone. The
     // tier tail (t.tail) carries the per-tier nudge.
-    const pct = Math.round(rawP * 100);
     const sentence =
       'Of your ' + nDataPoints + ' ' + datasetNoun + ', ' + observedCount +
       ' fell within ' + radiusKm + ' km of one of this shape\'s ' + vertexCount +
       ' vertices. Random orientations of the same shape matched or beat that ' +
-      pct + '% of the time' + t.tail;
+      pctStr + '% of the time' + t.tail;
     // ===================================================
 
     return { tier: t.tier, badge: t.badge, color: t.color, sentence: sentence };

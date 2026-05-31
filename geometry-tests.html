@@ -574,6 +574,25 @@
                V.formatP(0) === 'p < 0.001', 'got "' + V.formatP(0) + '"');
         isTrue('formatP(0.123) → "p = 0.123"', sec,
                V.formatP(0.123) === 'p = 0.123', 'got "' + V.formatP(0.123) + '"');
+
+        // Honest percentage in the sentence: a strikingly low p must never be
+        // rendered as a misleading rounded "0% of the time" (that reads as
+        // "never" and disagrees with the "p < 0.001" / "p = 0.00x" shown in the
+        // badge + diagnostics). Two resolution floors → plain-English "less than".
+        const floorP = V.interpret({ observedCount: 0, rawP: 0, nDataPoints: 700,
+                                     vertexCount: 32, radiusKm: 250 });
+        isTrue('rawP 0 → sentence "less than 0.1% of the time"', sec,
+               floorP.sentence.indexOf('less than 0.1% of the time') !== -1, floorP.sentence);
+        isTrue('rawP 0 → sentence never a bare "0% of the time"', sec,
+               floorP.sentence.indexOf('0% of the time') === -1, floorP.sentence);
+        const subOne = V.interpret({ observedCount: 1, rawP: 0.004, nDataPoints: 700,
+                                     vertexCount: 32, radiusKm: 250 });
+        isTrue('rawP 0.004 → sentence "less than 1% of the time"', sec,
+               subOne.sentence.indexOf('less than 1% of the time') !== -1, subOne.sentence);
+        const fivePct = V.interpret({ observedCount: 9, rawP: 0.05, nDataPoints: 700,
+                                      vertexCount: 32, radiusKm: 250 });
+        isTrue('rawP 0.05 → sentence "5% of the time" (normal rounding)', sec,
+               fivePct.sentence.indexOf('5% of the time') !== -1, fivePct.sentence);
       })();
 
       // ---------------------------------------------------------------------
