@@ -393,7 +393,9 @@
         </label>
         <button id="mc-run-btn" disabled title="Load a dataset above first.">Run Monte Carlo (load a dataset first)</button>
       </div>
-      <div id="mc-result" style="margin-top: 10px; font-family: var(--mono); font-size: 12px; line-height: 1.55; color: var(--fg); white-space: pre-wrap;"></div>
+      <div id="mc-result" style="margin-top: 10px; font-family: var(--mono); font-size: 12px; line-height: 1.55; color: var(--fg);"></div>
+      <div id="mc-honesty" style="margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--border); font-family: var(--mono); font-size: 12px; line-height: 1.55; color: var(--fg); display: none;"></div>
+      <button id="mc-reset-btn" style="margin-top: 10px; display: none;">Reset session (start a clean shot)</button>
     </div>
   </section>
 
@@ -1361,6 +1363,11 @@
           document.getElementById('mc-radius-display').textContent = km;
           state.mcRadiusKm = km;
         });
+        const mcReset = document.getElementById('mc-reset-btn');
+        if (mcReset) mcReset.addEventListener('click', function () {
+          state.mcAttempts = [];   // back to a clean shot; meter hides on re-render
+          renderHonestyMeter();
+        });
         updateMonteCarloButton();
       }
 
@@ -1608,9 +1615,97 @@
         return 'earthquakes';
       }
 
-      // Renders the session honesty meter into #mc-honesty. Fully implemented
-      // in Task 4; this stub keeps runMonteCarlo() working in the meantime.
-      function renderHonestyMeter() { /* Task 4 */ }
+      // Formats a config descriptor for the "best result" line, e.g.
+      // "rhombicTriacontahedron @ 42.5,-70.9, spin 18°, 250 km, earthquakes".
+      function describeConfig(c) {
+        if (!c) return '(no runs)';
+        return c.shape + ' @ ' + c.anchorLat.toFixed(1) + ',' + c.anchorLon.toFixed(1) +
+               ', spin ' + c.spinDeg + '°, ' + c.radiusKm + ' km, ' + datasetNoun(c.datasetId);
+      }
+
+      // Renders the session honesty meter into #mc-honesty (spec §6). Run #1 is
+      // the "clean shot"; run #2+ shows the Bonferroni-corrected readout. Both
+      // the meter and the Reset button hide when there are no attempts.
+      function renderHonestyMeter() {
+        const host = document.getElementById('mc-honesty');
+        const resetBtn = document.getElementById('mc-reset-btn');
+        if (!host) return;
+        while (host.firstChild) host.removeChild(host.firstChild);
+
+        const attempts = state.mcAttempts;
+        if (!attempts || attempts.length === 0) {
+          host.style.display = 'none';
+          if (resetBtn) resetBtn.style.display = 'none';
+          return;
+        }
+        host.style.display = 'block';
+        if (resetBtn) resetBtn.style.display = 'inline-block';
+
+        const summary = window.Verdict.correctForAttempts(attempts);
+
+        function line(text) {
+          const d = document.createElement('div');
+          d.textContent = text;
+          host.appendChild(d);
+        }
+
+        // Run #1 — the clean shot.
+        if (summary.n === 1) {
+          const h = document.createElement('div');
+          h.style.fontWeight = '700';
+          h.textContent = 'Attempt 1 — your clean shot.';
+          host.appendChild(h);
+          line('One shape, one test. The p-value above means what it says.');
+          return;
+        }
+
+        // Run #2+ — persistent meter.
+        line('Attempts this session: ' + summary.n);
+        line('Best result so far: ' + window.Verdict.formatP(summary.bestRawP) +
+             ' — ' + describeConfig(summary.bestConfig));
+
+        // Corrected p + a session badge (reuse the module so colors never drift).
+        const correctedRow = document.createElement('div');
+        correctedRow.style.margin = '6px 0';
+        correctedRow.appendChild(document.createTextNode(
+          'Corrected for ' + summary.n + ' tries (Bonferroni): ' +
+          window.Verdict.formatP(summary.correctedP) + '  '));
+        const sInfo = window.Verdict.interpret({
+          observedCount: 0, rawP: summary.correctedP, nDataPoints: 0,
+          vertexCount: 0, radiusKm: 0,
+        });
+        const sBadge = document.createElement('span');
+        sBadge.className = 'verdict-badge verdict-' + summary.sessionTier;
+        sBadge.style.backgroundColor = sInfo.color;
+        sBadge.style.fontSize = '11px';
+        sBadge.textContent = sInfo.badge;
+        correctedRow.appendChild(sBadge);
+        host.appendChild(correctedRow);
+
+        // Forking-paths narrative.
+        const narrative = document.createElement('p');
+        narrative.style.margin = '8px 0';
+        narrative.textContent =
+          'Every shape, anchor, spin, and radius you try is another roll of the dice. ' +
+          'Try enough combinations and one will look striking by pure chance. The corrected ' +
+          'value multiplies your best raw p by the number of tries — the honest way to read a ' +
+          'result you went hunting for. The clean version of this test is one shape, chosen ' +
+          'before you looked at the data (pre-registration).';
+        host.appendChild(narrative);
+
+        // Footnote caveat.
+        const foot = document.createElement('p');
+        foot.style.margin = '8px 0 0';
+        foot.style.fontSize = '11px';
+        foot.style.color = 'var(--muted, #7c8aa8)';
+        foot.textContent =
+          'Footnote: Bonferroni assumes your tries were independent. They aren\'t quite — a cube ' +
+          'and a cuboctahedron share structure, so some "tries" overlap, which means this ' +
+          'correction slightly over-penalizes. We round toward skepticism on purpose: a result ' +
+          'that survives an over-strict correction is real; one that doesn\'t, you haven\'t lost ' +
+          'much by doubting.';
+        host.appendChild(foot);
+      }
 
       // ---------------------------------------------------------------
       // Sprint C — Share + Export from current state
