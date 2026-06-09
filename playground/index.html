@@ -219,8 +219,8 @@
   <section>
     <h2>3D globe</h2>
     <div class="map-caption" style="margin-bottom: 10px;">
-      Drag to rotate, scroll to zoom. The globe mirrors your two points (above) and
-      the polyhedron you spin up (below) — change either and the globe follows.
+      Drag to rotate, scroll to zoom. <strong>Double-click</strong> anywhere on the globe to reposition point A.
+      The globe mirrors your two points (above) and the polyhedron you spin up (below) — change either and the globe follows.
       Vertices are dots; edges are great-circle arcs on the sphere surface.
     </div>
     <!-- aria-hidden: the globe is a purely visual 3D mirror of state that's also
@@ -792,6 +792,30 @@
         }
         window.addEventListener('resize', sizeGlobeToContainer);
 
+        // Double-click anywhere on the globe surface → reposition point A.
+        // Globe.gl fires onGlobeClick on every click, so we implement
+        // double-click detection ourselves with a 400 ms window.
+        let _dblClickT = 0, _dblClickPos = null;
+        globeViz.onGlobeClick(function (coords) {
+          const now = performance.now();
+          const prev = _dblClickPos;
+          const dt = now - _dblClickT;
+          _dblClickT = now;
+          _dblClickPos = coords;
+          if (dt < 400 && prev &&
+              Math.abs(coords.lat - prev.lat) < 4 &&
+              Math.abs(coords.lng - prev.lng) < 4) {
+            // Confirmed double-click: set A
+            const inp = document.getElementById('tp-a-input');
+            const lat = +coords.lat.toFixed(4), lng = +coords.lng.toFixed(4);
+            inp.value = lat + ',' + lng;
+            delete inp.dataset.latlon;
+            delete inp.dataset.cityLabel;
+            inp.dispatchEvent(new Event('change', { bubbles: true }));
+            _dblClickT = 0; // reset so a third click doesn't re-fire
+          }
+        });
+
         // Aim the camera at the anchor on first paint.
         globeViz.pointOfView(
           { lat: state.anchor.lat, lng: state.anchor.lon, altitude: 2.2 },
@@ -1049,7 +1073,8 @@
             head.textContent = tag.padEnd(12) + ' ';
             const body = document.createElement('span');
             if (r.city) {
-              body.textContent = r.city.name + ', ' + r.city.country +
+              const loc = [r.city.name, r.city.admin1, r.city.country].filter(Boolean).join(', ');
+              body.textContent = loc +
                 ' — ' + Math.round(r.city.distanceKm).toLocaleString() + ' km' +
                 ' (pop ' + Math.round(r.city.population / 1000).toLocaleString() + 'k)';
               if (r.city.distanceKm > 1500) {
@@ -1220,7 +1245,7 @@
 
       function bindCurvesInputs() {
         document.getElementById('curve-p-input').addEventListener('change', function (e) {
-          const p = parseLatLon(e.target.value);
+          const p = readInputLatLon(e.target);
           if (p) {
             state.curveP = p;
             renderCurves();
@@ -1868,10 +1893,18 @@
       // ---------------------------------------------------------------
       // Wire inputs to state + re-render
       // ---------------------------------------------------------------
+      // Read lat/lon from an input: prefers dataset.latlon (set when a city was
+      // chosen from the dropdown so the visible value is a city name), falls
+      // back to parsing the visible value as coordinates.
+      function readInputLatLon(el) {
+        return (el.dataset.latlon ? parseLatLon(el.dataset.latlon) : null)
+            || parseLatLon(el.value);
+      }
+
       function bindTwoPointInputs() {
         function applyAB() {
-          const a = parseLatLon(document.getElementById('tp-a-input').value);
-          const b = parseLatLon(document.getElementById('tp-b-input').value);
+          const a = readInputLatLon(document.getElementById('tp-a-input'));
+          const b = readInputLatLon(document.getElementById('tp-b-input'));
           if (a) state.A = a;
           if (b) state.B = b;
           renderTwoPoint();
@@ -1880,7 +1913,7 @@
         // applyAB reads BOTH inputs, so validate only the field that fired —
         // otherwise editing B would scold you about an untouched A.
         function onABChange(e) {
-          if (e && e.target && !parseLatLon(e.target.value)) flagBadCoord();
+          if (e && e.target && !readInputLatLon(e.target)) flagBadCoord();
           applyAB();
         }
         // Auto-render on input change. The previous explicit "Update" button
@@ -1903,7 +1936,7 @@
         });
 
         document.getElementById('tp-p-input').addEventListener('change', function (e) {
-          const p = parseLatLon(e.target.value);
+          const p = readInputLatLon(e.target);
           if (p) {
             state.P = p;
             renderCrossTrack();
@@ -1915,7 +1948,7 @@
 
       function bindPolyhedraInputs() {
         document.getElementById('poly-anchor-input').addEventListener('change', function (e) {
-          const a = parseLatLon(e.target.value);
+          const a = readInputLatLon(e.target);
           if (a) {
             state.anchor = a;
             renderPolyhedra();
@@ -2090,15 +2123,18 @@
         }
 
         function choose(city) {
-          // TODO(stylistic): what to show after a pick. Currently the raw
-          //   coordinates ("42.3601,-71.0589"). Alternatives if you'd rather
-          //   keep it friendly:
-          //     a) the city name, storing coords on input.dataset (needs the
-          //        handlers to read dataset instead of parsing the value), or
-          //     b) "Boston (42.36, -71.06)" — pretty but parseLatLon would
-          //        need to tolerate the prefix.
-          //   Coords-only keeps every existing handler working with zero edits.
-          input.value = city.lat.toFixed(4) + ',' + city.lon.toFixed(4);
+          // Store the real coordinates in dataset.latlon so readInputLatLon()
+          // can find them even though the visible value is a city name.
+          input.dataset.latlon = city.lat.toFixed(4) + ',' + city.lon.toFixed(4);
+          // Build a friendly label: "Concord, NH, US" or "Paris, FR".
+          // Skip numeric admin1 codes — they mean nothing to a reader.
+          const admin1 = city.admin1 && !/^\d+$/.test(city.admin1) ? city.admin1 : null;
+          const parts = [city.name];
+          if (admin1) parts.push(admin1);
+          parts.push(city.country);
+          const label = parts.join(', ');
+          input.dataset.cityLabel = label;
+          input.value = label;
           input.dispatchEvent(new Event('change', { bubbles: true }));
           close();
         }
@@ -2117,7 +2153,15 @@
             name.textContent = c.name;
             const meta = document.createElement('span');
             meta.className = 'gs-meta';
-            meta.textContent = (c.country || '') + (c.population ? ' · ' + fmtPop(c.population) : '');
+            // Build "NH, US · 43k" or "NSW, AU · 210k" or "FR · 2M".
+            // Only show admin1 when it's alphabetic — numeric GeoNames codes
+            // (e.g. "08" for Argentine provinces) aren't useful to readers.
+            const admin1Display = c.admin1 && !/^\d+$/.test(c.admin1) ? c.admin1 : null;
+            const locationParts = [];
+            if (admin1Display) locationParts.push(admin1Display);
+            if (c.country) locationParts.push(c.country);
+            const locationStr = locationParts.join(', ');
+            meta.textContent = locationStr + (c.population ? ' · ' + fmtPop(c.population) : '');
             item.appendChild(name);
             item.appendChild(meta);
             // mousedown (not click) fires before the input's blur closes us.
@@ -2147,6 +2191,12 @@
           live.textContent = res.length + (res.length === 1 ? ' suggestion' : ' suggestions') + '. Use up and down arrows, Enter to choose.';
         }
 
+        // Clear stored city coords as soon as the user starts typing again —
+        // they are editing freely, not relying on the cached city pick.
+        input.addEventListener('input', function () {
+          delete input.dataset.latlon;
+          delete input.dataset.cityLabel;
+        });
         input.addEventListener('input', debounce(update, 80));
         input.addEventListener('focus', function () {
           if (/[a-z]/i.test(input.value)) update();
