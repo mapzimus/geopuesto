@@ -16,7 +16,7 @@
   Earth-grid coincidence real?"
 
 Both deploy as static HTML/JS on GitHub Pages. No build step, no `node_modules`,
-no service tier. Just Leaflet, IBM Plex Mono, and ~50 KB of geometry kernel.
+no service tier. Just MapLibre GL globes, IBM Plex Mono, and ~50 KB of geometry kernel.
 
 ---
 
@@ -146,7 +146,9 @@ both URLs within ~1-2 minutes.
 - **Plain HTML/CSS/JS**. No build step, no bundler, no `package.json`.
   The antipodal app is a single ~200 KB `index.html`; the playground is
   ~1500 KB across ~10 files plus the catalog JSON.
-- **Leaflet 1.9.4** from CDN for all maps.
+- **MapLibre GL JS 5.6.1** from CDN (pinned, SRI on the antipodal app) for all
+  maps — every viewport is a 3D globe (`projection: globe`) that unrolls to
+  flat Mercator as you zoom in.
 - **CARTO Dark Matter** + **Esri Dark Gray Canvas** tiles (both keyless).
 - **IBM Plex Mono** + **IBM Plex Sans** via Google Fonts.
 - **Math precision**: pure spherical (no ellipsoidal corrections). Earth

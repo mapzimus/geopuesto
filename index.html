@@ -19,7 +19,7 @@
 <meta name="twitter:title" content="Geopuesto · Antipodal Observation System" />
 <meta name="twitter:description" content="See what's on the exact opposite side of Earth from any location." />
 <meta name="twitter:image" content="https://maxwellhowegis.com/geopuesto/og-image.png" />
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.6.1/dist/maplibre-gl.css" integrity="sha384-Nq6PQ+9vJPvw7U/VfDELyrWoGQMsy0gi6QShhaSrGzkpF5KkM40csg2leky+YMTd" crossorigin="anonymous" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600;700&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
@@ -65,7 +65,6 @@
   @media (prefers-reduced-motion: reduce) {
     .status-led .dot, .pulse-marker .ring,
     .loading::after, .empty-icon { animation: none !important; }
-    .leaflet-fade-anim .leaflet-tile { transition: none !important; }
     * { scroll-behavior: auto !important; }
   }
   html, body {
@@ -788,7 +787,7 @@
     user-select: none;
   }
 
-  /* Phase 3b.4: embedded ring-overview Leaflet map inside the module.
+  /* Phase 3b.4: embedded ring-overview mini-globe inside the module.
      Lets the user SEE the orthodrome + all pins without scrolling back up
      to the main maps. Fitted to the ring's bounds on every render. */
   .equator-overview-map-wrap {
@@ -1153,17 +1152,40 @@
   }
   .ring-pin-popup .popup-set-origin:hover { filter: brightness(1.15); }
   .ring-pin-popup .popup-set-origin:focus { outline: 2px solid #fff; outline-offset: 1px; }
-  /* Override Leaflet's default popup chrome for the Mission Control aesthetic */
-  .leaflet-popup-content-wrapper {
+  /* Override MapLibre's default popup chrome for the Mission Control aesthetic.
+     The tip is a CSS border-triangle, so it takes a per-anchor border color
+     rather than a background. */
+  .maplibregl-popup-content {
     background: var(--surface);
     color: var(--text);
     border: 1px solid var(--border);
     border-radius: 6px;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    padding: 12px 16px;
+    font-family: inherit;
   }
-  .leaflet-popup-tip { background: var(--surface); border: 1px solid var(--border); }
-  .leaflet-popup-close-button { color: var(--dim) !important; }
-  .leaflet-popup-close-button:hover { color: var(--orange) !important; }
+  .maplibregl-popup-anchor-bottom .maplibregl-popup-tip,
+  .maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip,
+  .maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip { border-top-color: var(--border); }
+  .maplibregl-popup-anchor-top .maplibregl-popup-tip,
+  .maplibregl-popup-anchor-top-left .maplibregl-popup-tip,
+  .maplibregl-popup-anchor-top-right .maplibregl-popup-tip { border-bottom-color: var(--border); }
+  .maplibregl-popup-anchor-left .maplibregl-popup-tip { border-right-color: var(--border); }
+  .maplibregl-popup-anchor-right .maplibregl-popup-tip { border-left-color: var(--border); }
+  .maplibregl-popup-close-button {
+    color: var(--dim);
+    font-size: 1.05rem;
+    padding: 0 6px;
+  }
+  .maplibregl-popup-close-button:hover { color: var(--orange); background: transparent; }
+  /* Compact hover tooltips (overview mini-globe city pins) */
+  .globe-tip .maplibregl-popup-content {
+    padding: 6px 9px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    line-height: 1.5;
+    box-shadow: none;
+  }
   @media (max-width: 768px) {
     .equator-controls { padding: 10px; gap: 8px; }
     .equator-ctrl select { min-width: 90px; font-size: 0.75rem; }
@@ -1603,25 +1625,25 @@
   }
   .modal-img { max-width: 100%; max-height: 100%; }
 
-  /* Leaflet overrides */
-  .leaflet-container { background: #0a1218 !important; font-family: inherit; }
-  .leaflet-control-attribution {
-    font-size: 0.55rem !important;
-    background: rgba(10,18,24,0.85) !important;
-    color: var(--dim) !important;
-    font-family: 'IBM Plex Mono', monospace !important;
-  }
-  .leaflet-control-attribution a { color: var(--dim) !important; }
-  .leaflet-control-zoom a {
+  /* MapLibre overrides — the canvas clear color is the "space" behind the
+     globe, so the map background doubles as the void the planet floats in */
+  .maplibregl-map { background: #0a1218 !important; font-family: inherit; }
+  .maplibregl-canvas:focus { outline: none; }
+  .maplibregl-ctrl-group {
     background: var(--surface-2) !important;
-    color: var(--text) !important;
-    border-color: var(--border) !important;
-    font-family: 'IBM Plex Mono', monospace !important;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    box-shadow: none !important;
   }
-  .leaflet-control-zoom a:hover {
-    background: var(--orange-soft) !important;
-    color: var(--orange) !important;
+  .maplibregl-ctrl-group button {
+    background: transparent !important;
+    border: none !important;
   }
+  .maplibregl-ctrl-group button + button { border-top: 1px solid var(--border) !important; }
+  /* MapLibre's +/- glyphs are dark SVG background-images; invert to read on the dark theme */
+  .maplibregl-ctrl-group button .maplibregl-ctrl-icon { filter: invert(0.82); }
+  .maplibregl-ctrl-group button:hover { background: var(--orange-soft) !important; }
+  .maplibregl-ctrl-group button:hover .maplibregl-ctrl-icon { filter: invert(0.6) sepia(1) saturate(30) hue-rotate(347deg); }
   .pulse-marker { background: transparent; border: none; }
   .pulse-marker .dot {
     width: 12px; height: 12px;
@@ -1834,7 +1856,7 @@
   Geopuesto · Open data: OSM · Nominatim · Wikipedia · Wikimedia Commons · Open-Meteo · REST Countries · sunrise-sunset · wheretheiss.at · USGS · NOAA · radio-browser · Overpass · CARTO · Esri · OpenSky · AISStream · Mapillary · Google Maps · <a href="https://www.geonames.org/" target="_blank" rel="noopener">GeoNames</a> (CC BY 4.0) · <a href="./playground/">Spherical-geometry playground →</a>
 </footer>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/maplibre-gl@5.6.1/dist/maplibre-gl.js" integrity="sha384-/L1njH4bbgNt9Uk3HwJ272N9fxJzRBQCxhtwGkZiqgl+Nxpq2ETUNZhNMNV1RgyW" crossorigin="anonymous"></script>
 <script src="geometry.js"></script>
 <script src="cities.js"></script>
 <script>
@@ -1882,7 +1904,7 @@ const CONFIG = {
 
   // Windy.com Map Forecast API key — programmatic access to weather tiles + extended embed config.
   // https://api.windy.com/  · scope: Map Forecast API
-  // Currently held in reserve — wiring a custom Windy weather tile overlay on the Leaflet maps
+  // Currently held in reserve — wiring a custom Windy weather tile overlay on the globe maps
   // would replace/augment the basic embed iframe. Left as CONFIG-only for future use.
   windyMapForecastKey: "kVlPv680uiU7skU5m9M2tx3MwBbFFXfS",
 
@@ -2020,29 +2042,209 @@ const PRESETS = [
   { name: "Salar de Uyuni — train cemetery", dest: "South China Sea", lat: -20.4783, lng: -66.8253 },
 ];
 
+// ============================================================
+//  MapLibre GL globe setup (ported from Leaflet — same viewports,
+//  now rendered as 3D planets via projection: globe; the globe
+//  unrolls to flat Mercator automatically as the user zooms in).
+//
+//  Conventions carried over from playground/globeMap.js:
+//  - maplibre-gl pinned at 5.6.1 (same version repo-wide)
+//  - atmosphere-blend 0.6, faded out by the zoom where the globe
+//    has unrolled, so no hazy sky over the flat map
+//  - MapLibre's globe is still built from Web Mercator tiles, so
+//    the ±85.05° lat clip in the ring pipeline stays required
+//  - MapLibre speaks GeoJSON [lng, lat] everywhere; Leaflet's
+//    [lat, lng] is flipped at each call site, not shimmed
+// ============================================================
+
 // CARTO Dark Matter — denser labels (small cities/towns), keeps Mission Control aesthetic
-const BASE_URL = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
 const BASE_ATTR = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>';
-const TILE_OPTS = { attribution: BASE_ATTR, maxZoom: 20, subdomains: "abcd" };
+const TILE_RETINA = (window.devicePixelRatio || 1) > 1 ? "@2x" : "";
+const BASE_TILES = ["a", "b", "c", "d"].map(
+  s => `https://${s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}${TILE_RETINA}.png`
+);
+
+// Leaflet zooms are 256px-tile based, MapLibre's are 512px based: every
+// carried-over zoom constant shifts down by 1 (Leaflet z ≈ MapLibre z + 1).
+function gz(leafletZoom) { return Math.max(0, leafletZoom - 1); }
+
+function globeStyle() {
+  return {
+    version: 8,
+    projection: { type: "globe" },
+    // MapLibre's sky defaults are a daytime palette (light-blue sky, white
+    // fog) that veils a dark basemap in haze. Space-dark colors + a dim
+    // blue-teal limb glow keep the planet legible on the console theme;
+    // atmosphere fades out by the zoom where the globe has unrolled flat.
+    sky: {
+      "sky-color": "#05090e",
+      "horizon-color": "#10394e",
+      "fog-color": "#0a1218",
+      "fog-ground-blend": 0.5,
+      "atmosphere-blend": ["interpolate", ["linear"], ["zoom"], 0, 0.8, 4, 0.8, 6, 0],
+    },
+    light: { anchor: "map", intensity: 0.4 },
+    sources: {
+      carto: { type: "raster", tiles: BASE_TILES, tileSize: 256, maxzoom: 20, attribution: BASE_ATTR },
+    },
+    layers: [{ id: "carto", type: "raster", source: "carto" }],
+  };
+}
 
 // Attribution rendered separately in the .attribution-strip below the viewports
-const MAP_OPTS = { worldCopyJump: true, attributionControl: false };
-const TILE_OPTS_NOATTR = { maxZoom: TILE_OPTS.maxZoom, subdomains: TILE_OPTS.subdomains };
-const mapOrigin = L.map("mapOrigin", MAP_OPTS).setView([20, 0], 2);
-const mapAntipode = L.map("mapAntipode", MAP_OPTS).setView([-20, 180], 2);
-L.tileLayer(BASE_URL, TILE_OPTS_NOATTR).addTo(mapOrigin);
-L.tileLayer(BASE_URL, TILE_OPTS_NOATTR).addTo(mapAntipode);
+function makeGlobe(containerId, centerLngLat, zoom) {
+  const m = new maplibregl.Map({
+    container: containerId,
+    center: centerLngLat,
+    zoom: zoom,
+    maxZoom: gz(20),
+    attributionControl: false,
+    style: globeStyle(),
+  });
+  // top-left, where Leaflet's zoom control lived (top-right holds the viewport-header chip)
+  m.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-left");
+  return m;
+}
+
+// Initial zoom 1.4 (≈ old Leaflet 2, plus a nudge so the planet fills the
+// viewport instead of floating tiny in space)
+const mapOrigin = makeGlobe("mapOrigin", [0, 20], 1.4);
+const mapAntipode = makeGlobe("mapAntipode", [180, -20], 1.4);
+
+// ---- Shared GeoJSON stores for the ring + pins ----------------
+// Both main maps render identical data (the ring and its cities exist at
+// real coordinates, visible from either hemisphere), so one copy of each
+// FeatureCollection feeds both maps' sources. Sources/layers can only be
+// added after style.load; render functions may run before that (goTo fires
+// immediately on restore), so data lives here and each map syncs from it
+// whenever it's ready.
+function emptyFC() { return { type: "FeatureCollection", features: [] }; }
+let equatorData = emptyFC();      // Personal Equator ring segments
+let ringCityData = emptyFC();     // city pins on the ring
+let ringHighlightData = emptyFC(); // the single hovered pin, drawn hot
+
+const globeReady = new Map();     // map instance → sources exist yet?
+
+function syncGlobeSources(m) {
+  if (!globeReady.get(m)) return;
+  m.getSource("equator").setData(equatorData);
+  m.getSource("ring-cities").setData(ringCityData);
+  m.getSource("ring-highlight").setData(ringHighlightData);
+}
+
+// One open pin popup at a time, shared across both maps — matches the old
+// Leaflet feel and gives re-renders a single handle to close.
+let openPinPopup = null;
+function closePinPopup() {
+  if (openPinPopup) { openPinPopup.remove(); openPinPopup = null; }
+}
+
+function buildPinPopupHtml(p) {
+  return '<div class="ring-pin-popup">' +
+    '<strong>' + escapeHtml(p.name) + '</strong> ' +
+    '<span class="cc">' + escapeHtml(p.country) + '</span><br>' +
+    'population: ' + Number(p.population).toLocaleString() + '<br>' +
+    Number(p.distRingKm).toFixed(1) + ' km from ring · bearing ' + Number(p.bearingDeg).toFixed(0) + '°<br>' +
+    Number(p.distOriginKm).toFixed(0) + ' km from you · ' + Number(p.distAntipodeKm).toFixed(0) + ' km from antipode<br>' +
+    '<button type="button" class="popup-set-origin" data-set-origin="1" data-lat="' + p.lat + '" data-lng="' + p.lon + '">Set as new origin →</button>' +
+  '</div>';
+}
+
+function setupGlobeLayers(m) {
+  m.addSource("equator", { type: "geojson", data: equatorData });
+  m.addSource("ring-cities", { type: "geojson", data: ringCityData });
+  m.addSource("ring-highlight", { type: "geojson", data: ringHighlightData });
+
+  // Two-pass ring render: dark halo under amber line, same rationale as the
+  // Leaflet version (contrast against variable tile luminance)
+  m.addLayer({
+    id: "equator-halo", type: "line", source: "equator",
+    layout: { "line-cap": "round", "line-join": "round" },
+    paint: { "line-color": "#000", "line-width": 6, "line-opacity": 0.55 },
+  });
+  m.addLayer({
+    id: "equator-line", type: "line", source: "equator",
+    layout: { "line-cap": "round", "line-join": "round" },
+    paint: { "line-color": "#f2a949", "line-width": 3, "line-opacity": 1.0 },
+  });
+  // City pins: one GPU circle layer instead of thousands of SVG markers.
+  // Per-pin opacity taper rides in as a feature property.
+  m.addLayer({
+    id: "ring-cities", type: "circle", source: "ring-cities",
+    paint: {
+      "circle-radius": 4,
+      "circle-color": "#f2a949",
+      "circle-opacity": ["get", "fillOpacity"],
+      "circle-stroke-color": "#000",
+      "circle-stroke-width": 1.5,
+      "circle-stroke-opacity": 0.8,
+    },
+  });
+  // The hovered pin, drawn bigger + white-rimmed above everything ("hot"
+  // style from the old setStyle path)
+  m.addLayer({
+    id: "ring-highlight", type: "circle", source: "ring-highlight",
+    paint: {
+      "circle-radius": 8,
+      "circle-color": "#f2a949",
+      "circle-opacity": 1.0,
+      "circle-stroke-color": "#fff",
+      "circle-stroke-width": 2,
+    },
+  });
+
+  // Pin click → popup (the set-origin button inside is handled by the
+  // document-level [data-set-origin] delegation, same as the panel cards)
+  m.on("click", "ring-cities", (e) => {
+    e.preventDefault(); // flag consumed by the origin map's click-to-set handler
+    const f = e.features[0];
+    if (!f) return;
+    closePinPopup();
+    openPinPopup = new maplibregl.Popup({ offset: 12 })
+      .setLngLat(f.geometry.coordinates)
+      .setHTML(buildPinPopupHtml(f.properties))
+      .addTo(m);
+  });
+  // Pin hover → highlight self on both maps + matching card (no auto-scroll)
+  m.on("mousemove", "ring-cities", (e) => {
+    m.getCanvas().style.cursor = "pointer";
+    const f = e.features[0];
+    if (f) highlightRingPinByKey(f.properties.key, /*scrollCard=*/ false);
+  });
+  m.on("mouseleave", "ring-cities", () => {
+    m.getCanvas().style.cursor = "";
+    clearRingPinHighlight();
+  });
+
+  globeReady.set(m, true);
+  syncGlobeSources(m);
+}
+
+mapOrigin.once("style.load", () => setupGlobeLayers(mapOrigin));
+mapAntipode.once("style.load", () => setupGlobeLayers(mapAntipode));
+
+// Test hook (headless checks + console poking) — not a public API
+window.GeopuestoGlobes = {
+  mapOrigin, mapAntipode,
+  get overview() { return equatorOverviewMap; },
+  get equatorData() { return equatorData; },
+  get ringCityData() { return ringCityData; },
+  gz,
+};
 
 let originMarker = null, antipodeMarker = null;
 let activePresetName = null;
 let currentAnti = null;
 
+// Pulse markers are plain DOM elements handed to maplibregl.Marker —
+// the .pulse-marker CSS (ring animation) carries over unchanged.
 function makeMarker(color) {
-  return L.divIcon({
-    className: "pulse-marker",
-    html: `<div class="ring" style="background:${color};opacity:0.5;"></div><div class="dot" style="background:${color};"></div>`,
-    iconSize: [30, 30], iconAnchor: [15, 15],
-  });
+  const el = document.createElement("div");
+  el.className = "pulse-marker";
+  el.style.width = "30px";
+  el.style.height = "30px";
+  el.innerHTML = `<div class="ring" style="background:${color};opacity:0.5;"></div><div class="dot" style="background:${color};"></div>`;
+  return new maplibregl.Marker({ element: el });
 }
 
 // ============================================================
@@ -2053,48 +2255,39 @@ function makeMarker(color) {
 //  equally distant from both poles of your antipodal axis.
 //
 //  Math lives in geometry.js (Geometry.sampleGreatCircle,
-//  Geometry.antimeridianSplit). Ring layers are managed as their
-//  own LayerGroup so they can be cleared/redrawn cleanly on every
-//  origin change.
+//  Geometry.antimeridianSplit). The ring lives in the shared
+//  `equatorData` FeatureCollection; both maps' halo + line layers
+//  restyle it, so a redraw is one setData per map.
 // ============================================================
-const originEquatorLayer = L.layerGroup().addTo(mapOrigin);
-const antipodeEquatorLayer = L.layerGroup().addTo(mapAntipode);
-
 function renderPersonalEquator(lat, lng) {
-  originEquatorLayer.clearLayers();
-  antipodeEquatorLayer.clearLayers();
-  if (!window.Geometry) return;  // geometry.js not loaded — skip silently
+  equatorData = emptyFC();
+  if (!window.Geometry) { syncGlobeSources(mapOrigin); syncGlobeSources(mapAntipode); return; }
   const P = Geometry.latLonToXYZ(lat, lng);
   // 720 samples (0.5° arc each) keeps the curve looking smooth when the GC
   // runs at high latitudes — for near-equatorial origins the GC's max-lat
   // approaches 90° and 360 samples render visibly polygonal.
   const polyline = Geometry.sampleGreatCircle(P, 720);
   // Two-stage cleanup before draw:
-  //   1) antimeridianSplit — break at ±180° longitude wraps so Leaflet
-  //      doesn't draw a line all the way across the map.
-  //   2) clipPolylineToLat at 85° — Web Mercator can't represent anything
-  //      past ~85.0511°, so samples in the polar caps all collapse to the
-  //      same y at the top/bottom map edge and Leaflet bridges them with a
-  //      flat horizontal stripe (visible bug for near-equatorial origins
-  //      where the GC max-lat approaches 90°).
+  //   1) antimeridianSplit — break at ±180° longitude wraps so the renderer
+  //      doesn't draw a chord all the way across the map.
+  //   2) clipPolylineToLat at 85° — still required on the globe: MapLibre's
+  //      globe is the Web Mercator tile pyramid wrapped onto a sphere, so
+  //      geometry past ~85.0511° doesn't exist there either.
   const splitSegs = Geometry.antimeridianSplit(polyline);
-  const segments = [];
   for (const seg of splitSegs) {
     for (const clipped of Geometry.clipPolylineToLat(seg, 85)) {
-      segments.push(clipped);
+      equatorData.features.push({
+        type: "Feature",
+        properties: {},
+        // geometry.js speaks [lat, lng]; GeoJSON wants [lng, lat]
+        geometry: { type: "LineString", coordinates: clipped.map(p => [p[1], p[0]]) },
+      });
     }
   }
-  // Two-pass render: dark halo first for contrast against variable tile luminance
-  // (continents vs ocean vs city labels), then amber line on top. Without the
-  // halo, the line gets lost over white country labels and bright coastlines.
-  const halo = { color: "#000", weight: 6, opacity: 0.55, interactive: false, smoothFactor: 1.0 };
-  const line = { color: "#f2a949", weight: 3, opacity: 1.0, interactive: false, smoothFactor: 1.0 };
-  for (const seg of segments) {
-    L.polyline(seg, halo).addTo(originEquatorLayer);
-    L.polyline(seg, line).addTo(originEquatorLayer);
-    L.polyline(seg, halo).addTo(antipodeEquatorLayer);
-    L.polyline(seg, line).addTo(antipodeEquatorLayer);
-  }
+  // Halo-under-line styling lives on the two fixed layers (equator-halo /
+  // equator-line) added in setupGlobeLayers — data here, paint there.
+  syncGlobeSources(mapOrigin);
+  syncGlobeSources(mapAntipode);
 }
 
 // ============================================================
@@ -2107,8 +2300,8 @@ function renderPersonalEquator(lat, lng) {
 //  Capped at MAX_RING_PINS per map for perf (wide filters can match
 //  thousands of cities; rendering 10k+ SVG markers would freeze).
 // ============================================================
-const originRingCitiesLayer = L.layerGroup().addTo(mapOrigin);
-const antipodeRingCitiesLayer = L.layerGroup().addTo(mapAntipode);
+// (Pins render via the "ring-cities" circle layer on each map — GPU-drawn
+// from the shared ringCityData FeatureCollection, wired in setupGlobeLayers.)
 
 // Phase 3b.10: simplified picker. The picker is NOT a filter — the user's
 // tolerance + pop dropdowns set the scope. Picker just ships matches as pins.
@@ -2174,13 +2367,17 @@ function pinKey(lat, lon) {
 }
 
 function renderRingCities(lat, lng) {
-  originRingCitiesLayer.clearLayers();
-  antipodeRingCitiesLayer.clearLayers();
+  ringCityData = emptyFC();
+  ringHighlightData = emptyFC();
   ringPinIndex.clear();
   highlightedPinKey = null;
-  if (!window.Geometry) return 0;
+  closePinPopup(); // pins may vanish under an open popup on re-render
+  if (!window.Geometry || !window.GeopuestoCitiesResolved || window.GeopuestoCitiesResolved.length === 0) {
+    syncGlobeSources(mapOrigin);
+    syncGlobeSources(mapAntipode);
+    return 0;
+  }
   const cities = window.GeopuestoCitiesResolved;
-  if (!cities || cities.length === 0) return 0;
 
   const P = Geometry.latLonToXYZ(lat, lng);
   // Phase 3b.8: applyEquatorFilters also applies the name search so map pins
@@ -2191,60 +2388,61 @@ function renderRingCities(lat, lng) {
   // not just the densest (Asian) region. See pickPinsForOverview comment.
   const toRender = pickPinsForOverview(matches);
 
-  // Style: small amber dot with dark halo. Opacity tapers with distance from
-  // ring (closer = more solid).
-  function pinStyle(c) {
-    const t = c.distanceFromCircleKm / Math.max(equatorFilters.toleranceKm, 1);
-    const fillOpacity = 1.0 - 0.5 * t;
-    return {
-      radius: 4,
-      color: "#000",
-      weight: 1.5,
-      opacity: 0.8,
-      fillColor: "#f2a949",
-      fillOpacity: fillOpacity,
-    };
-  }
-
   for (const c of toRender) {
-    const popupHtml =
-      '<div class="ring-pin-popup">' +
-        '<strong>' + escapeHtml(c.name) + '</strong> ' +
-        '<span class="cc">' + escapeHtml(c.country) + '</span><br>' +
-        'population: ' + c.population.toLocaleString() + '<br>' +
-        c.distanceFromCircleKm.toFixed(1) + ' km from ring · bearing ' + c.bearingAlongCircleDeg.toFixed(0) + '°<br>' +
-        c.distanceFromOriginKm.toFixed(0) + ' km from you · ' + c.distanceFromAntipodeKm.toFixed(0) + ' km from antipode<br>' +
-        '<button type="button" class="popup-set-origin" data-set-origin="1" data-lat="' + c.lat + '" data-lng="' + c.lon + '">Set as new origin →</button>' +
-      '</div>';
-    const style = pinStyle(c);
-    const oPin = L.circleMarker([c.lat, c.lon], style).bindPopup(popupHtml).addTo(originRingCitiesLayer);
-    const aPin = L.circleMarker([c.lat, c.lon], style).bindPopup(popupHtml).addTo(antipodeRingCitiesLayer);
-
+    // Opacity tapers with distance from ring (closer = more solid); rides in
+    // as a feature property read by the layer's circle-opacity expression.
+    const t = c.distanceFromCircleKm / Math.max(equatorFilters.toleranceKm, 1);
     const key = pinKey(c.lat, c.lon);
-    ringPinIndex.set(key, { o: oPin, a: aPin, baseStyle: style });
-
-    // Pin hover → highlight self + matching card (NO auto-scroll — scroll is
-    // disorienting when the user is just moving the mouse over the map).
-    // Phase 3b.4: scrollCard=false so hovering pins doesn't yank the page.
-    function onPinHover() { highlightRingPinByKey(key, /*scrollCard=*/ false); }
-    function onPinLeave() { clearRingPinHighlight(); }
-    oPin.on("mouseover", onPinHover); oPin.on("mouseout", onPinLeave);
-    aPin.on("mouseover", onPinHover); aPin.on("mouseout", onPinLeave);
+    const props = {
+      key: key,
+      name: c.name,
+      country: c.country,
+      population: c.population,
+      distRingKm: c.distanceFromCircleKm,
+      bearingDeg: c.bearingAlongCircleDeg,
+      distOriginKm: c.distanceFromOriginKm,
+      distAntipodeKm: c.distanceFromAntipodeKm,
+      // Full-precision coords for the popup's set-origin button — the
+      // feature's own geometry gets quantized during GeoJSON tiling.
+      lat: c.lat,
+      lon: c.lon,
+      fillOpacity: 1.0 - 0.5 * t,
+    };
+    ringCityData.features.push({
+      type: "Feature",
+      properties: props,
+      geometry: { type: "Point", coordinates: [c.lon, c.lat] },
+    });
+    // Hover/popup handlers live at the layer level (setupGlobeLayers); the
+    // index maps key → props for the card↔pin highlight link.
+    ringPinIndex.set(key, props);
   }
+  syncGlobeSources(mapOrigin);
+  syncGlobeSources(mapAntipode);
   return toRender.length;
 }
 
 // Phase 3b.2 helpers
+// The hot pin is its own one-feature source + layer (ring-highlight, drawn
+// above the pins layer — bigger, white-rim, full-opaque amber to match the
+// .is-pin-linked card style). Hover only touches that source, so the 4k-point
+// pins source never re-tiles on mouse moves.
+function syncHighlightSource() {
+  for (const m of [mapOrigin, mapAntipode]) {
+    if (globeReady.get(m)) m.getSource("ring-highlight").setData(ringHighlightData);
+  }
+}
+
 function highlightRingPinByKey(key, scrollCard) {
   if (highlightedPinKey === key) return;
   clearRingPinHighlight();
-  const entry = ringPinIndex.get(key);
-  if (!entry) return;
-  // Boost: bigger, white-rim, full-opaque amber so the pin "pops" against
-  // background pins. Matches the .is-pin-linked card style visually.
-  const hot = { radius: 8, color: "#fff", weight: 2, opacity: 1.0, fillColor: "#f2a949", fillOpacity: 1.0 };
-  entry.o.setStyle(hot); entry.o.bringToFront();
-  entry.a.setStyle(hot); entry.a.bringToFront();
+  const props = ringPinIndex.get(key);
+  if (!props) return;
+  ringHighlightData = {
+    type: "FeatureCollection",
+    features: [{ type: "Feature", properties: {}, geometry: { type: "Point", coordinates: [props.lon, props.lat] } }],
+  };
+  syncHighlightSource();
   highlightedPinKey = key;
   // Highlight the matching card too, optionally scrolling it into view
   const card = document.querySelector('[data-equator-city][data-pin-key="' + key + '"]');
@@ -2256,46 +2454,45 @@ function highlightRingPinByKey(key, scrollCard) {
 
 function clearRingPinHighlight() {
   if (highlightedPinKey == null) return;
-  const entry = ringPinIndex.get(highlightedPinKey);
-  if (entry) {
-    entry.o.setStyle(entry.baseStyle);
-    entry.a.setStyle(entry.baseStyle);
-  }
+  ringHighlightData = emptyFC();
+  syncHighlightSource();
   const stale = document.querySelector(".equator-row.is-pin-linked");
   if (stale) stale.classList.remove("is-pin-linked");
   highlightedPinKey = null;
 }
 
-// "Show full ring" button — fitBounds both maps to the ring polyline extent.
-// For antipodal rings (always wrap the planet) this is essentially world view;
-// for v2 narrow rings (Boston↔NYC) it'd be much tighter. Same code, both cases.
+// "Show full ring" button — fitBounds both maps to the ring's extent.
+// For antipodal rings (always wrap the planet) this zooms out to the whole
+// globe — where, honestly, only half the ring is ever visible at once (the
+// other half is behind the planet; drag to chase it). For v2 narrow rings
+// (Boston↔NYC) the same code gives a much tighter frame.
 function zoomBothMapsToRing() {
-  const oLayers = originEquatorLayer.getLayers();
-  const aLayers = antipodeEquatorLayer.getLayers();
-  if (oLayers.length === 0 || aLayers.length === 0) return;
-  const oBounds = L.featureGroup(oLayers).getBounds();
-  const aBounds = L.featureGroup(aLayers).getBounds();
-  if (!oBounds.isValid() || !aBounds.isValid()) return;
-  const opts = { padding: [40, 40], maxZoom: 5, animate: true, duration: 0.7 };
-  mapOrigin.fitBounds(oBounds, opts);
-  mapAntipode.fitBounds(aBounds, opts);
+  if (equatorData.features.length === 0) return;
+  const bounds = new maplibregl.LngLatBounds();
+  for (const f of equatorData.features) {
+    for (const c of f.geometry.coordinates) bounds.extend(c);
+  }
+  const opts = { padding: 40, maxZoom: gz(5), duration: 700 };
+  mapOrigin.fitBounds(bounds, opts);
+  mapAntipode.fitBounds(bounds, opts);
 }
 
 // ============================================================
-//  Phase 3b.4 — Embedded ring-overview Leaflet map
+//  Phase 3b.4 — Embedded ring-overview mini-globe
 //
 //  Third map (besides mapOrigin / mapAntipode) that lives inside the
 //  orthodrome module body. Auto-fits to the ring's bounds so the user
-//  can see the WHOLE orthodrome + every pinned city without scrolling
-//  back up to the main maps and zooming out.
+//  can see the orthodrome + pinned cities without scrolling back up
+//  to the main maps and zooming out.
 //
 //  Module HTML gets rebuilt on every renderInfo() call and every
 //  refreshEquatorModule() — so the #equator-overview-map div is a fresh
-//  node each time. We .remove() the prior Leaflet instance before
-//  creating a new one. Cheap enough (~20ms) given how rarely it fires.
+//  node each time. We .remove() the prior MapLibre instance before
+//  creating a new one. MapLibre styles load async, so the contents are
+//  drawn from the style.load callback (drawEquatorOverviewContents
+//  no-ops until the style is ready, then the callback re-invokes it).
 // ============================================================
 let equatorOverviewMap = null;
-const equatorOverviewLayers = [];
 
 function initEquatorOverviewMap() {
   const div = document.getElementById("equator-overview-map");
@@ -2304,66 +2501,114 @@ function initEquatorOverviewMap() {
   if (equatorOverviewMap) {
     try { equatorOverviewMap.remove(); } catch (e) { /* ignore */ }
     equatorOverviewMap = null;
-    equatorOverviewLayers.length = 0;
   }
-  equatorOverviewMap = L.map(div, {
-    worldCopyJump: true,
+  const m = new maplibregl.Map({
+    container: div,
+    center: [0, 0],
+    zoom: 0.9,
+    maxZoom: gz(20),
     attributionControl: false,
-    zoomControl: true,
-    scrollWheelZoom: false,  // avoid hijacking page scroll
-  }).setView([0, 0], 2);
-  L.tileLayer(BASE_URL, TILE_OPTS_NOATTR).addTo(equatorOverviewMap);
-  if (currentOriginForEquator) {
-    drawEquatorOverviewContents(currentOriginForEquator.lat, currentOriginForEquator.lng);
-  }
+    scrollZoom: false,  // avoid hijacking page scroll
+    style: globeStyle(),
+  });
+  m.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-left");
+  equatorOverviewMap = m;
+
+  m.once("style.load", () => {
+    if (m !== equatorOverviewMap) return; // superseded by a newer rebuild
+    m.addSource("ov-ring", { type: "geojson", data: emptyFC() });
+    m.addSource("ov-cities", { type: "geojson", data: emptyFC() });
+    m.addSource("ov-anchors", { type: "geojson", data: emptyFC() });
+    m.addLayer({
+      id: "ov-ring-halo", type: "line", source: "ov-ring",
+      layout: { "line-cap": "round", "line-join": "round" },
+      paint: { "line-color": "#000", "line-width": 5, "line-opacity": 0.55 },
+    });
+    m.addLayer({
+      id: "ov-ring-line", type: "line", source: "ov-ring",
+      layout: { "line-cap": "round", "line-join": "round" },
+      paint: { "line-color": "#f2a949", "line-width": 2.5, "line-opacity": 1.0 },
+    });
+    m.addLayer({
+      id: "ov-cities", type: "circle", source: "ov-cities",
+      paint: {
+        "circle-radius": 3,
+        "circle-color": "#f2a949",
+        "circle-opacity": 0.9,
+        "circle-stroke-color": "#000",
+        "circle-stroke-width": 1,
+      },
+    });
+    // Origin/antipode anchors drawn above the city pins
+    m.addLayer({
+      id: "ov-anchors", type: "circle", source: "ov-anchors",
+      paint: {
+        "circle-radius": 6,
+        "circle-color": ["get", "fillColor"],
+        "circle-stroke-color": "#fff",
+        "circle-stroke-width": 2,
+      },
+    });
+
+    // Hover tooltips on city pins (popups disabled here — click the cards
+    // in the panel below for full info)
+    const tip = new maplibregl.Popup({ closeButton: false, closeOnClick: false, className: "globe-tip", offset: 8 });
+    m.on("mousemove", "ov-cities", (e) => {
+      const f = e.features[0];
+      if (!f) return;
+      m.getCanvas().style.cursor = "default";
+      tip.setLngLat(f.geometry.coordinates).setHTML(f.properties.tooltip).addTo(m);
+    });
+    m.on("mouseleave", "ov-cities", () => {
+      m.getCanvas().style.cursor = "";
+      tip.remove();
+    });
+
+    if (currentOriginForEquator) {
+      drawEquatorOverviewContents(currentOriginForEquator.lat, currentOriginForEquator.lng);
+    }
+  });
 }
 
 function drawEquatorOverviewContents(lat, lng) {
-  if (!equatorOverviewMap || !window.Geometry) return;
-  // Clear any prior non-tile layers
-  for (const layer of equatorOverviewLayers) {
-    try { equatorOverviewMap.removeLayer(layer); } catch (e) {}
-  }
-  equatorOverviewLayers.length = 0;
+  const m = equatorOverviewMap;
+  if (!m || !window.Geometry) return;
+  // Style still loading → the style.load callback re-invokes this draw
+  if (!m.getSource("ov-ring")) return;
 
-  // Ring polyline (halo + amber line, same convention as main maps)
+  // Ring (halo + amber line, same convention as main maps)
   // Same pipeline as renderPersonalEquator: 720-sample great circle (so the
   // curve stays smooth at high latitudes), antimeridianSplit at ±180°, then
-  // clipPolylineToLat at 85° to avoid Mercator-edge stripes when the GC
-  // crosses into the projection's polar caps (visible bug for near-equatorial
-  // origins like Ecuador where the GC max-lat approaches 90°).
+  // clipPolylineToLat at 85° — required on the globe too, since MapLibre's
+  // globe is the Web Mercator tile pyramid wrapped onto a sphere.
   const P = Geometry.latLonToXYZ(lat, lng);
   const polyline = Geometry.sampleGreatCircle(P, 720);
   const splitSegs = Geometry.antimeridianSplit(polyline);
-  const segments = [];
+  const ringFC = emptyFC();
   for (const seg of splitSegs) {
     for (const clipped of Geometry.clipPolylineToLat(seg, 85)) {
-      segments.push(clipped);
+      ringFC.features.push({
+        type: "Feature",
+        properties: {},
+        geometry: { type: "LineString", coordinates: clipped.map(p => [p[1], p[0]]) },
+      });
     }
   }
-  const halo = { color: "#000", weight: 5, opacity: 0.55, interactive: false, smoothFactor: 1.0 };
-  const line = { color: "#f2a949", weight: 2.5, opacity: 1.0, interactive: false, smoothFactor: 1.0 };
-  const ringLayers = [];
-  for (const seg of segments) {
-    ringLayers.push(L.polyline(seg, halo).addTo(equatorOverviewMap));
-    const ln = L.polyline(seg, line).addTo(equatorOverviewMap);
-    ringLayers.push(ln);
-    equatorOverviewLayers.push(ringLayers[ringLayers.length - 2], ln);
-  }
+  m.getSource("ov-ring").setData(ringFC);
 
-  // Origin (orange) and antipode (teal) markers — instant spatial anchors
+  // Origin (orange) and antipode (teal) anchors — instant spatial context
   const antiLat = -lat;
   const antiLng = lng > 0 ? lng - 180 : lng + 180;
-  const oMark = L.circleMarker([lat, lng], {
-    radius: 6, color: "#fff", weight: 2, fillColor: "#F26522", fillOpacity: 1, interactive: false
-  }).addTo(equatorOverviewMap);
-  const aMark = L.circleMarker([antiLat, antiLng], {
-    radius: 6, color: "#fff", weight: 2, fillColor: "#00BFA5", fillOpacity: 1, interactive: false
-  }).addTo(equatorOverviewMap);
-  equatorOverviewLayers.push(oMark, aMark);
+  m.getSource("ov-anchors").setData({
+    type: "FeatureCollection",
+    features: [
+      { type: "Feature", properties: { fillColor: "#F26522" }, geometry: { type: "Point", coordinates: [lng, lat] } },
+      { type: "Feature", properties: { fillColor: "#00BFA5" }, geometry: { type: "Point", coordinates: [antiLng, antiLat] } },
+    ],
+  });
 
-  // City pins on the ring (smaller than main maps, popups disabled — click
-  // the cards in the panel below for full info)
+  // City pins on the ring
+  const citiesFC = emptyFC();
   const cities = window.GeopuestoCitiesResolved;
   if (cities) {
     // Phase 3b.8: same filter pipeline (including name search) as the list
@@ -2373,24 +2618,24 @@ function drawEquatorOverviewContents(lat, lng) {
     // coverage, not just dense urban regions.
     const toRender = pickPinsForOverview(matches);
     for (const c of toRender) {
-      const pin = L.circleMarker([c.lat, c.lon], {
-        radius: 3,
-        color: "#000",
-        weight: 1,
-        fillColor: "#f2a949",
-        fillOpacity: 0.9,
-      }).bindTooltip(c.name + " (" + c.country + ")", { direction: "top", offset: [0, -3], opacity: 0.85 });
-      pin.addTo(equatorOverviewMap);
-      equatorOverviewLayers.push(pin);
+      citiesFC.features.push({
+        type: "Feature",
+        properties: { tooltip: escapeHtml(c.name + " (" + c.country + ")") },
+        geometry: { type: "Point", coordinates: [c.lon, c.lat] },
+      });
     }
   }
+  m.getSource("ov-cities").setData(citiesFC);
 
-  // Fit bounds to the ring so the whole orthodrome is visible at once.
-  // For antipodal rings (always wrap the planet) this is ~world view.
-  const fg = L.featureGroup(ringLayers);
-  const bounds = fg.getBounds();
-  if (bounds.isValid()) {
-    equatorOverviewMap.fitBounds(bounds, { padding: [16, 16], maxZoom: 3, animate: false });
+  // Frame the ring. fitBounds on a world-wrapping ring would center on the
+  // origin — which puts the ring exactly at the globe's limb (a personal
+  // equator is always 90° from its origin), i.e. invisible. Centering on a
+  // point ON the ring instead makes it arc straight across the disc, pins
+  // and all. (v2 narrow rings may want a real fitBounds again.)
+  if (ringFC.features.length) {
+    const seg = ringFC.features[0].geometry.coordinates;
+    const mid = seg[Math.floor(seg.length / 2)];
+    m.jumpTo({ center: mid, zoom: 0.9 });
   }
 }
 
@@ -2645,8 +2890,8 @@ function refreshEquatorModule() {
   // Phase 3b.1: also re-render the pin layer with the new filter values.
   // The pins use the same equatorFilters state, so they need to refresh too.
   renderRingCities(currentOriginForEquator.lat, currentOriginForEquator.lng);
-  // Phase 3b.4: the overview map div was replaced; rebuild the Leaflet
-  // instance on the new node. ~20ms cost on filter change.
+  // Phase 3b.4: the overview map div was replaced; rebuild the MapLibre
+  // instance on the new node. Cheap enough on filter change.
   initEquatorOverviewMap();
 }
 
@@ -2672,7 +2917,7 @@ document.addEventListener("change", (e) => {
 });
 
 // Phase 3b.8: free-text name search. Debounced so we don't re-render the
-// whole module + 3 Leaflet maps on every keystroke. refreshEquatorModule
+// whole module + 3 maps on every keystroke. refreshEquatorModule
 // rebuilds the module HTML so the input gets a new DOM node — we restore
 // focus and caret position so the user's typing flow isn't interrupted.
 let nameFilterDebounce = null;
@@ -2826,9 +3071,15 @@ document.addEventListener("keydown", (e) => {
 });
 
 mapOrigin.on("click", (e) => {
+  // Clicked a city pin → its layer handler owns this click (popup). The
+  // preventDefault flag covers handler-order; the rendered-feature query
+  // covers the registration race (layer handlers attach after style.load).
+  if (e.defaultPrevented) return;
+  if (mapOrigin.getLayer("ring-cities") &&
+      mapOrigin.queryRenderedFeatures(e.point, { layers: ["ring-cities"] }).length) return;
   activePresetName = null;
   renderPresets();
-  goTo(e.latlng.lat, e.latlng.lng);
+  goTo(e.lngLat.lat, e.lngLat.lng);
 });
 
 function calcAntipode(lat, lng) {
@@ -3632,10 +3883,10 @@ async function goTo(lat, lng, opts) {
     } catch (e) { /* SecurityError on some file:// origins — ignore */ }
   }
 
-  if (originMarker) mapOrigin.removeLayer(originMarker);
-  if (antipodeMarker) mapAntipode.removeLayer(antipodeMarker);
-  originMarker = L.marker([lat, lng], { icon: makeMarker("#F26522") }).addTo(mapOrigin);
-  antipodeMarker = L.marker([anti.lat, anti.lng], { icon: makeMarker("#00BFA5") }).addTo(mapAntipode);
+  if (originMarker) originMarker.remove();
+  if (antipodeMarker) antipodeMarker.remove();
+  originMarker = makeMarker("#F26522").setLngLat([lng, lat]).addTo(mapOrigin);
+  antipodeMarker = makeMarker("#00BFA5").setLngLat([anti.lng, anti.lat]).addTo(mapAntipode);
   // Phase 3a: render the personal equator ring on both maps. Pure-local math,
   // no API wait — appears at the same instant as the markers.
   renderPersonalEquator(lat, lng);
@@ -3645,9 +3896,11 @@ async function goTo(lat, lng, opts) {
   // Phase 3b.1: render city pins on both maps right next to the ring. These
   // are the same cities surfaced in the panel — one more spatial channel.
   renderRingCities(lat, lng);
-  // Initial quick flyTo at zoom 5 for immediate visual feedback — smart-zoom kicks in once reverse-geocode resolves
-  mapOrigin.flyTo([lat, lng], 5, { duration: 0.5 });
-  mapAntipode.flyTo([anti.lat, anti.lng], 5, { duration: 0.5 });
+  // Initial quick flyTo at zoom 5 (Leaflet scale) for immediate visual
+  // feedback — smart-zoom kicks in once reverse-geocode resolves. On the
+  // globe, flyTo arcs around the planet to reach the far side.
+  mapOrigin.flyTo({ center: [lng, lat], zoom: gz(5), duration: 500 });
+  mapAntipode.flyTo({ center: [anti.lng, anti.lat], zoom: gz(5), duration: 500 });
 
   // Kick off origin reverse-geocode in parallel (used for smart-zoom and not yet exposed elsewhere)
   const originGeoPromise = reverseGeocode(lat, lng);
@@ -3687,8 +3940,8 @@ async function goTo(lat, lng, opts) {
   const originGeo = await originGeoPromise;
   const originZoom = pickZoom(originGeo);
   const antipodeZoom = pickZoom(data);
-  mapOrigin.flyTo([lat, lng], originZoom, { duration: 0.9 });
-  mapAntipode.flyTo([anti.lat, anti.lng], antipodeZoom, { duration: 0.9 });
+  mapOrigin.flyTo({ center: [lng, lat], zoom: gz(originZoom), duration: 900 });
+  mapAntipode.flyTo({ center: [anti.lng, anti.lat], zoom: gz(antipodeZoom), duration: 900 });
 
   const wikiPromise = nearby.wikipedia ? fetchWikipediaSummary(nearby.wikipedia.pageid) : Promise.resolve(null);
   const photosPromise = nearby.commonsTitles.length ? fetchPhotoUrls(nearby.commonsTitles.slice(0, 12)) : Promise.resolve([]);
@@ -4423,7 +4676,7 @@ function renderInfo(lat, lng, data, nearby, wikiSummary, photos, sun, weather, c
     .join("");
   // Phase 3b.4: the orthodrome module HTML includes a placeholder div for the
   // embedded ring-overview map. innerHTML just replaced the old node, so the
-  // Leaflet instance pointing at the old div is dead — rebuild on the new
+  // MapLibre instance pointing at the old div is dead — rebuild on the new
   // node. Idempotent: this fires on both partial-data and full-data passes
   // of renderInfo, and that's fine.
   initEquatorOverviewMap();
@@ -4617,14 +4870,8 @@ document.getElementById("goBtn").addEventListener("click", () => {
   });
 });
 
-window.addEventListener("resize", () => {
-  mapOrigin.invalidateSize();
-  mapAntipode.invalidateSize();
-});
-setTimeout(() => {
-  mapOrigin.invalidateSize();
-  mapAntipode.invalidateSize();
-}, 100);
+// (Leaflet needed manual invalidateSize() on resize; MapLibre watches its
+// container with a ResizeObserver — trackResize is on by default.)
 
 // System clock — UTC, mono LCD style
 function tickClock() {

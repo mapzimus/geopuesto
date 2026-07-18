@@ -7,8 +7,10 @@ This is the consumer app at the repo root. Sibling research-geometry sandbox liv
 ## Stack
 
 - Plain HTML/CSS/JS — `index.html` plus the shared spherical-geometry kernel at top level (`geometry.js`, `cities.js`) used by both this app and `playground/`. No build step, no package.json, no node_modules.
-- Leaflet 1.9.4 from CDN for the two side-by-side maps
-- Esri Dark Gray Canvas + Reference labels (keyless tiles)
+- MapLibre GL JS 5.6.1 from CDN (pinned + SRI, same version as `playground/`) — both side-by-side viewports and the ring-overview mini-map render as 3D globes (`projection: globe`, ported from Leaflet 2026-07-18 per the repo's `.claude/skills/globe-maps` skill). Zoom constants carried over from Leaflet get −1 via the `gz()` helper (256px vs 512px tile bases). The ±85.05° lat clip in the ring pipeline is still required: MapLibre's globe is the Web Mercator tile pyramid wrapped onto a sphere.
+- CARTO Dark Matter raster tiles (keyless), retina variant on high-DPI displays
+- Ring + city pins draw as GeoJSON sources with GPU circle/line layers (shared FeatureCollections feed both maps); the hovered pin is its own single-feature source so hover never re-tiles the 4k-pin source
+- Test hook: `window.GeopuestoGlobes` (both maps, overview, ring data getters, `gz`)
 - IBM Plex Mono + IBM Plex Sans via Google Fonts
 
 ## How to run locally
