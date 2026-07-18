@@ -188,7 +188,7 @@
          before any interaction. -->
     <div id="tp-map"></div>
     <div class="map-caption" id="tp-map-caption">
-      Orange = A. Teal = B. Solid orange arc = the A&rarr;B great circle (the shortest path on a sphere). Dashed teal arc = the perpendicular-bisector great circle (every point on this curve is equidistant from A and B). Blue pins = M and &minus;M (the Geomates). Yellow pins = n and &minus;n (the poles of the A&ndash;B great circle).
+      Orange = A. Teal = B. Solid orange arc = the A&rarr;B great circle (the shortest path on a sphere). Dashed teal arc = the perpendicular-bisector great circle (every point on this curve is equidistant from A and B). Blue pins = M and &minus;M (the Geomates). Yellow pins = n and &minus;n (the poles of the A&ndash;B great circle). Drag to spin, scroll to zoom, <strong>double-click</strong> to reposition A.
     </div>
     <div class="control-row" style="margin-top: 14px;">
       <label>A (origin):
@@ -605,6 +605,19 @@
         tpMap = GlobeMap.create('tp-map', { center: [20, 0], zoom: 1 });
         tpLayers.lines = tpMap.group();
         tpLayers.pins = tpMap.group();
+        // Same affordance as the 3D globe up top: double-click repositions A.
+        // Funnel through the input's change handler so validation, share-link
+        // state, and re-render all happen exactly as if the user typed it.
+        tpMap.map.doubleClickZoom.disable();
+        tpMap.map.on('dblclick', function (e) {
+          const inp = document.getElementById('tp-a-input');
+          const lat = +e.lngLat.lat.toFixed(4);
+          const lng = +(((e.lngLat.lng + 180) % 360 + 360) % 360 - 180).toFixed(4);
+          inp.value = lat + ',' + lng;
+          delete inp.dataset.latlon;
+          delete inp.dataset.cityLabel;
+          inp.dispatchEvent(new Event('change', { bubbles: true }));
+        });
         return tpMap;
       }
 
