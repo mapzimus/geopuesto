@@ -2105,6 +2105,15 @@ const SPIN_SLOW_ZOOM = 1;  // ease speed down between this and SPIN_MAX_ZOOM
 
 function spinGlobe() {
   if (userInteracting) return;
+  // The wheel-idle timer below calls this on a fixed delay with no real
+  // knowledge of whether MapLibre's own scroll-zoom easing has actually
+  // finished — without this guard, calling easeTo() while that internal
+  // animation is still running crashes MapLibre's frame scheduler
+  // ("Attempting to run(), but is already running"). moveend-triggered
+  // calls are already safe (isMoving() is false by the time it fires); this
+  // guard only ever short-circuits the racy timer-triggered call, which
+  // then self-heals on the moveend that follows once the real ease ends.
+  if (mapGlobe.isMoving()) return;
   const zoom = mapGlobe.getZoom();
   if (zoom >= SPIN_MAX_ZOOM) return;
   let degPerSec = 360 / SPIN_SECONDS_PER_REV;
@@ -2120,6 +2129,25 @@ mapGlobe.on("dragstart", () => { userInteracting = true; });
 mapGlobe.on("touchstart", () => { userInteracting = true; });
 mapGlobe.on("mouseup", () => { userInteracting = false; spinGlobe(); });
 mapGlobe.on("touchend", () => { userInteracting = false; spinGlobe(); });
+// Scroll-zoom has no dedicated hook above, so spin's own easeTo (which holds
+// zoom constant while it eases longitude) was fighting the wheel handler for
+// control of the camera — measured Δzoom for an identical scroll gesture
+// dropped from +1.44 to +0.008 while spinning. Debounce a synthetic
+// interaction window around each wheel event instead: there's no native
+// "wheel end" event, so treat 200ms of silence as the gesture finishing.
+let wheelIdleTimer = null;
+mapGlobe.on("wheel", () => {
+  userInteracting = true;
+  clearTimeout(wheelIdleTimer);
+  wheelIdleTimer = setTimeout(() => { userInteracting = false; spinGlobe(); }, 200);
+});
+// mousedown/dragstart set userInteracting, but the matching mouseup/dragend
+// only fire if the release happens over the canvas — overshoot the globe's
+// edge while dragging (easy to do) and the map-scoped mouseup never lands,
+// leaving spin off permanently. A window-level fallback catches releases
+// anywhere on the page.
+window.addEventListener("mouseup", () => { userInteracting = false; spinGlobe(); });
+window.addEventListener("touchend", () => { userInteracting = false; spinGlobe(); });
 mapGlobe.on("moveend", spinGlobe);
 spinGlobe();
 
@@ -2244,6 +2272,13 @@ window.GeopuestoGlobes = {
 let originMarker = null, antipodeMarker = null;
 let activePresetName = null;
 let currentAnti = null;
+// goTo() is async, fire-and-forget at every call site, and has no
+// cancellation token — so a slow-resolving earlier call can complete AFTER
+// a newer one and clobber it (stale flyTo + stale renderInfo overwriting
+// the screen with the wrong location's data). Each invocation stamps its
+// own generation; anything that would mutate shared UI state after an
+// await checks it's still the latest before doing so.
+let goToGeneration = 0;
 
 // Pulse markers are plain DOM elements handed to maplibregl.Marker —
 // the .pulse-marker CSS (ring animation) carries over unchanged.
@@ -3879,6 +3914,7 @@ async function goTo(lat, lng, opts) {
   lng = ((lng + 540) % 360) - 180;
   const anti = calcAntipode(lat, lng);
   currentAnti = anti;
+  const myGen = ++goToGeneration;
 
   // Phase 3b.6: push to browser history so back-button (UI + native browser
   // back + Alt+Left + mobile gesture) all just work. Skip when restoring
@@ -3942,6 +3978,10 @@ async function goTo(lat, lng, opts) {
     fetchHourlyForecast(anti.lat, anti.lng),
   ]);
 
+  // A newer goTo() started while these ~17 requests were in flight — don't
+  // fly the camera or paint the panel with this call's now-stale antipode.
+  if (myGen !== goToGeneration) return;
+
   // The reveal: fly across the planet to the antipode, smart-zoomed to what's
   // actually there (tight on a city block, wide on open ocean). A long
   // duration lets MapLibre's flyTo arc — zoom out, cross the globe, zoom
@@ -3959,6 +3999,9 @@ async function goTo(lat, lng, opts) {
 
   renderInfo(anti.lat, anti.lng, data, nearby, null, null, sun, weather, null, mapillary, iss, sats, flights, null, gtz, gelev, quakes, aq, null, kp, magDec, pois, volcanoes, webcams, windyForecast);
   const [wikiSummary, photos, country, ships, radio] = await Promise.all([wikiPromise, photosPromise, countryPromise, shipsPromise, radioPromise]);
+  // Narrower repeat of the same guard: a newer goTo() could have started
+  // during this second, smaller batch of requests too.
+  if (myGen !== goToGeneration) return;
   renderInfo(anti.lat, anti.lng, data, nearby, wikiSummary, photos, sun, weather, country, mapillary, iss, sats, flights, ships, gtz, gelev, quakes, aq, radio, kp, magDec, pois, volcanoes, webcams, windyForecast);
 }
 
