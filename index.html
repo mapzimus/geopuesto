@@ -185,12 +185,11 @@
     .lab-banner .lab-sub { display: none; }
   }
 
-  /* ============ Map Viewports ============ */
+  /* ============ Map Viewport — single rotating globe ============ */
   .viewport-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    height: 38vh;
-    min-height: 320px;
+    height: 56vh;
+    min-height: 420px;
+    max-height: 680px;
     background: var(--bg-2);
     position: relative;
     border-bottom: 1px solid var(--border);
@@ -198,6 +197,8 @@
   .viewport {
     position: relative;
     background: #0a1218;
+    width: 100%;
+    height: 100%;
   }
   .viewport-header {
     position: absolute;
@@ -215,8 +216,12 @@
     align-items: center;
     gap: 6px;
     backdrop-filter: blur(4px);
+    pointer-events: none;
   }
-  .viewport-header.origin { border-color: var(--orange); color: var(--orange); }
+  /* Two legend chips share one globe now — origin pins to the opposite
+     corner from target so both read at a glance regardless of which
+     hemisphere is currently rotated into view. */
+  .viewport-header.origin { top: 10px; left: 10px; right: auto; border-color: var(--orange); color: var(--orange); }
   .viewport-header.target { border-color: var(--teal); color: var(--teal); }
   .viewport-header::before { content: "▸"; font-size: 0.7rem; }
   /* Corner brackets */
@@ -231,28 +236,7 @@
   }
   .viewport::before { top: 0; left: 0; border-width: 1px 0 0 1px; }
   .viewport::after { bottom: 0; right: 0; border-width: 0 1px 1px 0; }
-  .viewport.target::before { top: 0; right: 0; left: auto; border-width: 1px 1px 0 0; }
-  .viewport.target::after { bottom: 0; left: 0; right: auto; border-width: 0 0 1px 1px; }
   .map { width: 100%; height: 100%; }
-  .divider {
-    position: absolute;
-    top: 0; bottom: 0; left: 50%;
-    width: 1px;
-    background: linear-gradient(var(--orange), var(--teal));
-    z-index: 600;
-    pointer-events: none;
-    transform: translateX(-0.5px);
-  }
-  .divider::before, .divider::after {
-    content: "";
-    position: absolute;
-    left: 50%;
-    width: 8px; height: 8px;
-    border-radius: 50%;
-    transform: translateX(-50%);
-  }
-  .divider::before { top: 12px; background: var(--orange); box-shadow: 0 0 8px var(--orange); }
-  .divider::after { bottom: 12px; background: var(--teal); box-shadow: 0 0 8px var(--teal); }
 
   /* ============ Coordinate Readout (LCD) ============ */
   .readout-strip {
@@ -1681,15 +1665,7 @@
   footer a:hover { color: var(--orange); }
 
   @media (max-width: 720px) {
-    .viewport-row { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; height: 56vh; }
-    .divider {
-      left: 0; right: 0; top: 50%; bottom: auto;
-      width: 100%; height: 1px;
-      background: linear-gradient(90deg, var(--orange), var(--teal));
-      transform: translateY(-0.5px);
-    }
-    .divider::before { left: 14px; top: 50%; transform: translate(0, -50%); }
-    .divider::after { left: auto; right: 14px; bottom: auto; top: 50%; transform: translate(0, -50%); }
+    .viewport-row { height: 46vh; min-height: 340px; max-height: 520px; }
     .readout-strip { gap: 10px; }
     /* WCAG 2.5.5 — interactive controls ≥44×44px on touch devices */
     .tab { padding: 12px 16px; min-height: 44px; }
@@ -1788,14 +1764,10 @@
 </a>
 
 <div class="viewport-row">
-  <div class="viewport origin">
+  <div class="viewport">
     <div class="viewport-header origin">Origin</div>
-    <div id="mapOrigin" class="map"></div>
-  </div>
-  <div class="divider"></div>
-  <div class="viewport target">
     <div class="viewport-header target">Target / Antipode</div>
-    <div id="mapAntipode" class="map"></div>
+    <div id="mapGlobe" class="map"></div>
   </div>
 </div>
 <div class="attribution-strip">
@@ -2043,13 +2015,22 @@ const PRESETS = [
 ];
 
 // ============================================================
-//  MapLibre GL globe setup (ported from Leaflet — same viewports,
-//  now rendered as 3D planets via projection: globe; the globe
-//  unrolls to flat Mercator automatically as the user zooms in).
+//  MapLibre GL globe setup — ONE planet (not split origin/antipode
+//  panels) carrying both markers and the Personal Equator ring at
+//  once. projection: globe unrolls to flat Mercator as you zoom in,
+//  so the same map goes from "whole Earth" to street level.
+//
+//  Since an antipode is always 180° around the sphere, the two
+//  markers can never be on-screen simultaneously at any real zoom —
+//  goTo() flies the camera to the origin first (instant click
+//  feedback), then "tunnels through the Earth" to the antipode at
+//  its smart zoom once the reveal data lands, matching the loading
+//  copy. Dragging (or the ambient auto-spin below) brings the other
+//  marker into view on the far side.
 //
 //  Conventions carried over from playground/globeMap.js:
 //  - maplibre-gl pinned at 5.6.1 (same version repo-wide)
-//  - atmosphere-blend 0.6, faded out by the zoom where the globe
+//  - atmosphere-blend, faded out by the zoom where the globe
 //    has unrolled, so no hazy sky over the flat map
 //  - MapLibre's globe is still built from Web Mercator tiles, so
 //    the ±85.05° lat clip in the ring pipeline stays required
@@ -2091,45 +2072,73 @@ function globeStyle() {
   };
 }
 
-// Attribution rendered separately in the .attribution-strip below the viewports
-function makeGlobe(containerId, centerLngLat, zoom) {
-  const m = new maplibregl.Map({
-    container: containerId,
-    center: centerLngLat,
-    zoom: zoom,
-    maxZoom: gz(20),
-    attributionControl: false,
-    style: globeStyle(),
-  });
-  // top-left, where Leaflet's zoom control lived (top-right holds the viewport-header chip)
-  m.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-left");
-  return m;
-}
+// Attribution rendered separately in the .attribution-strip below the viewport
+// maxZoom 21 — a deliberate cap above the carto source's own maxzoom:20, so
+// the last real tile overzooms (stretches) for a couple of extra levels
+// instead of hard-stopping. "Zoom in really far" reads better as gently
+// blurry-but-continuous than as a wall.
+const mapGlobe = new maplibregl.Map({
+  container: "mapGlobe",
+  center: [0, 15],
+  zoom: 0.7,
+  maxZoom: 21,
+  attributionControl: false,
+  style: globeStyle(),
+});
+// bottom-left, clear of both viewport-header legend chips up top
+mapGlobe.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-left");
 
-// Initial zoom 1.4 (≈ old Leaflet 2, plus a nudge so the planet fills the
-// viewport instead of floating tiny in space)
-const mapOrigin = makeGlobe("mapOrigin", [0, 20], 1.4);
-const mapAntipode = makeGlobe("mapAntipode", [180, -20], 1.4);
+// ---- Ambient auto-rotation --------------------------------------
+// Standard MapLibre/Mapbox "spinning globe" recipe: a self-perpetuating
+// easeTo chain nudging longitude, re-armed on every moveend. Spins only
+// while zoomed out (idle browsing at planet scale); stops once the camera
+// is zoomed into a location (examining detail) — and resumes on its own if
+// the user zooms back out, no extra state needed beyond zoom + interaction.
+// goTo()'s own flyTo calls simply pre-empt whatever the spin was doing —
+// MapLibre coalesces the interrupted animation, moveend fires once the real
+// flight settles, and spinGlobe() re-checks zoom then (already above the
+// threshold post-arrival, so it correctly stays off).
+let userInteracting = false;
+const SPIN_SECONDS_PER_REV = 240;
+const SPIN_MAX_ZOOM = 3;   // spin stops at/above this zoom
+const SPIN_SLOW_ZOOM = 1;  // ease speed down between this and SPIN_MAX_ZOOM
+
+function spinGlobe() {
+  if (userInteracting) return;
+  const zoom = mapGlobe.getZoom();
+  if (zoom >= SPIN_MAX_ZOOM) return;
+  let degPerSec = 360 / SPIN_SECONDS_PER_REV;
+  if (zoom > SPIN_SLOW_ZOOM) {
+    degPerSec *= (SPIN_MAX_ZOOM - zoom) / (SPIN_MAX_ZOOM - SPIN_SLOW_ZOOM);
+  }
+  const center = mapGlobe.getCenter();
+  center.lng -= degPerSec;
+  mapGlobe.easeTo({ center, duration: 1000, easing: (n) => n });
+}
+mapGlobe.on("mousedown", () => { userInteracting = true; });
+mapGlobe.on("dragstart", () => { userInteracting = true; });
+mapGlobe.on("touchstart", () => { userInteracting = true; });
+mapGlobe.on("mouseup", () => { userInteracting = false; spinGlobe(); });
+mapGlobe.on("touchend", () => { userInteracting = false; spinGlobe(); });
+mapGlobe.on("moveend", spinGlobe);
+spinGlobe();
 
 // ---- Shared GeoJSON stores for the ring + pins ----------------
-// Both main maps render identical data (the ring and its cities exist at
-// real coordinates, visible from either hemisphere), so one copy of each
-// FeatureCollection feeds both maps' sources. Sources/layers can only be
-// added after style.load; render functions may run before that (goTo fires
-// immediately on restore), so data lives here and each map syncs from it
-// whenever it's ready.
+// Sources/layers can only be added after style.load; render functions may
+// run before that (goTo fires immediately on restore), so data lives here
+// and the map syncs from it once ready.
 function emptyFC() { return { type: "FeatureCollection", features: [] }; }
 let equatorData = emptyFC();      // Personal Equator ring segments
 let ringCityData = emptyFC();     // city pins on the ring
 let ringHighlightData = emptyFC(); // the single hovered pin, drawn hot
 
-const globeReady = new Map();     // map instance → sources exist yet?
+let glReady = false;
 
-function syncGlobeSources(m) {
-  if (!globeReady.get(m)) return;
-  m.getSource("equator").setData(equatorData);
-  m.getSource("ring-cities").setData(ringCityData);
-  m.getSource("ring-highlight").setData(ringHighlightData);
+function syncGlobeSources() {
+  if (!glReady) return;
+  mapGlobe.getSource("equator").setData(equatorData);
+  mapGlobe.getSource("ring-cities").setData(ringCityData);
+  mapGlobe.getSource("ring-highlight").setData(ringHighlightData);
 }
 
 // One open pin popup at a time, shared across both maps — matches the old
@@ -2150,7 +2159,8 @@ function buildPinPopupHtml(p) {
   '</div>';
 }
 
-function setupGlobeLayers(m) {
+function setupGlobeLayers() {
+  const m = mapGlobe;
   m.addSource("equator", { type: "geojson", data: equatorData });
   m.addSource("ring-cities", { type: "geojson", data: ringCityData });
   m.addSource("ring-highlight", { type: "geojson", data: ringHighlightData });
@@ -2216,16 +2226,15 @@ function setupGlobeLayers(m) {
     clearRingPinHighlight();
   });
 
-  globeReady.set(m, true);
-  syncGlobeSources(m);
+  glReady = true;
+  syncGlobeSources();
 }
 
-mapOrigin.once("style.load", () => setupGlobeLayers(mapOrigin));
-mapAntipode.once("style.load", () => setupGlobeLayers(mapAntipode));
+mapGlobe.once("style.load", setupGlobeLayers);
 
 // Test hook (headless checks + console poking) — not a public API
 window.GeopuestoGlobes = {
-  mapOrigin, mapAntipode,
+  map: mapGlobe,
   get overview() { return equatorOverviewMap; },
   get equatorData() { return equatorData; },
   get ringCityData() { return ringCityData; },
@@ -2249,19 +2258,19 @@ function makeMarker(color) {
 
 // ============================================================
 //  Phase 3a — "Your Personal Equator" ring
-//  Renders the great circle perpendicular to the antipodal axis
-//  on both maps. Every point on this ring is ~10,007.5 km from
-//  the origin AND from the antipode — the set of all places
-//  equally distant from both poles of your antipodal axis.
+//  Renders the great circle perpendicular to the antipodal axis.
+//  Every point on this ring is ~10,007.5 km from the origin AND
+//  from the antipode — the set of all places equally distant from
+//  both poles of your antipodal axis.
 //
 //  Math lives in geometry.js (Geometry.sampleGreatCircle,
 //  Geometry.antimeridianSplit). The ring lives in the shared
-//  `equatorData` FeatureCollection; both maps' halo + line layers
-//  restyle it, so a redraw is one setData per map.
+//  `equatorData` FeatureCollection; the halo + line layers restyle
+//  it, so a redraw is one setData.
 // ============================================================
 function renderPersonalEquator(lat, lng) {
   equatorData = emptyFC();
-  if (!window.Geometry) { syncGlobeSources(mapOrigin); syncGlobeSources(mapAntipode); return; }
+  if (!window.Geometry) { syncGlobeSources(); return; }
   const P = Geometry.latLonToXYZ(lat, lng);
   // 720 samples (0.5° arc each) keeps the curve looking smooth when the GC
   // runs at high latitudes — for near-equatorial origins the GC's max-lat
@@ -2286,22 +2295,21 @@ function renderPersonalEquator(lat, lng) {
   }
   // Halo-under-line styling lives on the two fixed layers (equator-halo /
   // equator-line) added in setupGlobeLayers — data here, paint there.
-  syncGlobeSources(mapOrigin);
-  syncGlobeSources(mapAntipode);
+  syncGlobeSources();
 }
 
 // ============================================================
-//  Phase 3b.1 — City pins on the ring (both maps)
+//  Phase 3b.1 — City pins on the ring
 //
 //  Renders each city that matched the current filters as a small
-//  circle marker on both the origin and antipode maps. Cities are
-//  literally on the ring, so they appear at their real lat/lon.
+//  circle marker at its real lat/lon on the ring.
 //  Click a pin → popup with city info + "set as origin" button.
-//  Capped at MAX_RING_PINS per map for perf (wide filters can match
-//  thousands of cities; rendering 10k+ SVG markers would freeze).
+//  Capped at PIN_HARD_CAP for perf (wide filters can match thousands
+//  of cities; rendering 10k+ SVG markers would freeze — moot now
+//  that pins are one GPU layer, but kept as safety headroom).
 // ============================================================
-// (Pins render via the "ring-cities" circle layer on each map — GPU-drawn
-// from the shared ringCityData FeatureCollection, wired in setupGlobeLayers.)
+// (Pins render via the "ring-cities" circle layer — GPU-drawn from the
+// shared ringCityData FeatureCollection, wired in setupGlobeLayers.)
 
 // Phase 3b.10: simplified picker. The picker is NOT a filter — the user's
 // tolerance + pop dropdowns set the scope. Picker just ships matches as pins.
@@ -2373,8 +2381,7 @@ function renderRingCities(lat, lng) {
   highlightedPinKey = null;
   closePinPopup(); // pins may vanish under an open popup on re-render
   if (!window.Geometry || !window.GeopuestoCitiesResolved || window.GeopuestoCitiesResolved.length === 0) {
-    syncGlobeSources(mapOrigin);
-    syncGlobeSources(mapAntipode);
+    syncGlobeSources();
     return 0;
   }
   const cities = window.GeopuestoCitiesResolved;
@@ -2417,8 +2424,7 @@ function renderRingCities(lat, lng) {
     // index maps key → props for the card↔pin highlight link.
     ringPinIndex.set(key, props);
   }
-  syncGlobeSources(mapOrigin);
-  syncGlobeSources(mapAntipode);
+  syncGlobeSources();
   return toRender.length;
 }
 
@@ -2428,9 +2434,7 @@ function renderRingCities(lat, lng) {
 // .is-pin-linked card style). Hover only touches that source, so the 4k-point
 // pins source never re-tiles on mouse moves.
 function syncHighlightSource() {
-  for (const m of [mapOrigin, mapAntipode]) {
-    if (globeReady.get(m)) m.getSource("ring-highlight").setData(ringHighlightData);
-  }
+  if (glReady) mapGlobe.getSource("ring-highlight").setData(ringHighlightData);
 }
 
 function highlightRingPinByKey(key, scrollCard) {
@@ -2461,26 +2465,27 @@ function clearRingPinHighlight() {
   highlightedPinKey = null;
 }
 
-// "Show full ring" button — fitBounds both maps to the ring's extent.
-// For antipodal rings (always wrap the planet) this zooms out to the whole
-// globe — where, honestly, only half the ring is ever visible at once (the
-// other half is behind the planet; drag to chase it). For v2 narrow rings
-// (Boston↔NYC) the same code gives a much tighter frame.
-function zoomBothMapsToRing() {
+// "Show full ring" button. fitBounds is the wrong tool here: a
+// world-wrapping ring's bounding box centers on the origin (the ring is
+// equidistant from it in every direction), and the origin is by definition
+// 90° from its own personal equator — so fitBounds would park the ring
+// exactly at the globe's limb, off to the side, barely visible. Flying to a
+// point ON the ring instead (same fix as the overview mini-globe below)
+// puts the ring front and center, arcing across the disc with its pins.
+// Only half is ever visible at once either way (the rest is behind the
+// planet) — drag to chase it. For v2 narrow rings (Boston↔NYC) this would
+// want a real fitBounds again.
+function zoomToRing() {
   if (equatorData.features.length === 0) return;
-  const bounds = new maplibregl.LngLatBounds();
-  for (const f of equatorData.features) {
-    for (const c of f.geometry.coordinates) bounds.extend(c);
-  }
-  const opts = { padding: 40, maxZoom: gz(5), duration: 700 };
-  mapOrigin.fitBounds(bounds, opts);
-  mapAntipode.fitBounds(bounds, opts);
+  const seg = equatorData.features[0].geometry.coordinates;
+  const mid = seg[Math.floor(seg.length / 2)];
+  mapGlobe.flyTo({ center: mid, zoom: gz(5), duration: 700 });
 }
 
 // ============================================================
 //  Phase 3b.4 — Embedded ring-overview mini-globe
 //
-//  Third map (besides mapOrigin / mapAntipode) that lives inside the
+//  Second map (besides the main mapGlobe) that lives inside the
 //  orthodrome module body. Auto-fits to the ring's bounds so the user
 //  can see the orthodrome + pinned cities without scrolling back up
 //  to the main maps and zooming out.
@@ -3040,7 +3045,7 @@ document.addEventListener("click", (e) => {
   const action = e.target.closest("[data-equator-action]");
   if (!action) return;
   const what = action.getAttribute("data-equator-action");
-  if (what === "zoom-to-ring") zoomBothMapsToRing();
+  if (what === "zoom-to-ring") zoomToRing();
 });
 
 // Phase 3b.2: card hover → highlight matching pin pair on both maps.
@@ -3070,13 +3075,17 @@ document.addEventListener("keydown", (e) => {
   row.click();
 });
 
-mapOrigin.on("click", (e) => {
+// Click anywhere on the globe → set a new origin there (whichever hemisphere
+// happens to be rotated into view). Clicking exactly on the antipode marker
+// works out as an implicit "swap" — goTo(anti.lat, anti.lng) is the same call
+// the Swap button makes.
+mapGlobe.on("click", (e) => {
   // Clicked a city pin → its layer handler owns this click (popup). The
   // preventDefault flag covers handler-order; the rendered-feature query
   // covers the registration race (layer handlers attach after style.load).
   if (e.defaultPrevented) return;
-  if (mapOrigin.getLayer("ring-cities") &&
-      mapOrigin.queryRenderedFeatures(e.point, { layers: ["ring-cities"] }).length) return;
+  if (mapGlobe.getLayer("ring-cities") &&
+      mapGlobe.queryRenderedFeatures(e.point, { layers: ["ring-cities"] }).length) return;
   activePresetName = null;
   renderPresets();
   goTo(e.lngLat.lat, e.lngLat.lng);
@@ -3885,25 +3894,22 @@ async function goTo(lat, lng, opts) {
 
   if (originMarker) originMarker.remove();
   if (antipodeMarker) antipodeMarker.remove();
-  originMarker = makeMarker("#F26522").setLngLat([lng, lat]).addTo(mapOrigin);
-  antipodeMarker = makeMarker("#00BFA5").setLngLat([anti.lng, anti.lat]).addTo(mapAntipode);
-  // Phase 3a: render the personal equator ring on both maps. Pure-local math,
-  // no API wait — appears at the same instant as the markers.
+  originMarker = makeMarker("#F26522").setLngLat([lng, lat]).addTo(mapGlobe);
+  antipodeMarker = makeMarker("#00BFA5").setLngLat([anti.lng, anti.lat]).addTo(mapGlobe);
+  // Phase 3a: render the personal equator ring. Pure-local math, no API
+  // wait — appears at the same instant as the markers.
   renderPersonalEquator(lat, lng);
   // Phase 3b: remember current origin so refreshEquatorModule() can rebuild
   // the city list on filter changes without needing to re-call renderInfo.
   currentOriginForEquator = { lat: lat, lng: lng };
-  // Phase 3b.1: render city pins on both maps right next to the ring. These
-  // are the same cities surfaced in the panel — one more spatial channel.
+  // Phase 3b.1: render city pins right next to the ring. These are the same
+  // cities surfaced in the panel — one more spatial channel.
   renderRingCities(lat, lng);
-  // Initial quick flyTo at zoom 5 (Leaflet scale) for immediate visual
-  // feedback — smart-zoom kicks in once reverse-geocode resolves. On the
-  // globe, flyTo arcs around the planet to reach the far side.
-  mapOrigin.flyTo({ center: [lng, lat], zoom: gz(5), duration: 500 });
-  mapAntipode.flyTo({ center: [anti.lng, anti.lat], zoom: gz(5), duration: 500 });
-
-  // Kick off origin reverse-geocode in parallel (used for smart-zoom and not yet exposed elsewhere)
-  const originGeoPromise = reverseGeocode(lat, lng);
+  // Quick flyTo to the origin for immediate click feedback (fixed zoom —
+  // reverse-geocode for the antipode's smart zoom hasn't resolved yet). The
+  // camera "tunnels through the Earth" to the antipode's reveal further
+  // down, once that data lands — one globe, one flight, two stops.
+  mapGlobe.flyTo({ center: [lng, lat], zoom: gz(5), duration: 600 });
 
   document.getElementById("readoutStrip").dataset.empty = "false";
   document.getElementById("originCoords").textContent = fmtCoord(lat, lng);
@@ -3936,12 +3942,12 @@ async function goTo(lat, lng, opts) {
     fetchHourlyForecast(anti.lat, anti.lng),
   ]);
 
-  // Smart-zoom both maps based on what's at each end
-  const originGeo = await originGeoPromise;
-  const originZoom = pickZoom(originGeo);
+  // The reveal: fly across the planet to the antipode, smart-zoomed to what's
+  // actually there (tight on a city block, wide on open ocean). A long
+  // duration lets MapLibre's flyTo arc — zoom out, cross the globe, zoom
+  // back in — read as "tunneling through the Earth" rather than a jump cut.
   const antipodeZoom = pickZoom(data);
-  mapOrigin.flyTo({ center: [lng, lat], zoom: gz(originZoom), duration: 900 });
-  mapAntipode.flyTo({ center: [anti.lng, anti.lat], zoom: gz(antipodeZoom), duration: 900 });
+  mapGlobe.flyTo({ center: [anti.lng, anti.lat], zoom: gz(antipodeZoom), duration: 2200 });
 
   const wikiPromise = nearby.wikipedia ? fetchWikipediaSummary(nearby.wikipedia.pageid) : Promise.resolve(null);
   const photosPromise = nearby.commonsTitles.length ? fetchPhotoUrls(nearby.commonsTitles.slice(0, 12)) : Promise.resolve([]);

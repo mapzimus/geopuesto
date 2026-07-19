@@ -7,10 +7,13 @@ This is the consumer app at the repo root. Sibling research-geometry sandbox liv
 ## Stack
 
 - Plain HTML/CSS/JS — `index.html` plus the shared spherical-geometry kernel at top level (`geometry.js`, `cities.js`) used by both this app and `playground/`. No build step, no package.json, no node_modules.
-- MapLibre GL JS 5.6.1 from CDN (pinned + SRI, same version as `playground/`) — both side-by-side viewports and the ring-overview mini-map render as 3D globes (`projection: globe`, ported from Leaflet 2026-07-18 per the repo's `.claude/skills/globe-maps` skill). Zoom constants carried over from Leaflet get −1 via the `gz()` helper (256px vs 512px tile bases). The ±85.05° lat clip in the ring pipeline is still required: MapLibre's globe is the Web Mercator tile pyramid wrapped onto a sphere.
+- MapLibre GL JS 5.6.1 from CDN (pinned + SRI, same version as `playground/`) — one hero globe (`#mapGlobe`, `projection: globe`) plus the ring-overview mini-map further down the page. Ported from Leaflet 2026-07-18, then consolidated from split origin/antipode panels into a single globe 2026-07-19, per the repo's `.claude/skills/globe-maps` skill. Zoom constants carried over from Leaflet get −1 via the `gz()` helper (256px vs 512px tile bases); `maxZoom` itself is a fresh 21 (not gz'd), letting the carto source (maxzoom 20) overzoom a level for "zoom in really far." The ±85.05° lat clip in the ring pipeline is still required: MapLibre's globe is the Web Mercator tile pyramid wrapped onto a sphere.
+- Single globe carries both markers + the ring at once. Since an antipode is always 180° away, both are never on-screen together at any real zoom — `goTo()` flies the camera to the origin first (instant click feedback), then "tunnels through the Earth" to the antipode's smart zoom once the reveal data lands (matches the "Tunneling through the Earth" loading copy). Dragging, or the ambient auto-spin, brings the far marker into view.
+- Auto-spin: standard MapLibre/Mapbox recursive-easeTo pattern (`spinGlobe()` + `moveend` re-arm), gated on zoom rather than a timer — spins below `SPIN_MAX_ZOOM` (3), stops once zoomed into a location, resumes on its own if zoomed back out. `goTo()`'s own flyTo calls just pre-empt it; no special-casing needed.
 - CARTO Dark Matter raster tiles (keyless), retina variant on high-DPI displays
-- Ring + city pins draw as GeoJSON sources with GPU circle/line layers (shared FeatureCollections feed both maps); the hovered pin is its own single-feature source so hover never re-tiles the 4k-pin source
-- Test hook: `window.GeopuestoGlobes` (both maps, overview, ring data getters, `gz`)
+- Ring + city pins draw as GeoJSON sources with GPU circle/line layers; the hovered pin is its own single-feature source so hover never re-tiles the 4k-pin source
+- "Show full ring" / the overview mini-map both frame the ring by flying to a point *on* the ring, not `fitBounds` — a world-wrapping ring's bounding box centers on the origin, which is by definition 90° from its own ring, so `fitBounds` parks it at the globe's limb, barely visible
+- Test hook: `window.GeopuestoGlobes` (`map`, `overview`, ring data getters, `gz`)
 - IBM Plex Mono + IBM Plex Sans via Google Fonts
 
 ## How to run locally

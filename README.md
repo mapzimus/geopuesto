@@ -30,7 +30,7 @@ Click a map, type a city, or use geolocation:
   photo gallery + Google Street View + Sentinel-2 satellite + Open-Meteo
   weather + Open-Meteo air quality + REST Countries data + sunrise/sunset.
 - **Personal Equator** — great circle perpendicular to your antipodal axis,
-  rendered on both maps with every GeoNames city along it (~150k cities,
+  rendered on the globe with every GeoNames city along it (~150k cities,
   filterable by population, tolerance band, sort by closeness/population/bearing).
 - **"Right Now Over There"** time/weather/aurora/radio module.
 - **Big-deal callouts** when there's an M5+ earthquake, active volcano,
