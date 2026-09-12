@@ -74,6 +74,8 @@
     font-size: 14px;
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
+    height: 100%;
+    overflow: hidden;
   }
   body::before {
     content: "";
@@ -84,19 +86,89 @@
   }
   .mono { font-family: 'IBM Plex Mono', 'SF Mono', Menlo, Consolas, monospace; }
 
+  /* ============ v2 app shell — no page scroll ============ */
+  .app-shell {
+    height: 100%;
+    display: grid;
+    grid-template-columns: minmax(280px, 22vw) minmax(0, 1fr) minmax(280px, 22vw);
+    grid-template-rows: 48px minmax(0, 1fr) minmax(200px, 28vh);
+    grid-template-areas:
+      "top top top"
+      "left globe right"
+      "bottom bottom bottom";
+    min-height: 0;
+  }
+  .app-shell.left-collapsed {
+    grid-template-columns: 36px minmax(0, 1fr) minmax(280px, 22vw);
+  }
+  .app-shell.right-collapsed {
+    grid-template-columns: minmax(280px, 22vw) minmax(0, 1fr) 36px;
+  }
+  .app-shell.left-collapsed.right-collapsed {
+    grid-template-columns: 36px minmax(0, 1fr) 36px;
+  }
+  .app-shell.ortho-expanded {
+    grid-template-rows: 48px minmax(0, 1fr) minmax(280px, 42vh);
+  }
+  .app-shell.left-collapsed .dock-left .dock-scroll,
+  .app-shell.right-collapsed .dock-right .dock-scroll { display: none; }
+  .app-shell.left-collapsed .dock-left .dock-head-text,
+  .app-shell.right-collapsed .dock-right .dock-head-text { display: none; }
+
   /* ============ Console Header ============ */
   .console-header {
-    position: sticky; top: 0; z-index: 1000;
+    grid-area: top;
+    position: relative; z-index: 1000;
     background: var(--bg);
     border-bottom: 1px solid var(--border);
-    padding: 11px 20px;
+    padding: 0 14px;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 16px;
-    flex-wrap: wrap;
+    gap: 12px;
+    min-height: 48px;
+    overflow: hidden;
   }
-  .console-header .lhs { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+  .console-header .lhs { display: flex; align-items: baseline; gap: 14px; flex-wrap: nowrap; min-width: 0; }
+  .toolbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .cam-chips { display: flex; gap: 0; }
+  .cam-chip {
+    background: var(--surface-2);
+    border: 1px solid var(--border-bright);
+    color: var(--text);
+    padding: 6px 11px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    cursor: pointer;
+  }
+  .cam-chip:first-child { border-radius: 1px 0 0 1px; }
+  .cam-chip:last-child { border-radius: 0 1px 1px 0; }
+  .cam-chip + .cam-chip { border-left: none; }
+  .cam-chip:hover { color: var(--text); border-color: var(--border-bright); }
+  .cam-chip.origin:hover { color: var(--orange); }
+  .cam-chip.target:hover { color: var(--teal); }
+  .lab-chip {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.58rem;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--teal);
+    text-decoration: none;
+    border: 1px solid var(--border);
+    padding: 5px 10px;
+    background: var(--surface-2);
+  }
+  .lab-chip:hover { border-color: var(--teal); background: var(--teal-soft); }
+  @media (max-width: 1280px) {
+    .system-id { display: none; }
+  }
   .brand {
     font-family: 'IBM Plex Mono', monospace;
     font-size: 1.15rem;
@@ -187,12 +259,14 @@
 
   /* ============ Map Viewport — single rotating globe ============ */
   .viewport-row {
-    height: 56vh;
-    min-height: 420px;
-    max-height: 680px;
+    grid-area: globe;
+    height: auto;
+    min-height: 0;
+    max-height: none;
     background: var(--bg-2);
     position: relative;
-    border-bottom: 1px solid var(--border);
+    border: none;
+    overflow: hidden;
   }
   .viewport {
     position: relative;
@@ -345,6 +419,217 @@
     letter-spacing: 0.14em;
     text-transform: uppercase;
   }
+
+  /* ============ Docks ============ */
+  .dock {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    min-width: 0;
+    background: var(--bg);
+    overflow: hidden;
+  }
+  .dock-left { grid-area: left; border-right: 1px solid var(--border); }
+  .dock-right { grid-area: right; border-left: 1px solid var(--border); }
+  .dock-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-2);
+    flex-shrink: 0;
+  }
+  .dock-head.origin { border-left: 2px solid var(--orange); }
+  .dock-head.target { border-left: 2px solid var(--teal); }
+  .dock-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.58rem;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    display: block;
+  }
+  .dock-head.origin .dock-label { color: var(--orange); }
+  .dock-head.target .dock-label { color: var(--teal); }
+  .dock-coords {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--text-bright);
+    letter-spacing: 0.02em;
+  }
+  .dock-toggle {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--dim);
+    width: 28px; height: 28px;
+    cursor: pointer;
+    font-family: 'IBM Plex Mono', monospace;
+    flex-shrink: 0;
+  }
+  .dock-toggle:hover { color: var(--text); border-color: var(--border-bright); }
+  .dock-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .dock .input-panel {
+    flex-shrink: 0;
+    padding: 8px 10px 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .dock .tabs { margin-bottom: 8px; flex-wrap: wrap; }
+  .dock .tab { padding: 6px 8px; font-size: 0.55rem; letter-spacing: 0.12em; }
+  .dock .tab.tab-action { margin-left: 0; padding: 6px 8px; }
+  .dock .tab-shuffle { margin-left: 0; padding: 6px 8px; font-size: 0.55rem; }
+  .dock .presets-grid {
+    grid-template-rows: none;
+    grid-auto-flow: row;
+    grid-auto-columns: minmax(0, 1fr);
+    overflow-x: hidden;
+    overflow-y: auto;
+    max-height: 168px;
+  }
+  .dock .preset-pair { grid-row: auto; }
+  .dock-cards {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .dock-cards .cluster,
+  .dock-cards.cluster {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 0;
+    max-width: none;
+    margin: 0;
+  }
+  .dock-cards .module.full,
+  .dock-cards .module.half { grid-column: auto; }
+  .dock-cards .hero-body { grid-template-columns: 1fr; padding: 12px; gap: 12px; }
+  .dock-cards .hero-photo img { width: 100%; height: 140px; }
+  .dock-cards .hero-title { font-size: 1.35rem; }
+  .dock-cards .hero-fact { grid-template-columns: 1fr; gap: 2px; padding: 6px 0; }
+  .dock-cards .empty-state { padding: 28px 12px; }
+  .dock-cards .empty-state .question { font-size: 1.05rem; }
+  .dock-cards .loading { padding: 28px 12px; }
+
+  /* ============ Orthodrome bottom console ============ */
+  .orthodrome-console {
+    grid-area: bottom;
+    border-top: 1px solid var(--border);
+    background: var(--bg);
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .ortho-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 6px 12px;
+    background: var(--bg-2);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .ortho-bar-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.62rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--orange);
+  }
+  .ortho-expand-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--dim);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.58rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    padding: 4px 10px;
+    cursor: pointer;
+  }
+  .ortho-expand-btn:hover { color: var(--text); border-color: var(--border-bright); }
+  .orthodrome-console .equator-module,
+  .orthodrome-console #equator-module {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: none;
+    background: transparent;
+  }
+  .orthodrome-console .equator-flagship-header {
+    padding: 8px 12px 6px;
+    gap: 2px;
+    flex-shrink: 0;
+  }
+  .orthodrome-console .equator-flagship-header .title { font-size: 1rem; }
+  .orthodrome-console .equator-flagship-header .lede { font-size: 0.8rem; }
+  .orthodrome-console .equator-flagship-header .badge-new { display: none; }
+  .orthodrome-console .equator-headline {
+    padding: 8px 12px;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+  .orthodrome-console .equator-headline-name { font-size: 1.1rem; margin-bottom: 2px; }
+  .orthodrome-console .module-body {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .orthodrome-console .equator-controls { flex-shrink: 0; padding: 6px 10px; gap: 8px; }
+  .orthodrome-console:not(.is-expanded) .equator-list {
+    display: flex;
+    flex-direction: row;
+    overflow-x: auto;
+    overflow-y: hidden;
+    max-height: none;
+    gap: 6px;
+    padding: 6px 10px 10px;
+  }
+  .orthodrome-console:not(.is-expanded) .equator-row {
+    min-width: 220px;
+    flex: 0 0 auto;
+    border: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+  .orthodrome-console.is-expanded .equator-list {
+    flex: 1;
+    max-height: none;
+    overflow-y: auto;
+  }
+  .orthodrome-console .equator-overview-map-wrap,
+  .orthodrome-console .equator-playground-cta { display: none; }
+  .globe-attr {
+    position: absolute;
+    bottom: 6px;
+    right: 10px;
+    z-index: 400;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.5rem;
+    color: var(--dim);
+    letter-spacing: 0.06em;
+    background: rgba(10,18,24,0.75);
+    padding: 2px 6px;
+    pointer-events: auto;
+  }
+  .globe-attr a { color: var(--dim); text-decoration: none; }
+  .globe-attr a:hover { color: var(--orange); }
+  .mobile-tabs { display: none; }
 
   /* ============ Input Panel ============ */
   .input-panel {
@@ -1664,8 +1949,56 @@
   footer a { color: var(--dim); text-decoration: none; }
   footer a:hover { color: var(--orange); }
 
+  @media (max-width: 1100px) {
+    .app-shell {
+      grid-template-columns: 1fr;
+      grid-template-rows: 48px minmax(0, 1fr) 44px;
+      grid-template-areas:
+        "top"
+        "globe"
+        "mobtabs";
+    }
+    .app-shell.ortho-expanded,
+    .app-shell.left-collapsed,
+    .app-shell.right-collapsed {
+      grid-template-columns: 1fr;
+      grid-template-rows: 48px minmax(0, 1fr) 44px;
+    }
+    .dock-left, .dock-right, .orthodrome-console { display: none; }
+    .app-shell.show-origin .dock-left,
+    .app-shell.show-antipode .dock-right,
+    .app-shell.show-ring .orthodrome-console {
+      display: flex;
+      position: absolute;
+      top: 48px; left: 0; right: 0; bottom: 44px;
+      z-index: 20;
+      background: var(--bg);
+      border: none;
+    }
+    .mobile-tabs {
+      display: flex;
+      grid-area: mobtabs;
+      border-top: 1px solid var(--border);
+      background: var(--bg-2);
+    }
+    .mobile-tabs button {
+      flex: 1;
+      background: transparent;
+      border: none;
+      border-top: 2px solid transparent;
+      color: var(--dim);
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.58rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      cursor: pointer;
+    }
+    .mobile-tabs button.active { color: var(--orange); border-top-color: var(--orange); }
+    .cam-chips { display: none; }
+    .system-id { display: none; }
+  }
   @media (max-width: 720px) {
-    .viewport-row { height: 46vh; min-height: 340px; max-height: 520px; }
+    .viewport-row { height: auto; min-height: 0; max-height: none; }
     .readout-strip { gap: 10px; }
     /* WCAG 2.5.5 — interactive controls ≥44×44px on touch devices */
     .tab { padding: 12px 16px; min-height: 44px; }
@@ -1745,88 +2078,122 @@
 </head>
 <body>
 <a href="#content" class="skip-link">Skip to content</a>
-<header class="console-header" role="banner">
-  <div class="lhs">
-    <span class="brand" aria-label="Geopuesto"><span class="geo">Ge</span><span class="pivot">o</span><span class="puesto">puesto</span></span>
-    <span class="system-id">Antipodal Observation System · See what's happening on the opposite side of Earth</span>
-  </div>
-  <div class="status-row" role="status" aria-live="off">
-    <span class="status-led"><span class="dot" aria-hidden="true"></span> SYS · OK</span>
-    <span class="system-clock" id="systemClock">--:--:-- UTC</span>
-  </div>
-</header>
+<div class="app-shell" id="appShell">
+  <header class="console-header" role="banner">
+    <div class="lhs">
+      <span class="brand" aria-label="Geopuesto"><span class="geo">Ge</span><span class="pivot">o</span><span class="puesto">puesto</span></span>
+      <span class="system-id">Antipodal Observation System</span>
+    </div>
+    <div class="toolbar-actions">
+      <button class="back-btn" id="backBtn" type="button" aria-label="Go back to previous origin" hidden><span class="arrow" aria-hidden="true">←</span> Back</button>
+      <button class="swap-btn" id="swapBtn" type="button" aria-label="Swap origin and target"><span class="arrows" aria-hidden="true">⇄</span> Swap</button>
+      <div class="cam-chips" role="group" aria-label="Globe camera">
+        <button type="button" class="cam-chip origin" data-cam="origin">Origin</button>
+        <button type="button" class="cam-chip target" data-cam="antipode">Antipode</button>
+        <button type="button" class="cam-chip" data-cam="ring">Ring</button>
+      </div>
+      <a href="./playground/" class="lab-chip" aria-label="Open the spherical-geometry playground">▣ Lab</a>
+      <div class="status-row" role="status" aria-live="off">
+        <span class="status-led"><span class="dot" aria-hidden="true"></span> SYS · OK</span>
+        <span class="system-clock" id="systemClock">--:--:-- UTC</span>
+      </div>
+    </div>
+  </header>
 
-<a href="./playground/" class="lab-banner" aria-label="Open the spherical-geometry playground">
-  <span class="lab-tag">▣ Lab</span>
-  <span class="lab-msg">Explore the <em>mind-bending geometry</em> behind any point (or points) on Earth</span>
-  <span class="lab-sub">polyhedra · curves · Monte Carlo</span>
-  <span class="lab-arrow" aria-hidden="true">→</span>
-</a>
+  <aside class="dock dock-left" id="originDock">
+    <div class="dock-head origin">
+      <div class="dock-head-text">
+        <span class="dock-label">Origin</span>
+        <span class="dock-coords" id="originCoords">—</span>
+      </div>
+      <button type="button" class="dock-toggle" data-dock="left" aria-label="Collapse origin dock">‹</button>
+    </div>
+    <div class="dock-scroll">
+      <div class="input-panel">
+        <div class="tabs">
+          <button class="tab active" data-tab="presets">Quick Picks</button>
+          <button class="tab" data-tab="search">Search</button>
+          <button class="tab" data-tab="coords">Coordinates</button>
+          <button class="tab tab-action" id="myLocationBtn" type="button" aria-label="Use my current location"><span aria-hidden="true">📍</span> Locate</button>
+          <button class="tab-shuffle" id="shuffleBtn" type="button" aria-label="Pick a random preset"><span aria-hidden="true">🎲</span> Shuffle</button>
+        </div>
+        <div class="panel active" data-panel="presets">
+          <div class="presets-grid" id="presetsContainer"></div>
+        </div>
+        <div class="panel" data-panel="search">
+          <div class="search-wrap">
+            <input type="text" id="searchInput" placeholder="Type a place name…" autocomplete="off" aria-label="Search for a place" />
+            <div class="suggestions" id="suggestions" style="display:none;"></div>
+          </div>
+        </div>
+        <div class="panel" data-panel="coords">
+          <div class="coord-inputs">
+            <input type="number" id="latInput" placeholder="LAT" step="any" min="-90" max="90" aria-label="Latitude in degrees" />
+            <input type="number" id="lngInput" placeholder="LON" step="any" min="-180" max="180" aria-label="Longitude in degrees" />
+            <button class="btn-go" id="goBtn">Go</button>
+          </div>
+        </div>
+      </div>
+      <div class="dock-cards" id="originCards">
+        <div class="empty-state">
+          <div class="empty-icon" aria-hidden="true">◎</div>
+          <div class="question">Select a point</div>
+          <div class="instruction">Quick pick · search · click the globe</div>
+        </div>
+      </div>
+    </div>
+  </aside>
 
-<div class="viewport-row">
-  <div class="viewport">
-    <div class="viewport-header origin">Origin</div>
-    <div class="viewport-header target">Target / Antipode</div>
-    <div id="mapGlobe" class="map"></div>
-  </div>
-</div>
-<div class="attribution-strip">
-  Tiles &copy; <a href="https://www.esri.com/" target="_blank" rel="noopener">Esri</a>, HERE, Garmin, FAO, NOAA, USGS &middot;
-  Data &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors
-</div>
-
-<div class="readout-strip" id="readoutStrip" data-empty="true">
-  <div class="readout origin" aria-live="polite">
-    <span class="label">Origin</span>
-    <span class="value" id="originCoords">—</span>
-  </div>
-  <div class="readout-actions">
-    <button class="back-btn" id="backBtn" type="button" aria-label="Go back to previous origin" hidden><span class="arrow" aria-hidden="true">←</span> Back</button>
-    <button class="swap-btn" id="swapBtn" type="button" aria-label="Swap origin and target"><span class="arrows" aria-hidden="true">⇄</span> Swap</button>
-  </div>
-  <div class="readout target" aria-live="polite">
-    <span class="label">Target</span>
-    <span class="value" id="antipodeCoords">—</span>
-  </div>
-</div>
-
-<div class="input-panel">
-  <div class="tabs">
-    <button class="tab active" data-tab="presets">Quick Picks</button>
-    <button class="tab" data-tab="search">Search</button>
-    <button class="tab" data-tab="coords">Coordinates</button>
-    <button class="tab tab-action" id="myLocationBtn" type="button" aria-label="Use my current location"><span aria-hidden="true">📍</span> Use my location</button>
-    <button class="tab-shuffle" id="shuffleBtn" type="button" aria-label="Pick a random preset"><span aria-hidden="true">🎲</span> Shuffle</button>
-  </div>
-  <div class="panel active" data-panel="presets">
-    <div class="presets-grid" id="presetsContainer"></div>
-  </div>
-  <div class="panel" data-panel="search">
-    <div class="search-wrap">
-      <input type="text" id="searchInput" placeholder="Type a place name (city, address, landmark)…" autocomplete="off" aria-label="Search for a place" />
-      <div class="suggestions" id="suggestions" style="display:none;"></div>
+  <div class="viewport-row">
+    <div class="viewport">
+      <div class="viewport-header origin">Origin</div>
+      <div class="viewport-header target">Target / Antipode</div>
+      <div id="mapGlobe" class="map"></div>
+      <div class="globe-attr">
+        Tiles &copy; <a href="https://www.esri.com/" target="_blank" rel="noopener">Esri</a> ·
+        Data &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>
+      </div>
     </div>
   </div>
-  <div class="panel" data-panel="coords">
-    <div class="coord-inputs">
-      <input type="number" id="latInput" placeholder="LAT" step="any" min="-90" max="90" aria-label="Latitude in degrees" />
-      <input type="number" id="lngInput" placeholder="LON" step="any" min="-180" max="180" aria-label="Longitude in degrees" />
-      <button class="btn-go" id="goBtn">Acquire</button>
+
+  <aside class="dock dock-right">
+    <div class="dock-head target">
+      <div class="dock-head-text">
+        <span class="dock-label">Antipode</span>
+        <span class="dock-coords" id="antipodeCoords">—</span>
+      </div>
+      <button type="button" class="dock-toggle" data-dock="right" aria-label="Collapse antipode dock">›</button>
     </div>
-  </div>
+    <div class="dock-scroll">
+      <main class="dock-cards cluster" id="content" role="main" tabindex="-1">
+        <div class="empty-state">
+          <div class="empty-icon" aria-hidden="true">🌍</div>
+          <div class="question">What's on the opposite side of Earth?</div>
+          <div class="instruction">Pick an origin to reveal the antipode</div>
+        </div>
+      </main>
+    </div>
+  </aside>
+
+  <section class="orthodrome-console" id="orthodrome-console" aria-label="Personal Equator">
+    <div class="ortho-bar">
+      <span class="ortho-bar-title">Orthodrome · Personal Equator</span>
+      <button type="button" class="ortho-expand-btn" id="orthoExpandBtn" aria-expanded="false">Expand</button>
+    </div>
+    <div class="module full" id="equator-module">
+      <div class="module-body padded">
+        <div class="equator-empty">Pick an origin to draw the great circle equidistant from you and your antipode — every GeoNames city along it lands here.</div>
+      </div>
+    </div>
+  </section>
+
+  <nav class="mobile-tabs" aria-label="Console panels">
+    <button type="button" data-sheet="globe" class="active">Globe</button>
+    <button type="button" data-sheet="origin">Origin</button>
+    <button type="button" data-sheet="antipode">Antipode</button>
+    <button type="button" data-sheet="ring">Ring</button>
+  </nav>
 </div>
-
-<main class="cluster" id="content" role="main" tabindex="-1">
-  <div class="empty-state">
-    <div class="empty-icon" aria-hidden="true">🌍</div>
-    <div class="question">What's on the opposite side of the Earth?</div>
-    <div class="instruction">Click the map · pick a city · search · enter coordinates</div>
-  </div>
-</main>
-
-<footer>
-  Geopuesto · Open data: OSM · Nominatim · Wikipedia · Wikimedia Commons · Open-Meteo · REST Countries · sunrise-sunset · wheretheiss.at · USGS · NOAA · radio-browser · Overpass · Esri · OpenSky · AISStream · Mapillary · Google Maps · <a href="https://www.geonames.org/" target="_blank" rel="noopener">GeoNames</a> (CC BY 4.0) · <a href="./playground/">Spherical-geometry playground →</a>
-</footer>
 
 <script src="https://unpkg.com/maplibre-gl@5.6.1/dist/maplibre-gl.js" integrity="sha384-/L1njH4bbgNt9Uk3HwJ272N9fxJzRBQCxhtwGkZiqgl+Nxpq2ETUNZhNMNV1RgyW" crossorigin="anonymous"></script>
 <script src="geometry.js"></script>
@@ -2264,6 +2631,7 @@ function setupGlobeLayers() {
 
   glReady = true;
   syncGlobeSources();
+  resizeGlobe();
 }
 
 mapGlobe.once("style.load", setupGlobeLayers);
@@ -2924,24 +3292,15 @@ function buildEquatorModuleHtml(lat, lng, cities, filters) {
     <div class="module full" id="equator-module">
       <div class="equator-flagship-header">
         <span class="eyebrow"><span class="badge-new">NEW · v2</span> Orthodrome · Personal Equator</span>
-        <h2 class="title">Your orthodrome — every city equidistant from you and your antipode</h2>
+        <h2 class="title">Every city equidistant from you and your antipode</h2>
         <p class="lede">${lede}</p>
-        ${countLine ? `<p class="lede" style="color:var(--dim);font-size:0.8rem;font-family:'IBM Plex Mono',monospace;">${countLine}</p>` : ''}
+        ${countLine ? `<p class="lede" style="color:var(--dim);font-size:0.72rem;font-family:'IBM Plex Mono',monospace;">${countLine}</p>` : ''}
         ${breakdownLine ? `<div class="continent-breakdown" role="region" aria-label="Cities by continent">${breakdownLine}</div>` : ''}
       </div>
       <div class="module-body">
-        <div class="equator-overview-map-wrap"><div id="equator-overview-map" class="equator-overview-map"></div></div>
         ${headlineHtml}
         ${controlsHtml}
         ${listHtml}
-        <a href="./playground/" class="equator-playground-cta" aria-label="Open the spherical-geometry playground">
-          <span class="cta-icon" aria-hidden="true">&#9635;</span>
-          <span class="cta-text">
-            <span class="cta-title">Keep exploring in the playground</span>
-            <span class="cta-sub">Your orthodrome is just one great circle. Spin up the <em>full 3D geometry</em> on a globe — two-point arcs, polyhedra, and curves.</span>
-          </span>
-          <span class="cta-arrow" aria-hidden="true">&rarr;</span>
-        </a>
       </div>
     </div>`;
 }
@@ -2964,9 +3323,6 @@ function refreshEquatorModule() {
   // Phase 3b.1: also re-render the pin layer with the new filter values.
   // The pins use the same equatorFilters state, so they need to refresh too.
   renderRingCities(currentOriginForEquator.lat, currentOriginForEquator.lng);
-  // Phase 3b.4: the overview map div was replaced; rebuild the MapLibre
-  // instance on the new node. Cheap enough on filter change.
-  initEquatorOverviewMap();
 }
 
 // Re-render when cities finish loading (covers the case where user picked an
@@ -3189,21 +3545,37 @@ function haversine(lat1, lng1, lat2, lng2) {
   return 2 * R * Math.asin(Math.sqrt(a));
 }
 
+// Nominatim is 1 req/sec. Origin + antipode reverse-geocodes (and search)
+// share one queue so v2's mirrored docks don't trip the rate limit.
+let nominatimLock = Promise.resolve();
+function queuedNominatim(fn) {
+  const run = nominatimLock.then(fn, fn);
+  nominatimLock = run.then(
+    () => new Promise((r) => setTimeout(r, 1100)),
+    () => new Promise((r) => setTimeout(r, 1100))
+  );
+  return run;
+}
+
 async function reverseGeocode(lat, lng) {
-  try {
-    const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=jsonv2&zoom=14&addressdetails=1&accept-language=en`;
-    const r = await fetch(url);
-    if (!r.ok) return null;
-    const d = await r.json();
-    return d.error ? null : d;
-  } catch { return null; }
+  return queuedNominatim(async () => {
+    try {
+      const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=jsonv2&zoom=14&addressdetails=1&accept-language=en`;
+      const r = await fetch(url);
+      if (!r.ok) return null;
+      const d = await r.json();
+      return d.error ? null : d;
+    } catch { return null; }
+  });
 }
 async function searchPlace(q) {
-  try {
-    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=jsonv2&limit=6&accept-language=en`;
-    const r = await fetch(url);
-    return r.ok ? await r.json() : [];
-  } catch { return []; }
+  return queuedNominatim(async () => {
+    try {
+      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=jsonv2&limit=6&accept-language=en`;
+      const r = await fetch(url);
+      return r.ok ? await r.json() : [];
+    } catch { return []; }
+  });
 }
 
 async function checkNearby(lat, lng) {
@@ -3942,6 +4314,51 @@ function parseOriginHash() {
   return { lat: lat, lng: lng };
 }
 
+async function fetchPlaceCore(lat, lng, heavy) {
+  const volcanoes = findNearbyVolcanoes(lat, lng, 500);
+  const [data, nearby, sun, weather, mapillary, iss, sats, flights, gtz, gelev, quakes, aq, kp, magDec, pois, webcams, windyForecast] = await Promise.all([
+    reverseGeocode(lat, lng),
+    checkNearby(lat, lng),
+    fetchSunTimes(lat, lng),
+    fetchWeather(lat, lng),
+    fetchMapillaryImage(lat, lng),
+    fetchISS(),
+    heavy ? fetchSatellitesAbove(lat, lng) : Promise.resolve(null),
+    heavy ? fetchOpenSkyFlights(lat, lng) : Promise.resolve(null),
+    fetchTimezone(lat, lng),
+    fetchElevation(lat, lng),
+    fetchEarthquakes(lat, lng),
+    fetchAirQuality(lat, lng),
+    fetchKpIndex(),
+    fetchMagDeclination(lat, lng),
+    fetchOverpassPOIs(lat, lng),
+    heavy ? fetchWindyWebcams(lat, lng) : Promise.resolve(null),
+    fetchHourlyForecast(lat, lng),
+  ]);
+  return {
+    lat, lng, data, nearby, sun, weather, mapillary, iss, sats, flights,
+    gtz, gelev, quakes, aq, kp, magDec, pois, volcanoes, webcams, windyForecast,
+    wikiSummary: null, photos: null, country: null, ships: null, radio: null,
+  };
+}
+
+async function fetchPlaceEnrichment(core, heavy) {
+  const { lat, lng, data, nearby } = core;
+  const wikiPromise = nearby && nearby.wikipedia ? fetchWikipediaSummary(nearby.wikipedia.pageid) : Promise.resolve(null);
+  const photosPromise = nearby && nearby.commonsTitles && nearby.commonsTitles.length ? fetchPhotoUrls(nearby.commonsTitles.slice(0, 12)) : Promise.resolve([]);
+  const cca2 = data && data.address && data.address.country_code;
+  const countryPromise = cca2 ? fetchCountry(cca2) : Promise.resolve(null);
+  const radioPromise = (heavy && cca2) ? fetchRadioStations(cca2) : Promise.resolve(null);
+  const shipsPromise = heavy ? fetchAISShips(lat, lng) : Promise.resolve(null);
+  const [wikiSummary, photos, country, ships, radio] = await Promise.all([wikiPromise, photosPromise, countryPromise, shipsPromise, radioPromise]);
+  return { ...core, wikiSummary, photos, country, ships, radio };
+}
+
+function paintDock(el, side, b) {
+  if (!el || !b) return;
+  renderInfo(b.lat, b.lng, b.data, b.nearby, b.wikiSummary, b.photos, b.sun, b.weather, b.country, b.mapillary, b.iss, b.sats, b.flights, b.ships, b.gtz, b.gelev, b.quakes, b.aq, b.radio, b.kp, b.magDec, b.pois, b.volcanoes, b.webcams, b.windyForecast, el, side);
+}
+
 async function goTo(lat, lng, opts) {
   opts = opts || {};
   lat = Math.max(-90, Math.min(90, lat));
@@ -3981,69 +4398,51 @@ async function goTo(lat, lng, opts) {
   // down, once that data lands — one globe, one flight, two stops.
   mapGlobe.flyTo({ center: [lng, lat], zoom: gz(5), duration: 600 });
 
-  document.getElementById("readoutStrip").dataset.empty = "false";
   document.getElementById("originCoords").textContent = fmtCoord(lat, lng);
   document.getElementById("antipodeCoords").textContent = fmtCoord(anti.lat, anti.lng);
 
+  document.getElementById("originCards").innerHTML = '<div class="loading">Reading this point</div>';
   document.getElementById("content").innerHTML = '<div class="loading">Tunneling through the Earth</div>';
+  refreshEquatorModule();
 
   // Persist last location for repeat visitors
   saveLastLocation(lat, lng, activePresetName);
 
-  const volcanoes = findNearbyVolcanoes(anti.lat, anti.lng, 500);
+  const originCoreP = fetchPlaceCore(lat, lng, false);
+  const antiCoreP = fetchPlaceCore(anti.lat, anti.lng, true);
+  const [originCore, antiCore] = await Promise.all([originCoreP, antiCoreP]);
 
-  const [data, nearby, sun, weather, mapillary, iss, sats, flights, gtz, gelev, quakes, aq, kp, magDec, pois, webcams, windyForecast] = await Promise.all([
-    reverseGeocode(anti.lat, anti.lng),
-    checkNearby(anti.lat, anti.lng),
-    fetchSunTimes(anti.lat, anti.lng),
-    fetchWeather(anti.lat, anti.lng),
-    fetchMapillaryImage(anti.lat, anti.lng),
-    fetchISS(),
-    fetchSatellitesAbove(anti.lat, anti.lng),
-    fetchOpenSkyFlights(anti.lat, anti.lng),
-    fetchTimezone(anti.lat, anti.lng),
-    fetchElevation(anti.lat, anti.lng),
-    fetchEarthquakes(anti.lat, anti.lng),
-    fetchAirQuality(anti.lat, anti.lng),
-    fetchKpIndex(),
-    fetchMagDeclination(anti.lat, anti.lng),
-    fetchOverpassPOIs(anti.lat, anti.lng),
-    fetchWindyWebcams(anti.lat, anti.lng),
-    fetchHourlyForecast(anti.lat, anti.lng),
-  ]);
-
-  // A newer goTo() started while these ~17 requests were in flight — don't
-  // fly the camera or paint the panel with this call's now-stale antipode.
+  // A newer goTo() started while these requests were in flight — don't
+  // fly the camera or paint the docks with this call's now-stale antipode.
   if (myGen !== goToGeneration) return;
 
   // The reveal: fly across the planet to the antipode, smart-zoomed to what's
   // actually there (tight on a city block, wide on open ocean). A long
   // duration lets MapLibre's flyTo arc — zoom out, cross the globe, zoom
   // back in — read as "tunneling through the Earth" rather than a jump cut.
-  const antipodeZoom = pickZoom(data);
+  const antipodeZoom = pickZoom(antiCore.data);
   mapGlobe.flyTo({ center: [anti.lng, anti.lat], zoom: gz(antipodeZoom), duration: 2200 });
 
-  const wikiPromise = nearby.wikipedia ? fetchWikipediaSummary(nearby.wikipedia.pageid) : Promise.resolve(null);
-  const photosPromise = nearby.commonsTitles.length ? fetchPhotoUrls(nearby.commonsTitles.slice(0, 12)) : Promise.resolve([]);
-  const cca2 = data && data.address && data.address.country_code;
-  const countryPromise = cca2 ? fetchCountry(cca2) : Promise.resolve(null);
-  const radioPromise = cca2 ? fetchRadioStations(cca2) : Promise.resolve(null);
-  // AIS WebSocket runs ~8s in parallel with the rest
-  const shipsPromise = fetchAISShips(anti.lat, anti.lng);
+  paintDock(document.getElementById("originCards"), "origin", originCore);
+  paintDock(document.getElementById("content"), "antipode", antiCore);
 
-  renderInfo(anti.lat, anti.lng, data, nearby, null, null, sun, weather, null, mapillary, iss, sats, flights, null, gtz, gelev, quakes, aq, null, kp, magDec, pois, volcanoes, webcams, windyForecast);
-  const [wikiSummary, photos, country, ships, radio] = await Promise.all([wikiPromise, photosPromise, countryPromise, shipsPromise, radioPromise]);
-  // Narrower repeat of the same guard: a newer goTo() could have started
-  // during this second, smaller batch of requests too.
+  const [originFull, antiFull] = await Promise.all([
+    fetchPlaceEnrichment(originCore, false),
+    fetchPlaceEnrichment(antiCore, true),
+  ]);
   if (myGen !== goToGeneration) return;
-  renderInfo(anti.lat, anti.lng, data, nearby, wikiSummary, photos, sun, weather, country, mapillary, iss, sats, flights, ships, gtz, gelev, quakes, aq, radio, kp, magDec, pois, volcanoes, webcams, windyForecast);
+  paintDock(document.getElementById("originCards"), "origin", originFull);
+  paintDock(document.getElementById("content"), "antipode", antiFull);
 }
 
 function tcell(label, value, klass = "") {
   return `<div class="tel-cell"><span class="label">${label}</span><div class="value ${klass}">${value}</div></div>`;
 }
 
-function renderInfo(lat, lng, data, nearby, wikiSummary, photos, sun, weather, country, mapillary, iss, sats, flights, ships, gtz, gelev, quakes, aq, radio, kp, magDec, pois, volcanoes, webcams, windyForecast) {
+function renderInfo(lat, lng, data, nearby, wikiSummary, photos, sun, weather, country, mapillary, iss, sats, flights, ships, gtz, gelev, quakes, aq, radio, kp, magDec, pois, volcanoes, webcams, windyForecast, targetEl, side) {
+  targetEl = targetEl || document.getElementById("content");
+  side = side || "antipode";
+  const isOrigin = side === "origin";
   const isLand = !!(data && data.address && data.address.country);
   const addr = (data && data.address) || {};
   const surfaceBadge = isLand ? '<span class="badge land">LAND</span>' : '<span class="badge ocean">OCEAN</span>';
@@ -4115,7 +4514,7 @@ function renderInfo(lat, lng, data, nearby, wikiSummary, photos, sun, weather, c
   ].filter(Boolean);
   const rightNowModule = `
     <div class="module full">
-      <div class="module-header teal"><span>Right Now Over There</span><span class="meta">Open-Meteo · sunrise-sunset.org</span></div>
+      <div class="module-header teal"><span>${isOrigin ? "Right Now Here" : "Right Now Over There"}</span><span class="meta">Open-Meteo · sunrise-sunset.org</span></div>
       <div class="module-body"><div class="telemetry">${rightNowCells.join("")}</div></div>
     </div>`;
 
@@ -4697,7 +5096,7 @@ function renderInfo(lat, lng, data, nearby, wikiSummary, photos, sun, weather, c
       <div class="hero-body">
         ${heroImg}
         <div class="hero-text">
-          <div class="hero-eyebrow"><span class="hero-eyebrow-dot">●</span> Antipode · what's on the other side of Earth</div>
+          <div class="hero-eyebrow"${isOrigin ? ' style="color:var(--orange)"' : ""}><span class="hero-eyebrow-dot">●</span> ${isOrigin ? "Origin · selected point" : "Antipode · what's on the other side of Earth"}</div>
           <h1 class="hero-title">${escapeHtml(heroTitle)}</h1>
           <div class="hero-subtitle">${heroSubtitle}</div>
           <div class="hero-facts">
@@ -4715,19 +5114,9 @@ function renderInfo(lat, lng, data, nearby, wikiSummary, photos, sun, weather, c
   const closeVolcano = nearestVolcano && nearestVolcano.distKm <= 250;
   const issOverhead = issDistKm != null && issDistKm < 500;
   const badAir = aq && aq.european_aqi >= 80;
-  // Phase 3b: "Your Personal Equator" module — slim card list of cities
-  // along the great circle perpendicular to the antipodal axis. Renders with
-  // a "loading" placeholder if cities haven't resolved yet; will refresh
-  // automatically via the geopuesto:cities-ready event.
-  const equatorModule = buildEquatorModuleHtml(
-    lat, lng,
-    window.GeopuestoCitiesResolved,
-    equatorFilters
-  );
 
   const modules = [
     { html: heroModule, prio: 10000, size: "full" },
-    { html: equatorModule, prio: 2000, size: "full" },
     { html: wikiModule, prio: 900, size: "full" },
     { html: quakeModule, prio: 500 + (bigQuake ? 8500 : 0), size: bigQuake ? "full" : "half" },
     { html: volcanoModule, prio: 470 + (closeVolcano ? 8200 : 0), size: closeVolcano ? "full" : "half" },
@@ -4751,18 +5140,12 @@ function renderInfo(lat, lng, data, nearby, wikiSummary, photos, sun, weather, c
     { html: countryModule, prio: 200, size: "half" },
     { html: positionModule, prio: 150, size: "full" },
   ];
-  document.getElementById("content").innerHTML = modules
+  targetEl.innerHTML = modules
     .filter(m => m.html)
     .sort((a, b) => b.prio - a.prio)
     // Module HTML templates hardcode `class="module full"`. Rewrite to whichever size the entry requested.
     .map(m => m.html.replace('class="module full', `class="module ${m.size || "full"}`))
     .join("");
-  // Phase 3b.4: the orthodrome module HTML includes a placeholder div for the
-  // embedded ring-overview map. innerHTML just replaced the old node, so the
-  // MapLibre instance pointing at the old div is dead — rebuild on the new
-  // node. Idempotent: this fires on both partial-data and full-data passes
-  // of renderInfo, and that's fine.
-  initEquatorOverviewMap();
 
   // Webcam alt-thumbnail switcher — swap the main player/image when clicked
   document.querySelectorAll(".webcam-alt").forEach(btn => {
@@ -4898,6 +5281,55 @@ searchInput.addEventListener("input", () => {
 });
 searchInput.addEventListener("blur", () => setTimeout(() => suggestionsBox.style.display = "none", 200));
 searchInput.addEventListener("focus", () => { if (suggestionsBox.children.length) suggestionsBox.style.display = "block"; });
+
+const appShell = document.getElementById("appShell");
+function resizeGlobe() {
+  try { if (typeof mapGlobe !== "undefined" && mapGlobe) mapGlobe.resize(); } catch (e) { /* ignore */ }
+}
+document.querySelectorAll(".dock-toggle").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const side = btn.getAttribute("data-dock");
+    const cls = side === "left" ? "left-collapsed" : "right-collapsed";
+    appShell.classList.toggle(cls);
+    if (side === "left") {
+      btn.textContent = appShell.classList.contains("left-collapsed") ? "›" : "‹";
+    } else {
+      btn.textContent = appShell.classList.contains("right-collapsed") ? "‹" : "›";
+    }
+    requestAnimationFrame(resizeGlobe);
+  });
+});
+document.getElementById("orthoExpandBtn").addEventListener("click", () => {
+  const expanded = appShell.classList.toggle("ortho-expanded");
+  document.getElementById("orthodrome-console").classList.toggle("is-expanded", expanded);
+  document.getElementById("orthoExpandBtn").textContent = expanded ? "Collapse" : "Expand";
+  document.getElementById("orthoExpandBtn").setAttribute("aria-expanded", expanded ? "true" : "false");
+  requestAnimationFrame(resizeGlobe);
+});
+document.querySelectorAll("[data-cam]").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const which = btn.getAttribute("data-cam");
+    if (which === "origin" && currentOriginForEquator) {
+      mapGlobe.flyTo({ center: [currentOriginForEquator.lng, currentOriginForEquator.lat], zoom: gz(6), duration: 900 });
+    } else if (which === "antipode" && currentAnti) {
+      mapGlobe.flyTo({ center: [currentAnti.lng, currentAnti.lat], zoom: gz(6), duration: 900 });
+    } else if (which === "ring") {
+      zoomToRing();
+    }
+  });
+});
+document.querySelectorAll(".mobile-tabs [data-sheet]").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const sheet = btn.getAttribute("data-sheet");
+    appShell.classList.remove("show-origin", "show-antipode", "show-ring");
+    document.querySelectorAll(".mobile-tabs [data-sheet]").forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+    if (sheet === "origin") appShell.classList.add("show-origin");
+    else if (sheet === "antipode") appShell.classList.add("show-antipode");
+    else if (sheet === "ring") appShell.classList.add("show-ring");
+    requestAnimationFrame(resizeGlobe);
+  });
+});
 
 document.getElementById("swapBtn").addEventListener("click", () => {
   if (!currentAnti) return;
