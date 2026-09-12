@@ -1771,7 +1771,7 @@
   </div>
 </div>
 <div class="attribution-strip">
-  Tiles &copy; <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> &middot;
+  Tiles &copy; <a href="https://www.esri.com/" target="_blank" rel="noopener">Esri</a>, HERE, Garmin, FAO, NOAA, USGS &middot;
   Data &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors
 </div>
 
@@ -2038,44 +2038,60 @@ const PRESETS = [
 //    [lat, lng] is flipped at each call site, not shimmed
 // ============================================================
 
-// OpenFreeMap dark — keyless vector basemap. Replaced CARTO Dark Matter
-// raster tiles after CARTO started watermarking unauthenticated requests
-// ("API key required") and retiring the raster service. Vector stays
-// sharp when overzoomed, so maxZoom 21 still reads as "zoom in really far."
-const BASE_STYLE_URL = "https://tiles.openfreemap.org/styles/dark";
-
-// MapLibre's sky defaults are a daytime palette (light-blue sky, white
-// fog) that veils a dark basemap in haze. Space-dark colors + a dim
-// blue-teal limb glow keep the planet legible on the console theme;
-// atmosphere fades out by the zoom where the globe has unrolled flat.
-const GLOBE_SKY = {
-  "sky-color": "#05090e",
-  "horizon-color": "#10394e",
-  "fog-color": "#0a1218",
-  "fog-ground-blend": 0.5,
-  "atmosphere-blend": ["interpolate", ["linear"], ["zoom"], 0, 0.8, 4, 0.8, 6, 0],
-};
-
-function applyGlobeAtmosphere(map) {
-  map.setSky(GLOBE_SKY);
-  map.setLight({ anchor: "map", intensity: 0.4 });
-}
+// Esri Dark Gray Canvas — keyless raster. Replaced CARTO Dark Matter after
+// CARTO started watermarking unauthenticated requests ("API key required")
+// and retiring the raster service. Same source the playground globe already
+// uses; land/water contrast stays readable at planet scale.
+const BASE_ATTR = '&copy; <a href="https://www.esri.com/">Esri</a>, HERE, Garmin, FAO, NOAA, USGS &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
+const ESRI_DARK_BASE = "https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}";
+const ESRI_DARK_REF = "https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}";
 
 // Leaflet zooms are 256px-tile based, MapLibre's are 512px based: every
 // carried-over zoom constant shifts down by 1 (Leaflet z ≈ MapLibre z + 1).
 function gz(leafletZoom) { return Math.max(0, leafletZoom - 1); }
 
+function globeStyle() {
+  return {
+    version: 8,
+    projection: { type: "globe" },
+    // MapLibre's sky defaults are a daytime palette (light-blue sky, white
+    // fog) that veils a dark basemap in haze. Space-dark colors + a dim
+    // blue-teal limb glow keep the planet legible on the console theme;
+    // atmosphere fades out by the zoom where the globe has unrolled flat.
+    sky: {
+      "sky-color": "#05090e",
+      "horizon-color": "#10394e",
+      "fog-color": "#0a1218",
+      "fog-ground-blend": 0.5,
+      "atmosphere-blend": ["interpolate", ["linear"], ["zoom"], 0, 0.8, 4, 0.8, 6, 0],
+    },
+    light: { anchor: "map", intensity: 0.4 },
+    sources: {
+      esri: {
+        type: "raster", tiles: [ESRI_DARK_BASE], tileSize: 256, maxzoom: 16,
+        attribution: BASE_ATTR,
+      },
+      esriLabels: {
+        type: "raster", tiles: [ESRI_DARK_REF], tileSize: 256, maxzoom: 16,
+      },
+    },
+    layers: [
+      { id: "esri", type: "raster", source: "esri" },
+      { id: "esri-labels", type: "raster", source: "esriLabels" },
+    ],
+  };
+}
+
 // Attribution rendered separately in the .attribution-strip below the viewport
-// maxZoom 21 — vector tiles stay sharp past the source maxzoom, so the
-// last real detail overzooms cleanly instead of hard-stopping.
+// maxZoom 21 — a couple of extra overzoom levels past Esri's maxzoom 16 so
+// "zoom in really far" stays continuous instead of hitting a wall.
 const mapGlobe = new maplibregl.Map({
   container: "mapGlobe",
   center: [0, 15],
   zoom: 0.7,
   maxZoom: 21,
   attributionControl: false,
-  style: BASE_STYLE_URL,
-  projection: { type: "globe" },
+  style: globeStyle(),
 });
 // bottom-left, clear of both viewport-header legend chips up top
 mapGlobe.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-left");
@@ -2250,10 +2266,7 @@ function setupGlobeLayers() {
   syncGlobeSources();
 }
 
-mapGlobe.once("style.load", () => {
-  applyGlobeAtmosphere(mapGlobe);
-  setupGlobeLayers();
-});
+mapGlobe.once("style.load", setupGlobeLayers);
 
 // Test hook (headless checks + console poking) — not a public API
 window.GeopuestoGlobes = {
@@ -2570,15 +2583,13 @@ function initEquatorOverviewMap() {
     maxZoom: gz(20),
     attributionControl: false,
     scrollZoom: false,  // avoid hijacking page scroll
-    style: BASE_STYLE_URL,
-    projection: { type: "globe" },
+    style: globeStyle(),
   });
   m.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-left");
   equatorOverviewMap = m;
 
   m.once("style.load", () => {
     if (m !== equatorOverviewMap) return; // superseded by a newer rebuild
-    applyGlobeAtmosphere(m);
     m.addSource("ov-ring", { type: "geojson", data: emptyFC() });
     m.addSource("ov-cities", { type: "geojson", data: emptyFC() });
     m.addSource("ov-anchors", { type: "geojson", data: emptyFC() });
