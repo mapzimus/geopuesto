@@ -1771,7 +1771,7 @@
   </div>
 </div>
 <div class="attribution-strip">
-  Tiles &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a> &middot;
+  Tiles &copy; <a href="https://www.esri.com/" target="_blank" rel="noopener">Esri</a>, HERE, Garmin, FAO, NOAA, USGS &middot;
   Data &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors
 </div>
 
@@ -1825,7 +1825,7 @@
 </main>
 
 <footer>
-  Geopuesto · Open data: OSM · Nominatim · Wikipedia · Wikimedia Commons · Open-Meteo · REST Countries · sunrise-sunset · wheretheiss.at · USGS · NOAA · radio-browser · Overpass · CARTO · Esri · OpenSky · AISStream · Mapillary · Google Maps · <a href="https://www.geonames.org/" target="_blank" rel="noopener">GeoNames</a> (CC BY 4.0) · <a href="./playground/">Spherical-geometry playground →</a>
+  Geopuesto · Open data: OSM · Nominatim · Wikipedia · Wikimedia Commons · Open-Meteo · REST Countries · sunrise-sunset · wheretheiss.at · USGS · NOAA · radio-browser · Overpass · Esri · OpenSky · AISStream · Mapillary · Google Maps · <a href="https://www.geonames.org/" target="_blank" rel="noopener">GeoNames</a> (CC BY 4.0) · <a href="./playground/">Spherical-geometry playground →</a>
 </footer>
 
 <script src="https://unpkg.com/maplibre-gl@5.6.1/dist/maplibre-gl.js" integrity="sha384-/L1njH4bbgNt9Uk3HwJ272N9fxJzRBQCxhtwGkZiqgl+Nxpq2ETUNZhNMNV1RgyW" crossorigin="anonymous"></script>
@@ -2038,12 +2038,13 @@ const PRESETS = [
 //    [lat, lng] is flipped at each call site, not shimmed
 // ============================================================
 
-// CARTO Dark Matter — denser labels (small cities/towns), keeps Mission Control aesthetic
-const BASE_ATTR = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>';
-const TILE_RETINA = (window.devicePixelRatio || 1) > 1 ? "@2x" : "";
-const BASE_TILES = ["a", "b", "c", "d"].map(
-  s => `https://${s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}${TILE_RETINA}.png`
-);
+// Esri Dark Gray Canvas — keyless raster. Replaced CARTO Dark Matter after
+// CARTO started watermarking unauthenticated requests ("API key required")
+// and retiring the raster service. Same source the playground globe already
+// uses; land/water contrast stays readable at planet scale.
+const BASE_ATTR = '&copy; <a href="https://www.esri.com/">Esri</a>, HERE, Garmin, FAO, NOAA, USGS &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
+const ESRI_DARK_BASE = "https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}";
+const ESRI_DARK_REF = "https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}";
 
 // Leaflet zooms are 256px-tile based, MapLibre's are 512px based: every
 // carried-over zoom constant shifts down by 1 (Leaflet z ≈ MapLibre z + 1).
@@ -2066,17 +2067,24 @@ function globeStyle() {
     },
     light: { anchor: "map", intensity: 0.4 },
     sources: {
-      carto: { type: "raster", tiles: BASE_TILES, tileSize: 256, maxzoom: 20, attribution: BASE_ATTR },
+      esri: {
+        type: "raster", tiles: [ESRI_DARK_BASE], tileSize: 256, maxzoom: 16,
+        attribution: BASE_ATTR,
+      },
+      esriLabels: {
+        type: "raster", tiles: [ESRI_DARK_REF], tileSize: 256, maxzoom: 16,
+      },
     },
-    layers: [{ id: "carto", type: "raster", source: "carto" }],
+    layers: [
+      { id: "esri", type: "raster", source: "esri" },
+      { id: "esri-labels", type: "raster", source: "esriLabels" },
+    ],
   };
 }
 
 // Attribution rendered separately in the .attribution-strip below the viewport
-// maxZoom 21 — a deliberate cap above the carto source's own maxzoom:20, so
-// the last real tile overzooms (stretches) for a couple of extra levels
-// instead of hard-stopping. "Zoom in really far" reads better as gently
-// blurry-but-continuous than as a wall.
+// maxZoom 21 — a couple of extra overzoom levels past Esri's maxzoom 16 so
+// "zoom in really far" stays continuous instead of hitting a wall.
 const mapGlobe = new maplibregl.Map({
   container: "mapGlobe",
   center: [0, 15],
