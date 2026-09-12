@@ -68,9 +68,11 @@
   <script>
     'use strict';
 
-    // ---- Map setup (mirrors production index.html line 1395-1398) ----
-    const TILE_URL = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
-    const TILE_OPTS = { maxZoom: 20, subdomains: "abcd" };
+    // ---- Map setup (Leaflet preview; production globes use OpenFreeMap) ----
+    // Esri Dark Gray — keyless raster. CARTO Dark Matter now watermarks
+    // unauthenticated requests ("API key required").
+    const TILE_URL = "https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}";
+    const TILE_OPTS = { maxZoom: 16 };
     const MAP_OPTS = { worldCopyJump: true, attributionControl: false };
     const mapOrigin = L.map("mapOrigin", MAP_OPTS).setView([20, 0], 2);
     const mapAntipode = L.map("mapAntipode", MAP_OPTS).setView([-20, 180], 2);

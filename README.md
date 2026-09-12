@@ -149,7 +149,7 @@ both URLs within ~1-2 minutes.
 - **MapLibre GL JS 5.6.1** from CDN (pinned, SRI on the antipodal app) for all
   maps — every viewport is a 3D globe (`projection: globe`) that unrolls to
   flat Mercator as you zoom in.
-- **CARTO Dark Matter** + **Esri Dark Gray Canvas** tiles (both keyless).
+- **OpenFreeMap** dark vector style (consumer globes) + **Esri Dark Gray Canvas** raster tiles (playground) — both keyless.
 - **IBM Plex Mono** + **IBM Plex Sans** via Google Fonts.
 - **Math precision**: pure spherical (no ellipsoidal corrections). Earth
   radius = 6371 km. Most operations machine-precise (max error ~1e-15 rad ≈
