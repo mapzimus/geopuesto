@@ -130,11 +130,18 @@ Hero photo cascades: Wikipedia thumb → Commons photo → Mapillary image → g
 
 ## Deploy
 
-Lives at `https://maxwellhowegis.com/geopuesto/`. This repo (`mapzimus/geopuesto`) is referenced as a git submodule by the parent portfolio repo `mapzimus/maxwellhowegis`. The portfolio's GitHub Pages workflow checks out submodules recursively, so the deploy flow is:
+Two URLs, two pipelines:
 
-1. Commit + push changes to `mapzimus/geopuesto` `main`.
-2. In the parent `maxwellhowegis` repo: `git submodule update --remote geopuesto`, then commit the bumped pointer and push.
-3. The Pages workflow on `mapzimus/maxwellhowegis` fires automatically and re-deploys the whole site (fast — the build is just file copy plus submodule fetch).
+- **Direct GitHub Pages** at `https://mapzimus.github.io/geopuesto/` — this repo, `main` branch root. Legacy Pages source; a push to `main` rebuilds it on its own.
+- **Consumer URL** at `https://maxwellhowegis.com/geopuesto/` — GitHub Pages of the parent portfolio `mapzimus/maxwellhowegis`, which vendors this repo as a submodule. The parent's `pages.yml` checks out submodules recursively, then runs `node scripts/build_portfolio.mjs`.
+
+A merge to this repo's `main` does **not** move the consumer URL by itself. `.github/workflows/sync-portfolio.yml` does that: on push to `main` (or `workflow_dispatch`) it clones the parent, runs `git submodule update --remote geopuesto`, commits the new pin, and explicitly `gh workflow run pages.yml` — token-authored commits do not retrigger the parent's `on: push`. Same reason `sync-lidar-test.yml` exists on the parent.
+
+One-time setup: store a fine-grained PAT with Contents + Actions write on `mapzimus/maxwellhowegis` as the `PORTFOLIO_SYNC_TOKEN` Actions secret (same name `ground-truth` already uses). Without it the job warns and exits 0; `github.io` still updates, the consumer URL stays on the last pinned SHA. Set repo variable `PORTFOLIO_SYNC_ENABLED=off` to disable the job.
+
+Optional hourly backup (mirrors lidar-test): copy `.github/portfolio/sync-geopuesto.yml` to `maxwellhowegis/.github/workflows/`. That file also accepts `repository_dispatch` type `geopuesto-push` and `workflow_dispatch`.
+
+`.github/workflows/ci.yml` parse-checks every tracked `.js` file on push to `main` and on pull requests.
 
 Promotion from subfolder to standalone repo followed the `ma-atlas` precedent: `git filter-repo --subdirectory-filter geopuesto` against a clone of `maxwellhowegis`, push to a new GitHub repo, replace the subfolder with `git submodule add`. The 14 commits of pre-promotion history are preserved.
 

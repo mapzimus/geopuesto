@@ -1,0 +1,63 @@
+# Bump the geopuesto submodule pin in mapzimus/maxwellhowegis and
+# retrigger that repo's Pages deploy. Same secret name as ground-truth.
+#
+# One-time setup: add a fine-grained PAT (Contents + Actions write on
+# mapzimus/maxwellhowegis) as the PORTFOLIO_SYNC_TOKEN Actions secret.
+# Set repo variable PORTFOLIO_SYNC_ENABLED=off to disable.
+#
+# GITHUB_TOKEN commits on the parent do not fire on: push, so this job
+# calls `gh workflow run pages.yml` after a successful bump — same
+# reason sync-lidar-test.yml does.
+
+name: Sync portfolio submodule
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: sync-portfolio
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    if: ${{ vars.PORTFOLIO_SYNC_ENABLED != 'off' }}
+    steps:
+      - name: Bump geopuesto pin and deploy Pages
+        env:
+          GH_TOKEN: ${{ secrets.PORTFOLIO_SYNC_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "::warning::PORTFOLIO_SYNC_TOKEN is not set. mapzimus.github.io/geopuesto updates from this repo's Pages source; maxwellhowegis.com/geopuesto will stay on the last pinned submodule until the secret is added (Contents + Actions write on mapzimus/maxwellhowegis). Same token ground-truth already uses."
+            exit 0
+          fi
+
+          git clone --depth 1 \
+            "https://x-access-token:${GH_TOKEN}@github.com/mapzimus/maxwellhowegis.git" \
+            parent
+          cd parent
+
+          git submodule update --init --depth 1 geopuesto
+          git submodule update --remote --depth 1 geopuesto
+
+          if git diff --quiet -- geopuesto; then
+            echo "Parent geopuesto pin already matches origin/main."
+            exit 0
+          fi
+
+          sha=$(git -C geopuesto rev-parse --short HEAD)
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add geopuesto
+          git commit -m "Sync geopuesto to $sha"
+          git push origin HEAD:main
+
+          # Token-authored commits do not retrigger the parent's on: push workflow.
+          gh workflow run pages.yml -R mapzimus/maxwellhowegis
+          echo "Bumped parent pin to $sha and triggered pages.yml."
