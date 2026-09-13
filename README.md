@@ -128,16 +128,24 @@ server. Any free port works.
 
 This repo is consumed two ways:
 
-- **As a submodule** in [`mapzimus/maxwellhowegis`](https://github.com/mapzimus/maxwellhowegis),
-  which serves it at <https://maxwellhowegis.com/geopuesto/> via the parent's
-  GitHub Pages workflow (which checks out submodules recursively, same as
-  the parent's `ma-atlas` and `whydah` siblings).
-
 - **Direct GitHub Pages** at <https://mapzimus.github.io/geopuesto/>
-  (`source: main branch root`).
+  (`source: main` branch root). A push to `main` rebuilds this URL on its own.
 
-Both deploys are kept in sync — pushes to this repo's `main` rebuild
-both URLs within ~1-2 minutes.
+- **As a submodule** in [`mapzimus/maxwellhowegis`](https://github.com/mapzimus/maxwellhowegis),
+  which serves the consumer URL <https://maxwellhowegis.com/geopuesto/>.
+  The parent's Pages workflow checks out submodules recursively (same as
+  `ma-atlas` and `whydah`).
+
+The consumer URL only moves when the parent pin moves.
+`.github/workflows/sync-portfolio.yml` bumps that pin on every push to
+`main` and retriggers the parent's `pages.yml`. It needs a one-time
+`PORTFOLIO_SYNC_TOKEN` secret — a fine-grained PAT with Contents +
+Actions write on `maxwellhowegis` (same secret name `ground-truth`
+already uses). Until that secret is set, only the `github.io` URL
+tracks `main`.
+
+Optional hourly backup: copy `.github/portfolio/sync-geopuesto.yml`
+into the parent repo's `.github/workflows/` (mirrors `sync-lidar-test.yml`).
 
 ---
 
